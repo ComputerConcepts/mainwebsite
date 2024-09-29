@@ -1,183 +1,421 @@
-{% extends 'partials/base.html' %}
+{% load static %}
 
-{% block title %}About Us - Computer Concepts{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us - Computer Concept</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #00c2cb;
+            --secondary-color: #1a2533;
+            --text-color: #333;
+            --light-text-color: #ffffff;
+            --background-color: #f8f9fa;
+        }
 
-{% block content %}
-<style>
-    /* Custom styles */
-  body {
-  font-family: 'Poppins', sans-serif;
-  color: #333;
-  background-color: #f8f9fa;
-  margin: 0;
-  }
-  .container-square {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  }
-  .content-wrapper {
-  flex: 1;
-  }
-  .header {
-  background-color: #1a2533;
-  color: #ffffff;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  padding: 1rem 2rem;
-  }
-  .header a {
-  color: #ffffff;
-  text-decoration: none;
-  }
-  .nav-pills .nav-link {
-  color: #ffffff;
-  border-radius: 0.375rem;
-  margin: 0 0.5rem;
-  }
-  .nav-pills .nav-link.active {
-  background-color: #00c2cb;
-  color: #ffffff;
-  border-color: #00c2cb;
-  }
-  .tab-content {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem;
-  }
-  .tab-pane {
-  text-align: center;
-  transition: opacity 0.5s ease-in-out;
-  }
-  .tab-pane img {
-  max-width: 90%;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  margin-bottom: 1.5rem;
-  }
-  .footer {
-  background-color: #1a2533;
-  color: #ffffff;
-  font-size: 0.875rem;
-  text-align: center;
-  padding: 1.5rem 0;
-  }
-  .footer a {
-  color: #00c2cb;
-  text-decoration: none;
-  }
-  .footer a:hover {
-  color: #009ba3;
-  }
-  .btn-primary-custom {
-  background-color: #00c2cb;
-  border-color: #00c2cb;
-  transition: background-color 0.3s, border-color 0.3s;
-  }
-  .btn-primary-custom:hover {
-  background-color: #009ba3;
-  border-color: #00848b;
-  }
-  .logo-text {
-  color: #ffffff;
-  font-size: 1.75rem;
-  font-weight: 600;
-  letter-spacing: 1px;
-  }
-  .header .nav-item:hover {
-  background-color: #2a3a4f;
-  border-radius: 0.375rem;
-  }
-  .section-title {
-  font-size: 2.5rem;
-  font-weight: 600;
-  color: #1a2533;
-  margin-bottom: 2rem;
-  }
-  .card {
-  border: none;
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  margin-bottom: 2rem;
-  background: linear-gradient(135deg, #00c2cb, #009ba3);
-  color: #ffffff;
-  transition: transform 0.3s;
-  }
-  .card:hover {
-  transform: scale(1.05);
-  }
-  .card-body {
-  padding: 1.5rem;
-  }
-  .card-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #ffffff;
-  }
-  .card-text {
-  font-size: 1rem;
-  color: #e0f7f9;
-  }
-  .list-unstyled li {
-  color: #e0f7f9;
-  }
-  .discover-more {
-  background: #1a2533;
-  color: #ffffff;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  border-radius: 0.375rem;
-  transition: background 0.3s;
-  }
-  .discover-more:hover {
-  background: #2a3a4f;
-  }
-  .hero-section {
-  background: linear-gradient(135deg, #1a2533, #2a3a4f);
-  color: #ffffff;
-  padding: 4rem 0;
-  text-align: center;
-  }
-  .hero-section h2 {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  }
-  .hero-section p {
-  font-size: 1.25rem;
-  margin-bottom: 2rem;
-  }
-  .about-section {
-  background-color: #ffffff;
-  padding: 3rem 2rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  color: #333;
-  margin: 2rem 0;
-  }
-  .about-section h2 {
-  font-size: 2rem;
-  margin-bottom: 1.5rem;
-  }
-  .about-section p {
-  font-size: 1rem;
-  line-height: 1.6;
-  }
-  </style>
-  <div class="container-square">
-    <div class="content-wrapper">
-      <div class="hero-section">
-        <h2>Welcome to Computer Concept</h2>
-        <p>From our family to yours, we offer innovative IT and computing services with a personal touch.</p>
-      </div>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-      <div class="about-section text-center">
-        <h2 class="section-title">About Us</h2>
-        <p><strong>Since 1993</strong></p>
-        <p>Computer Concept began in 1979 as Professional Four, providing Word Processing, Resume Preparation, Bookkeeping/Tax Services, and Computer Programming. In 1993, we expanded to building computers, and from 2000 onward, we continued to evolve in areas such as Accounting, Tax Services, Computer Training, Software Development, and Networking. In 2005, we ventured into Digital Media production, and from 2016 to 2019, we collaborated with Liberty Tax.</p>
-        <p>We're proud to offer the highest quality, most unique merchandise on the market today. From our family to yours, we put lots of love and careful attention into each item. We hope you enjoy our work as much as we enjoy bringing it to you.</p>
-      </div>
-    </div>
+        body {
+            font-family: 'Poppins', sans-serif;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            line-height: 1.6;
+        }
 
-{% endblock %}
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background-color: var(--secondary-color);
+            padding: 1rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo img {
+            width: 50px;
+            height: 50px;
+            margin-right: 10px;
+        }
+
+        .logo-text {
+            color: var(--light-text-color);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+        }
+
+        .nav-links li {
+            margin-left: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--light-text-color);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary-color);
+        }
+
+        .hero {
+            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+            color: var(--light-text-color);
+            padding: 8rem 0 4rem;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            max-width: 800px;
+            margin: 0 auto 2rem;
+        }
+
+        .about-section {
+            padding: 4rem 0;
+            background-color: var(--light-text-color);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            color: var(--secondary-color);
+        }
+
+        .timeline {
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 0;
+        }
+
+        .timeline::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            background-color: var(--primary-color);
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            margin-left: -3px;
+        }
+
+        .timeline-item {
+            padding: 10px 40px;
+            position: relative;
+            background-color: inherit;
+            width: 50%;
+        }
+
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            right: -17px;
+            background-color: var(--light-text-color);
+            border: 4px solid var(--primary-color);
+            top: 15px;
+            border-radius: 50%;
+            z-index: 1;
+        }
+
+        .left {
+            left: 0;
+        }
+
+        .right {
+            left: 50%;
+        }
+
+        .left::before {
+            content: " ";
+            height: 0;
+            position: absolute;
+            top: 22px;
+            width: 0;
+            z-index: 1;
+            right: 30px;
+            border: medium solid var(--primary-color);
+            border-width: 10px 0 10px 10px;
+            border-color: transparent transparent transparent var(--primary-color);
+        }
+
+        .right::before {
+            content: " ";
+            height: 0;
+            position: absolute;
+            top: 22px;
+            width: 0;
+            z-index: 1;
+            left: 30px;
+            border: medium solid var(--primary-color);
+            border-width: 10px 10px 10px 0;
+            border-color: transparent var(--primary-color) transparent transparent;
+        }
+
+        .right::after {
+            left: -16px;
+        }
+
+        .timeline-content {
+            padding: 20px 30px;
+            background-color: var(--light-text-color);
+            position: relative;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .timeline-content h3 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .mission-vision {
+            background-color: var(--background-color);
+            padding: 4rem 0;
+        }
+
+        .mission-vision-content {
+            display: flex;
+            justify-content: space-between;
+            gap: 2rem;
+        }
+
+        .mission, .vision {
+            flex: 1;
+            background-color: var(--light-text-color);
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .mission h3, .vision h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        footer {
+            background-color: var(--secondary-color);
+            color: var(--light-text-color);
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 4rem;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .footer-links {
+            display: flex;
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-left: 1.5rem;
+        }
+
+        .footer-links a {
+            color: var(--light-text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--primary-color);
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .timeline::after {
+                left: 31px;
+            }
+
+            .timeline-item {
+                width: 100%;
+                padding-left: 70px;
+                padding-right: 25px;
+            }
+
+            .timeline-item::before {
+                left: 60px;
+                border: medium solid var(--primary-color);
+                border-width: 10px 10px 10px 0;
+                border-color: transparent var(--primary-color) transparent transparent;
+            }
+
+            .left::after, .right::after {
+                left: 15px;
+            }
+
+            .right {
+                left: 0%;
+            }
+
+            .mission-vision-content {
+                flex-direction: column;
+            }
+
+            .footer-content {
+                flex-direction: column;
+            }
+
+            .footer-links {
+                margin-top: 1rem;
+            }
+
+            .footer-links li {
+                margin: 0 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <img src="{% static 'images/logo.jpg' %}" alt="Computer Concept Logo">
+                <span class="logo-text">Computer Concept</span>
+            </div>
+            <ul class="nav-links">
+              <li><a href="{% url 'index' %}">Home</a></li>
+              <li><a href="{% url 'about' %}">About</a></li>
+              <li><a href="{% url 'contact' %}">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h1>About Computer Concept</h1>
+                <p>From our family to yours, we offer innovative IT and computing services with a personal touch since 1993.</p>
+            </div>
+        </section>
+
+        <section id="about" class="about-section">
+            <div class="container">
+                <h2 class="section-title">Our Journey</h2>
+                <div class="timeline">
+                    <div class="timeline-item left">
+                        <div class="timeline-content">
+                            <h3>1979</h3>
+                            <p>Founded as Professional Four, offering Word Processing, Resume Preparation, Bookkeeping/Tax Services, and Computer Programming.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item right">
+                        <div class="timeline-content">
+                            <h3>1993</h3>
+                            <p>Expanded into building computers, marking the birth of Computer Concept.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item left">
+                        <div class="timeline-content">
+                            <h3>2000</h3>
+                            <p>Evolved to include Accounting, Tax Services, Computer Training, Software Development, and Networking.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item right">
+                        <div class="timeline-content">
+                            <h3>2005</h3>
+                            <p>Ventured into Digital Media production, expanding our service offerings.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item left">
+                        <div class="timeline-content">
+                            <h3>2016-2019</h3>
+                            <p>Collaborated with Liberty Tax, further enhancing our tax services.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item right">
+                        <div class="timeline-content">
+                            <h3>Today</h3>
+                            <p>Continuing to evolve and provide cutting-edge IT solutions to meet the changing needs of our clients.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mission-vision">
+            <div class="container">
+                <h2 class="section-title">Our Mission & Vision</h2>
+                <div class="mission-vision-content">
+                    <div class="mission">
+                        <h3>Our Mission</h3>
+                        <p>To provide the highest quality, most unique IT solutions on the market today. We put lots of love and careful attention into each service we offer, ensuring that our clients receive personalized and innovative solutions for their technological needs.</p>
+                    </div>
+                    <div class="vision">
+                        <h3>Our Vision</h3>
+                        <p>To be the leading provider of comprehensive IT solutions, bridging the gap between technology and people. We strive to empower businesses and individuals with cutting-edge tools and knowledge, fostering growth and success in the digital age.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <p>&copy; 2024 Computer Concept. All rights reserved.</p>
+                <ul class="footer-links">
+                  <li><a href="{%url 'index' %}">Home</a></li>
+                  <li><a href="{%url 'about' %}">About</a></li>
+                  <li><a href="{%url 'contact' %}">Contact</a></li>
+                </ul>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
