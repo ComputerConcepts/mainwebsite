@@ -21,7 +21,7 @@ from barcode.writer import ImageWriter
 from io import BytesIO
 from django.conf import settings
 import datetime
-from .forms import EventImageForm, JobPostingForm
+from .forms import EventImageForm, JobPostingForm, EmployeeProfileForm
 import random
 from django.core.mail import send_mail
 import stripe
@@ -629,27 +629,32 @@ def employee_dashboard(request):
 
 @login_required
 def employee_profile(request):
-    """Employee profile view"""
+    """Employee profile view with restricted editing"""
     try:
         employee = Employee.objects.get(user=request.user)
         
         if request.method == 'POST':
-            # Update profile
-            user = request.user
-            user.first_name = request.POST.get('first_name')
-            user.last_name = request.POST.get('last_name')
-            user.email = request.POST.get('email')
-            user.save()
-            
-            employee.phone = request.POST.get('phone')
-            employee.department = request.POST.get('department')
-            employee.position = request.POST.get('position')
-            employee.save()
-            
-            messages.success(request, 'Profile updated successfully.')
-            return redirect('employee_profile')
+            form = EmployeeProfileForm(request.POST, instance=employee, user=request.user)
+            if form.is_valid():
+                # Store user reference for save method
+                form.user = request.user
+                form.save()
+                
+                # If not superuser, manually update allowed fields only
+                if not request.user.is_superuser:
+                    # Update only non-restricted User fields
+                    user = request.user
+                    user.first_name = form.cleaned_data['first_name']
+                    user.last_name = form.cleaned_data['last_name']
+                    # Do NOT update email, department, or position for non-superusers
+                    user.save()
+                
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('employee_profile')
+        else:
+            form = EmployeeProfileForm(instance=employee, user=request.user)
         
-        return render(request, 'employee/profile.html', {'employee': employee})
+        return render(request, 'employee/profile.html', {'employee': employee, 'form': form})
     except Employee.DoesNotExist:
         messages.error(request, 'Employee profile not found.')
         return redirect('employee_login')

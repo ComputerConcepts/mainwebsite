@@ -179,52 +179,74 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group mb-3">
-                                        <label for="first_name" class="form-label">First Name</label>
-                                        <input type="text" class="form-control" id="first_name" name="first_name" value="{{ employee.user.first_name }}" required>
+                                        <label for="id_first_name" class="form-label">First Name</label>
+                                        {{ form.first_name }}
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group mb-3">
-                                        <label for="last_name" class="form-label">Last Name</label>
-                                        <input type="text" class="form-control" id="last_name" name="last_name" value="{{ employee.user.last_name }}" required>
+                                        <label for="id_last_name" class="form-label">Last Name</label>
+                                        {{ form.last_name }}
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="form-group mb-3">
-                                <label for="email" class="form-label">Email Address</label>
-                                <input type="email" class="form-control" id="email" name="email" value="{{ employee.user.email }}" required>
+                                <label for="id_email" class="form-label">Email Address</label>
+                                {{ form.email }}
+                                {% if form.email.help_text %}
+                                    <small class="text-muted">{{ form.email.help_text }}</small>
+                                {% endif %}
                             </div>
                             
                             <div class="form-group mb-3">
-                                <label for="phone" class="form-label">Phone Number</label>
-                                <input type="tel" class="form-control" id="phone" name="phone" value="{{ employee.phone }}" required>
+                                <label for="id_phone" class="form-label">Phone Number</label>
+                                {{ form.phone }}
                             </div>
                             
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group mb-3">
-                                        <label for="department" class="form-label">Department</label>
-                                        <select class="form-control" id="department" name="department" required>
-                                            <option value="IT" {% if employee.department == 'IT' %}selected{% endif %}>IT</option>
-                                            <option value="HR" {% if employee.department == 'HR' %}selected{% endif %}>HR</option>
-                                            <option value="Finance" {% if employee.department == 'Finance' %}selected{% endif %}>Finance</option>
-                                            <option value="Marketing" {% if employee.department == 'Marketing' %}selected{% endif %}>Marketing</option>
-                                            <option value="Sales" {% if employee.department == 'Sales' %}selected{% endif %}>Sales</option>
-                                            <option value="Operations" {% if employee.department == 'Operations' %}selected{% endif %}>Operations</option>
-                                            <option value="Customer Service" {% if employee.department == 'Customer Service' %}selected{% endif %}>Customer Service</option>
-                                        </select>
+                                        <label for="id_department" class="form-label">Department</label>
+                                        {{ form.department }}
+                                        {% if form.department.help_text %}
+                                            <small class="text-muted">{{ form.department.help_text }}</small>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group mb-3">
-                                        <label for="position" class="form-label">Position</label>
-                                        <input type="text" class="form-control" id="position" name="position" value="{{ employee.position }}" required>
+                                        <label for="id_position" class="form-label">Position</label>
+                                        {{ form.position }}
+                                        {% if form.position.help_text %}
+                                            <small class="text-muted">{{ form.position.help_text }}</small>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label for="id_address" class="form-label">Address</label>
+                                        {{ form.address }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label for="id_emergency_contact" class="form-label">Emergency Contact</label>
+                                        {{ form.emergency_contact }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-3">
+                                        <label for="id_emergency_phone" class="form-label">Emergency Phone</label>
+                                        {{ form.emergency_phone }}
+                                    </div>
+                                </div>
                                 <div class="col-md-6">
                                     <div class="form-group mb-3">
                                         <label for="employee_id" class="form-label">Employee ID</label>
@@ -232,6 +254,9 @@
                                         <small class="text-muted">Employee ID cannot be changed</small>
                                     </div>
                                 </div>
+                            </div>
+                            
+                            <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group mb-3">
                                         <label for="hire_date" class="form-label">Hire Date</label>
@@ -239,6 +264,14 @@
                                         <small class="text-muted">Hire date cannot be changed</small>
                                     </div>
                                 </div>
+                                {% if not user.is_superuser %}
+                                <div class="col-md-6">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>Note:</strong> Email, department, and position can only be modified by administrators.
+                                    </div>
+                                </div>
+                                {% endif %}
                             </div>
                             
                             <div class="text-end">
