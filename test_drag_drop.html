@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Drag and Drop Test</title>
+    <style>
+        .test-card {
+            width: 200px;
+            height: 50px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            margin: 10px;
+            padding: 10px;
+            cursor: move;
+        }
+        .test-zone {
+            width: 250px;
+            height: 200px;
+            background: #e0e0e0;
+            border: 2px dashed #ccc;
+            margin: 10px;
+            padding: 10px;
+        }
+        .drag-over {
+            background: #d0d0ff;
+            border-color: #0000ff;
+        }
+        .container {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <h1>Drag and Drop Test</h1>
+    <div class="container">
+        <div class="test-zone" data-zone="zone1">
+            <h3>Zone 1</h3>
+            <div class="test-card" draggable="true" data-card="card1">Card 1</div>
+            <div class="test-card" draggable="true" data-card="card2">Card 2</div>
+        </div>
+        <div class="test-zone" data-zone="zone2">
+            <h3>Zone 2</h3>
+        </div>
+    </div>
+
+    <script>
+        console.log('Test page loaded');
+        
+        const cards = document.querySelectorAll('.test-card');
+        const zones = document.querySelectorAll('.test-zone');
+        
+        cards.forEach(card => {
+            card.addEventListener('dragstart', function(e) {
+                console.log('Drag start:', this.dataset.card);
+                e.dataTransfer.setData('text/plain', this.dataset.card);
+            });
+        });
+        
+        zones.forEach(zone => {
+            zone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('drag-over');
+            });
+            
+            zone.addEventListener('dragleave', function(e) {
+                this.classList.remove('drag-over');
+            });
+            
+            zone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+                const cardId = e.dataTransfer.getData('text/plain');
+                const card = document.querySelector(`[data-card="${cardId}"]`);
+                console.log('Drop successful:', cardId, 'to', this.dataset.zone);
+                if (card) {
+                    this.appendChild(card);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

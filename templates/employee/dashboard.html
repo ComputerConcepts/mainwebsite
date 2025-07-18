@@ -114,6 +114,12 @@
                     <i class="fas fa-calendar me-1"></i>
                     Events
                 </a>
+                {% if employee.is_admin or employee.is_super_admin %}
+                    <a class="nav-link" href="{% url 'admin_dashboard' %}">
+                        <i class="fas fa-users-cog me-1"></i>
+                        Admin
+                    </a>
+                {% endif %}
                 <a class="nav-link" href="{% url 'employee_profile' %}">
                     <i class="fas fa-user me-1"></i>
                     Profile
@@ -164,24 +170,398 @@
             <div class="col-md-4">
                 <div class="stat-card">
                     <div class="stat-icon text-success">
-                        <i class="fas fa-check-circle"></i>
+                        <i class="fas fa-columns"></i>
                     </div>
-                    <div class="stat-number text-success">
-                        {% if employee.is_email_verified %}1{% else %}0{% endif %}
-                    </div>
-                    <div class="stat-label">Email Verified</div>
+                    <div class="stat-number text-success">{{ total_boards }}</div>
+                    <div class="stat-label">Project Boards</div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="stat-card">
-                    <div class="stat-icon text-info">
-                        <i class="fas fa-building"></i>
+                    <div class="stat-icon text-warning">
+                        <i class="fas fa-tasks"></i>
                     </div>
-                    <div class="stat-number text-info">{{ employee.department|length }}</div>
-                    <div class="stat-label">Department Length</div>
+                    <div class="stat-number text-warning">{{ assigned_cards_count }}</div>
+                    <div class="stat-label">Assigned Tasks</div>
                 </div>
             </div>
         </div>
+
+        <!-- Project Boards Overview -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-columns me-2"></i>
+                            Project Boards Overview
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="border-end">
+                                    <h4 class="text-primary">{{ created_boards_count }}</h4>
+                                    <small class="text-muted">Created by You</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <h4 class="text-info">{{ member_boards_count }}</h4>
+                                <small class="text-muted">Member Of</small>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <a href="{% url 'project_boards' %}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-eye me-1"></i>View All Boards
+                            </a>
+                            <a href="{% url 'create_board' %}" class="btn btn-outline-primary btn-sm ms-2">
+                                <i class="fas fa-plus me-1"></i>Create Board
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tasks me-2"></i>
+                            My Recent Tasks
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if assigned_cards %}
+                            {% for card in assigned_cards %}
+                                <div class="d-flex align-items-center mb-2 p-2 border-start border-{{ card.priority|default:'secondary' }} border-3 bg-light rounded">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-semibold">{{ card.title }}</div>
+                                        <small class="text-muted">{{ card.board_list.board.title }}</small>
+                                    </div>
+                                    <span class="badge bg-{{ card.priority|default:'secondary' }}">{{ card.priority|capfirst }}</span>
+                                </div>
+                            {% endfor %}
+                            <div class="mt-3">
+                                <a href="{% url 'project_boards' %}" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-tasks me-1"></i>View All Tasks
+                                </a>
+                            </div>
+                        {% else %}
+                            <p class="text-muted mb-0">No tasks assigned yet.</p>
+                            <a href="{% url 'project_boards' %}" class="btn btn-outline-primary btn-sm mt-2">
+                                <i class="fas fa-plus me-1"></i>Start Using Boards
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if employee.is_admin or employee.is_super_admin %}
+        <!-- Admin Panel Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users-cog me-2"></i>
+                            Admin Dashboard
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center p-3 border rounded">
+                                    <i class="fas fa-users text-primary" style="font-size: 2rem;"></i>
+                                    <h4 class="mt-2">{{ total_users|default:0 }}</h4>
+                                    <p class="text-muted mb-0">Total Users</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3 border rounded">
+                                    <i class="fas fa-user-check text-success" style="font-size: 2rem;"></i>
+                                    <h4 class="mt-2">{{ active_users|default:0 }}</h4>
+                                    <p class="text-muted mb-0">Active Users</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3 border rounded">
+                                    <i class="fas fa-user-clock text-warning" style="font-size: 2rem;"></i>
+                                    <h4 class="mt-2">{{ pending_users|default:0 }}</h4>
+                                    <p class="text-muted mb-0">Pending Users</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3 border rounded">
+                                    <i class="fas fa-building text-info" style="font-size: 2rem;"></i>
+                                    <h4 class="mt-2">{{ total_departments|default:0 }}</h4>
+                                    <p class="text-muted mb-0">Departments</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <div class="d-grid gap-2">
+                                    <a href="{% url 'user_management' %}" class="btn btn-primary">
+                                        <i class="fas fa-users me-2"></i>
+                                        Manage Users
+                                    </a>
+                                    <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-primary">
+                                        <i class="fas fa-chart-line me-2"></i>
+                                        View Full Admin Dashboard
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-grid gap-2">
+                                    <a href="{% url 'create_user' %}" class="btn btn-success">
+                                        <i class="fas fa-user-plus me-2"></i>
+                                        Create New User
+                                    </a>
+                                    <a href="{% url 'bulk_action' %}" class="btn btn-outline-warning">
+                                        <i class="fas fa-users-cog me-2"></i>
+                                        Bulk Actions
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent User Activity -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user-plus me-2"></i>
+                            Recent User Activity
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_users %}
+                            {% for user in recent_users %}
+                                <div class="d-flex align-items-center mb-3 p-2 border rounded">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-user-circle text-primary" style="font-size: 1.5rem;"></i>
+                                    </div>
+                                    <div class="flex-grow-1 ms-3">
+                                        <h6 class="mb-1">{{ user.first_name }} {{ user.last_name }}</h6>
+                                        <small class="text-muted">{{ user.email }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ user.employee.department }} - {{ user.employee.position }}</small>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        {% if user.employee.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Pending</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center py-3">No recent user activity</p>
+                        {% endif %}
+                        <div class="text-center mt-3">
+                            <a href="{% url 'user_management' %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-users me-1"></i>View All Users
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tasks me-2"></i>
+                            Quick Admin Actions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'user_management' %}?filter=pending" class="btn btn-outline-warning">
+                                <i class="fas fa-user-clock me-2"></i>
+                                Review Pending Users ({{ pending_users|default:0 }})
+                            </a>
+                            <a href="{% url 'user_management' %}?filter=inactive" class="btn btn-outline-danger">
+                                <i class="fas fa-user-slash me-2"></i>
+                                Review Inactive Users
+                            </a>
+                            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-info">
+                                <i class="fas fa-chart-pie me-2"></i>
+                                View Analytics
+                            </a>
+                            <a href="{% url 'create_user' %}" class="btn btn-outline-success">
+                                <i class="fas fa-user-plus me-2"></i>
+                                Add New Employee
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if is_hr %}
+        <!-- HR Management Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users me-2"></i>
+                            HR Management Dashboard
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center p-3 border rounded">
+                                    <i class="fas fa-briefcase text-primary" style="font-size: 2rem;"></i>
+                                    <h4 class="mt-2">{{ active_jobs|default:0 }}</h4>
+                                    <p class="text-muted mb-0">Active Jobs</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3 border rounded">
+                                    <i class="fas fa-file-alt text-warning" style="font-size: 2rem;"></i>
+                                    <h4 class="mt-2">{{ total_applications|default:0 }}</h4>
+                                    <p class="text-muted mb-0">Total Applications</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3 border rounded">
+                                    <i class="fas fa-clock text-info" style="font-size: 2rem;"></i>
+                                    <h4 class="mt-2">{{ pending_applications|default:0 }}</h4>
+                                    <p class="text-muted mb-0">Pending Review</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3 border rounded">
+                                    <i class="fas fa-archive text-secondary" style="font-size: 2rem;"></i>
+                                    <h4 class="mt-2">{{ inactive_jobs|default:0 }}</h4>
+                                    <p class="text-muted mb-0">Inactive Jobs</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <div class="d-grid gap-2">
+                                    <a href="{% url 'admin_jobs' %}" class="btn btn-success">
+                                        <i class="fas fa-briefcase me-2"></i>
+                                        Manage Job Postings
+                                    </a>
+                                    <a href="{% url 'admin_careers' %}" class="btn btn-outline-success">
+                                        <i class="fas fa-file-alt me-2"></i>
+                                        Review Applications
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-grid gap-2">
+                                    <a href="{% url 'admin_job_create' %}" class="btn btn-primary">
+                                        <i class="fas fa-plus me-2"></i>
+                                        Create Job Posting
+                                    </a>
+                                    <a href="{% url 'admin_careers' %}?status=submitted" class="btn btn-outline-warning">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        Pending Applications ({{ pending_applications|default:0 }})
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent HR Activity -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-briefcase me-2"></i>
+                            Recent Job Postings
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_jobs %}
+                            {% for job in recent_jobs %}
+                                <div class="d-flex align-items-start mb-3 p-2 border rounded">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-briefcase text-success" style="font-size: 1.5rem;"></i>
+                                    </div>
+                                    <div class="flex-grow-1 ms-3">
+                                        <h6 class="mb-1">{{ job.title }}</h6>
+                                        <small class="text-muted">{{ job.department }} - {{ job.location }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ job.created_at|date:"M j, Y" }}</small>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        {% if job.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center py-3">No job postings yet</p>
+                        {% endif %}
+                        <div class="text-center mt-3">
+                            <a href="{% url 'admin_jobs' %}" class="btn btn-outline-success btn-sm">
+                                <i class="fas fa-briefcase me-1"></i>View All Jobs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-alt me-2"></i>
+                            Recent Applications
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_applications %}
+                            {% for app in recent_applications %}
+                                <div class="d-flex align-items-start mb-3 p-2 border rounded">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-user text-primary" style="font-size: 1.5rem;"></i>
+                                    </div>
+                                    <div class="flex-grow-1 ms-3">
+                                        <h6 class="mb-1">{{ app.first_name }} {{ app.last_name }}</h6>
+                                        <small class="text-muted">{{ app.job_posting.title }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ app.created_at|date:"M j, Y" }}</small>
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        <span class="badge bg-{% if app.status == 'submitted' %}warning{% elif app.status == 'approved' %}success{% else %}secondary{% endif %}">
+                                            {{ app.status|capfirst }}
+                                        </span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center py-3">No recent applications</p>
+                        {% endif %}
+                        <div class="text-center mt-3">
+                            <a href="{% url 'admin_careers' %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-file-alt me-1"></i>View All Applications
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Recent Events -->
         <div class="row mt-4">

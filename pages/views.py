@@ -564,11 +564,64 @@ def employee_dashboard(request):
     """Employee dashboard view"""
     try:
         employee = Employee.objects.get(user=request.user)
+        
+        # Get project board statistics
+        from .models import Board, Card
+        created_boards = Board.objects.filter(created_by=employee, is_archived=False)
+        member_boards = Board.objects.filter(members=employee, is_archived=False).exclude(created_by=employee)
+        total_boards = created_boards.count() + member_boards.count()
+        
+        # Get recent cards assigned to user
+        assigned_cards = Card.objects.filter(assigned_to=employee, is_completed=False)[:5]
+        
+        # HR statistics (if user is HR)
         context = {
             'employee': employee,
             'events': Events.objects.filter(status=True)[:5],  # Show recent active events
             'total_events': Events.objects.filter(status=True).count(),
+            'total_boards': total_boards,
+            'created_boards_count': created_boards.count(),
+            'member_boards_count': member_boards.count(),
+            'assigned_cards': assigned_cards,
+            'assigned_cards_count': assigned_cards.count(),
         }
+        
+        # Add HR-specific statistics if user is HR
+        if is_hr_or_admin(request.user):
+            from .models import Career, JobPosting
+            recent_applications = Career.objects.order_by('-submitted_at')[:5]
+            recent_jobs = JobPosting.objects.filter(is_active=True).order_by('-created_at')[:5]
+            
+            context.update({
+                'total_applications': Career.objects.count(),
+                'pending_applications': Career.objects.filter(status='submitted').count(),
+                'active_jobs': JobPosting.objects.filter(is_active=True).count(),
+                'inactive_jobs': JobPosting.objects.filter(is_active=False).count(),
+                'recent_applications': recent_applications,
+                'recent_jobs': recent_jobs,
+                'is_hr': True,
+            })
+        
+        # Add admin-specific statistics if user is admin
+        if employee.is_admin() or employee.is_super_admin():
+            total_users = User.objects.count()
+            active_users = Employee.objects.filter(is_active=True).count()
+            pending_users = Employee.objects.filter(is_email_verified=False).count()
+            departments = Employee.objects.values('department').distinct().count()
+            
+            # Get recent users (last 5 users created)
+            recent_users = User.objects.select_related('employee').filter(
+                employee__isnull=False
+            ).order_by('-date_joined')[:5]
+            
+            context.update({
+                'total_users': total_users,
+                'active_users': active_users,
+                'pending_users': pending_users,
+                'total_departments': departments,
+                'recent_users': recent_users,
+            })
+        
         return render(request, 'employee/dashboard.html', context)
     except Employee.DoesNotExist:
         messages.error(request, 'Employee profile not found.')
@@ -675,10 +728,24 @@ def employee_help(request):
 
 def careers(request):
     """Public careers page"""
+    # Check if user is an employee - if so, show them a different message
+    is_employee = False
+    if request.user.is_authenticated:
+        try:
+            employee = Employee.objects.get(user=request.user)
+            is_employee = True
+        except Employee.DoesNotExist:
+            pass
+    
     # Get active job postings
     active_jobs = JobPosting.objects.filter(is_active=True).order_by('-created_at')
     
     if request.method == 'POST':
+        # Prevent employees from applying
+        if is_employee:
+            messages.error(request, 'Company employees cannot apply to job postings through the public portal. Please contact HR directly for internal opportunities.')
+            return redirect('careers')
+        
         # Handle career application submission
         try:
             job_posting_id = request.POST.get('job_posting_id')
@@ -811,7 +878,10 @@ def careers(request):
         except Exception as e:
             messages.error(request, 'There was an error submitting your application. Please try again.')
     
-    return render(request, 'careers.html', {'active_jobs': active_jobs})
+    return render(request, 'careers.html', {
+        'active_jobs': active_jobs,
+        'is_employee': is_employee
+    })
 
 def is_admin_user(user):
     """Check if user is admin (superuser or staff)"""
@@ -1032,6 +1102,16 @@ def admin_job_delete(request, job_id):
 def career_apply(request, job_id):
     """Application form for specific job posting"""
     job = get_object_or_404(JobPosting, id=job_id, is_active=True)
+    
+    # Check if user is an employee - if so, redirect them away
+    if request.user.is_authenticated:
+        try:
+            employee = Employee.objects.get(user=request.user)
+            messages.error(request, 'Company employees cannot apply to job postings through the public portal. Please contact HR directly for internal opportunities.')
+            return redirect('careers')
+        except Employee.DoesNotExist:
+            # User is not an employee, can proceed with application
+            pass
     
     if request.method == 'POST':
         try:

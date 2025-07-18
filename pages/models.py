@@ -82,21 +82,59 @@ class Career(models.Model):
         super().save(*args, **kwargs)
 
 class Employee(models.Model):
+    DEPARTMENT_CHOICES = [
+        ('IT', 'Information Technology'),
+        ('HR', 'Human Resources'),
+        ('Finance', 'Finance'),
+        ('Marketing', 'Marketing'),
+        ('Sales', 'Sales'),
+        ('Operations', 'Operations'),
+        ('Management', 'Management'),
+        ('Other', 'Other'),
+    ]
+    
+    ROLE_CHOICES = [
+        ('employee', 'Employee'),
+        ('manager', 'Manager'),
+        ('admin', 'Administrator'),
+        ('super_admin', 'Super Administrator'),
+    ]
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     employee_id = models.CharField(max_length=50, unique=True)
-    department = models.CharField(max_length=100)
+    department = models.CharField(max_length=100, choices=DEPARTMENT_CHOICES, default='Other')
     position = models.CharField(max_length=100)
     phone = models.CharField(max_length=20)
     hire_date = models.DateField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     is_email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=100, blank=True, null=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
+    manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates')
+    salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    address = models.TextField(blank=True, null=True)
+    emergency_contact = models.CharField(max_length=100, blank=True, null=True)
+    emergency_phone = models.CharField(max_length=20, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    last_login_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name} - {self.employee_id}"
+    
+    def get_full_name(self):
+        return f"{self.user.first_name} {self.user.last_name}"
+    
+    def is_admin(self):
+        return self.role in ['admin', 'super_admin']
+    
+    def is_super_admin(self):
+        return self.role == 'super_admin'
+    
+    def can_manage_users(self):
+        return self.role in ['admin', 'super_admin']
 
 class Events(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

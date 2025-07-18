@@ -75,6 +75,11 @@
                         <i class="fas fa-calendar me-1"></i>
                         Events
                     </a>
+                    <a class="nav-link {% if 'boards' in request.resolver_match.url_name %}active{% endif %}" 
+                       href="{% url 'project_boards' %}">
+                        <i class="fas fa-columns me-1"></i>
+                        Project Boards
+                    </a>
                     {% if user.is_superuser or user.is_staff or user.employee.department == 'HR' %}
                     <a class="nav-link {% if request.resolver_match.url_name == 'admin_careers' %}active{% endif %}" 
                        href="{% url 'admin_careers' %}">

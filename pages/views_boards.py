@@ -12,13 +12,22 @@ from .views import is_employee_authenticated
 import json
 
 
+def reorder_cards_in_list(board_list):
+    """Utility function to fix position conflicts in a list"""
+    cards = board_list.cards.all().order_by('position', 'created_at')
+    for index, card in enumerate(cards, 1):
+        if card.position != index:
+            card.position = index
+            card.save()
+
+
 @login_required
 def project_boards(request):
     """Display all project boards for the authenticated employee"""
     if not is_employee_authenticated(request):
         return redirect('employee_login')
     
-    employee = Employee.objects.get(email=request.user.email)
+    employee = Employee.objects.get(user=request.user)
     
     # Get boards where user is creator or member
     created_boards = Board.objects.filter(created_by=employee, is_archived=False)
@@ -44,7 +53,7 @@ def create_board(request):
         description = request.POST.get('description', '')
         
         if title:
-            employee = Employee.objects.get(email=request.user.email)
+            employee = Employee.objects.get(user=request.user)
             
             board = Board.objects.create(
                 title=title,
@@ -74,7 +83,7 @@ def board_detail(request, board_id):
     if not is_employee_authenticated(request):
         return redirect('employee_login')
     
-    employee = Employee.objects.get(email=request.user.email)
+    employee = Employee.objects.get(user=request.user)
     
     try:
         board = Board.objects.get(id=board_id)
@@ -113,7 +122,7 @@ def create_list(request, board_id):
     
     try:
         board = Board.objects.get(id=board_id)
-        employee = Employee.objects.get(email=request.user.email)
+        employee = Employee.objects.get(user=request.user)
         
         # Check access
         if board.created_by != employee and employee not in board.members.all():
@@ -157,7 +166,7 @@ def create_card(request, list_id):
     
     try:
         board_list = BoardList.objects.get(id=list_id)
-        employee = Employee.objects.get(email=request.user.email)
+        employee = Employee.objects.get(user=request.user)
         
         # Check access to board
         board = board_list.board
@@ -186,7 +195,7 @@ def create_card(request, list_id):
                 'title': card.title,
                 'position': card.position,
                 'priority': card.priority,
-                'created_by': f"{card.created_by.first_name} {card.created_by.last_name}"
+                'created_by': f"{card.created_by.user.first_name} {card.created_by.user.last_name}"
             }
         })
         
@@ -204,7 +213,7 @@ def card_detail(request, card_id):
     
     try:
         card = Card.objects.get(id=card_id)
-        employee = Employee.objects.get(email=request.user.email)
+        employee = Employee.objects.get(user=request.user)
         
         # Check access to board
         board = card.board_list.board
@@ -219,18 +228,18 @@ def card_detail(request, card_id):
             'priority': card.priority,
             'due_date': card.due_date.isoformat() if card.due_date else None,
             'is_completed': card.is_completed,
-            'created_by': f"{card.created_by.first_name} {card.created_by.last_name}",
+            'created_by': f"{card.created_by.user.first_name} {card.created_by.user.last_name}",
             'assigned_to': [
                 {
                     'id': str(emp.id),
-                    'name': f"{emp.first_name} {emp.last_name}"
+                    'name': f"{emp.user.first_name} {emp.user.last_name}"
                 } for emp in card.assigned_to.all()
             ],
             'comments': [
                 {
                     'id': str(comment.id),
                     'content': comment.content,
-                    'author': f"{comment.author.first_name} {comment.author.last_name}",
+                    'author': f"{comment.author.user.first_name} {comment.author.user.last_name}",
                     'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M')
                 } for comment in card.comments.all()
             ]
@@ -253,7 +262,7 @@ def update_card(request, card_id):
     
     try:
         card = Card.objects.get(id=card_id)
-        employee = Employee.objects.get(email=request.user.email)
+        employee = Employee.objects.get(user=request.user)
         
         # Check access to board
         board = card.board_list.board
@@ -295,38 +304,97 @@ def move_card(request):
         new_position = data.get('new_position', 1)
         
         card = Card.objects.get(id=card_id)
-        employee = Employee.objects.get(email=request.user.email)
+        employee = Employee.objects.get(user=request.user)
         
         # Check access to board
         board = card.board_list.board
         if board.created_by != employee and employee not in board.members.all():
             return JsonResponse({'error': 'Access denied'}, status=403)
         
+        # Validate and sanitize position
+        new_list = BoardList.objects.get(id=new_list_id)
+        max_position = new_list.cards.count()
+        
+        # If moving to the same list, don't count the card itself
+        if card.board_list.id == new_list.id:
+            max_position -= 1
+            
+        # Ensure position is within valid range
+        new_position = max(1, min(new_position, max_position + 1))
+        
         with transaction.atomic():
             old_list = card.board_list
             new_list = BoardList.objects.get(id=new_list_id)
             
-            # Update positions in old list
-            old_list.cards.filter(position__gt=card.position).update(
-                position=models.F('position') - 1
-            )
-            
-            # Update positions in new list
-            new_list.cards.filter(position__gte=new_position).update(
-                position=models.F('position') + 1
-            )
-            
-            # Move card
-            card.board_list = new_list
-            card.position = new_position
-            card.save()
+            if old_list.id == new_list.id:
+                # Moving within the same list - just reorder
+                old_position = card.position
+                if new_position < old_position:
+                    # Moving up - shift cards down
+                    old_list.cards.filter(
+                        position__gte=new_position,
+                        position__lt=old_position
+                    ).update(position=models.F('position') + 1)
+                elif new_position > old_position:
+                    # Moving down - shift cards up
+                    old_list.cards.filter(
+                        position__gt=old_position,
+                        position__lte=new_position
+                    ).update(position=models.F('position') - 1)
+                    
+                card.position = new_position
+                card.save()
+            else:
+                # Moving between different lists
+                # Step 1: Remove card from old list and compact positions
+                old_list.cards.filter(position__gt=card.position).update(
+                    position=models.F('position') - 1
+                )
+                
+                # Step 2: Make space in new list
+                new_list.cards.filter(position__gte=new_position).update(
+                    position=models.F('position') + 1
+                )
+                
+                # Step 3: Move card to new list
+                card.board_list = new_list
+                card.position = new_position
+                card.save()
         
         return JsonResponse({'success': True, 'message': 'Card moved successfully'})
         
     except (Card.DoesNotExist, BoardList.DoesNotExist):
         return JsonResponse({'error': 'Card or list not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        # If we get a position conflict, try to fix it and retry
+        if 'unique constraint' in str(e).lower() and 'position' in str(e).lower():
+            try:
+                with transaction.atomic():
+                    # Fix positions in both lists
+                    old_list = card.board_list
+                    new_list = BoardList.objects.get(id=new_list_id)
+                    
+                    reorder_cards_in_list(old_list)
+                    if old_list.id != new_list.id:
+                        reorder_cards_in_list(new_list)
+                    
+                    # Now try the move again with position at end
+                    max_position = new_list.cards.count()
+                    if old_list.id == new_list.id:
+                        max_position -= 1
+                    
+                    card.board_list = new_list
+                    card.position = max_position + 1
+                    card.save()
+                    
+                    # Reorder again to clean up
+                    reorder_cards_in_list(new_list)
+                    
+                return JsonResponse({'success': True, 'message': 'Card moved successfully (position corrected)'})
+            except Exception as retry_error:
+                return JsonResponse({'error': f'Failed to move card after position correction: {str(retry_error)}'}, status=500)
+        else:
+            return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required
@@ -338,7 +406,7 @@ def add_card_comment(request, card_id):
     
     try:
         card = Card.objects.get(id=card_id)
-        employee = Employee.objects.get(email=request.user.email)
+        employee = Employee.objects.get(user=request.user)
         
         # Check access to board
         board = card.board_list.board
@@ -360,7 +428,7 @@ def add_card_comment(request, card_id):
             'comment': {
                 'id': str(comment.id),
                 'content': comment.content,
-                'author': f"{comment.author.first_name} {comment.author.last_name}",
+                'author': f"{comment.author.user.first_name} {comment.author.user.last_name}",
                 'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M')
             }
         })
@@ -373,6 +441,174 @@ def add_card_comment(request, card_id):
 
 @login_required
 @require_http_methods(["POST"])
+def add_board_member(request, board_id):
+    """Add a member to a board"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        board = Board.objects.get(id=board_id)
+        employee = Employee.objects.get(user=request.user)
+        
+        # Only board creator can add members
+        if board.created_by != employee:
+            return JsonResponse({'error': 'Only the board creator can add members'}, status=403)
+        
+        # Get member email from request
+        member_email = request.POST.get('email')
+        if not member_email:
+            return JsonResponse({'error': 'Email is required'}, status=400)
+        
+        # Find the employee by email
+        try:
+            member_employee = Employee.objects.get(user__email=member_email)
+        except Employee.DoesNotExist:
+            return JsonResponse({'error': 'Employee not found with this email'}, status=404)
+        
+        # Check if already a member
+        if member_employee in board.members.all():
+            return JsonResponse({'error': 'Employee is already a member of this board'}, status=400)
+        
+        # Add member to board
+        board.members.add(member_employee)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{member_employee.first_name} {member_employee.last_name} added to board',
+            'member': {
+                'id': str(member_employee.id),
+                'name': f'{member_employee.first_name} {member_employee.last_name}',
+                'email': member_employee.user.email
+            }
+        })
+        
+    except Board.DoesNotExist:
+        return JsonResponse({'error': 'Board not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def remove_board_member(request, board_id):
+    """Remove a member from a board"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        board = Board.objects.get(id=board_id)
+        employee = Employee.objects.get(user=request.user)
+        
+        # Only board creator can remove members
+        if board.created_by != employee:
+            return JsonResponse({'error': 'Only the board creator can remove members'}, status=403)
+        
+        # Get member ID from request
+        member_id = request.POST.get('member_id')
+        if not member_id:
+            return JsonResponse({'error': 'Member ID is required'}, status=400)
+        
+        # Find the member
+        try:
+            member_employee = Employee.objects.get(id=member_id)
+        except Employee.DoesNotExist:
+            return JsonResponse({'error': 'Member not found'}, status=404)
+        
+        # Cannot remove the board creator
+        if member_employee == board.created_by:
+            return JsonResponse({'error': 'Cannot remove the board creator'}, status=400)
+        
+        # Check if member is actually on the board
+        if member_employee not in board.members.all():
+            return JsonResponse({'error': 'Employee is not a member of this board'}, status=400)
+        
+        # Remove member from board
+        board.members.remove(member_employee)
+        
+        # Also remove them from any card assignments on this board
+        for board_list in board.lists.all():
+            for card in board_list.cards.all():
+                if member_employee in card.assigned_to.all():
+                    card.assigned_to.remove(member_employee)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{member_employee.first_name} {member_employee.last_name} removed from board'
+        })
+        
+    except Board.DoesNotExist:
+        return JsonResponse({'error': 'Board not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def get_board_members(request, board_id):
+    """Get all members of a board"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        board = Board.objects.get(id=board_id)
+        employee = Employee.objects.get(user=request.user)
+        
+        # Check if user has access to this board
+        if board.created_by != employee and employee not in board.members.all():
+            return JsonResponse({'error': 'Access denied'}, status=403)
+        
+        # Get all members
+        members = []
+        for member in board.members.all():
+            members.append({
+                'id': str(member.id),
+                'name': f'{member.first_name} {member.last_name}',
+                'email': member.user.email,
+                'is_owner': member == board.created_by
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'members': members
+        })
+        
+    except Board.DoesNotExist:
+        return JsonResponse({'error': 'Board not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def search_employees(request):
+    """Search for employees to add to boards"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    query = request.GET.get('query', '')
+    if len(query) < 2:
+        return JsonResponse({'employees': []})
+    
+    # Search employees by name or email
+    employees = Employee.objects.filter(
+        models.Q(first_name__icontains=query) |
+        models.Q(last_name__icontains=query) |
+        models.Q(user__email__icontains=query)
+    )[:10]  # Limit to 10 results
+    
+    results = []
+    for emp in employees:
+        results.append({
+            'id': str(emp.id),
+            'name': f'{emp.first_name} {emp.last_name}',
+            'email': emp.user.email
+        })
+    
+    return JsonResponse({'employees': results})
+
+
+@login_required
+@require_http_methods(["POST"])
 def delete_board(request, board_id):
     """Archive a board (soft delete)"""
     if not is_employee_authenticated(request):
@@ -380,7 +616,7 @@ def delete_board(request, board_id):
     
     try:
         board = Board.objects.get(id=board_id)
-        employee = Employee.objects.get(email=request.user.email)
+        employee = Employee.objects.get(user=request.user)
         
         # Only board creator can delete
         if board.created_by != employee:
