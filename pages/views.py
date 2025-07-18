@@ -1132,6 +1132,8 @@ def career_apply(request, job_id):
                 salary_expectation=request.POST.get('salary_expectation') or None,
             )
             
+            # AI analysis will be handled by the hourly script
+            
             # Same email logic as careers view
             messages.success(request, f'Thank you for applying to {job.title}! We have received your application and sent a confirmation email.')
             return redirect('career_apply', job_id=job.id)

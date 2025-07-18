@@ -69,6 +69,24 @@ class Career(models.Model):
     reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
     
+    # AI Analysis fields
+    ai_analysis_completed = models.BooleanField(default=False)
+    ai_match_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="AI calculated match score (0-100)")
+    ai_skills_match = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Skills alignment score (0-100)")
+    ai_experience_match = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Experience alignment score (0-100)")
+    ai_education_match = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Education alignment score (0-100)")
+    ai_summary = models.TextField(blank=True, null=True, help_text="AI generated summary of the candidate")
+    ai_strengths = models.TextField(blank=True, null=True, help_text="AI identified candidate strengths")
+    ai_concerns = models.TextField(blank=True, null=True, help_text="AI identified potential concerns")
+    ai_recommendation = models.CharField(max_length=50, choices=[
+        ('highly_recommended', 'Highly Recommended'),
+        ('recommended', 'Recommended'),
+        ('consider', 'Consider'),
+        ('not_recommended', 'Not Recommended'),
+    ], blank=True, null=True)
+    ai_processed_at = models.DateTimeField(null=True, blank=True)
+    resume_text = models.TextField(blank=True, null=True, help_text="Extracted text from resume")
+    
     class Meta:
         ordering = ['-submitted_at']
     
