@@ -140,15 +140,6 @@ EMAIL_HOST_USER = 'noreplycomputerconcepts@gmail.com'
 EMAIL_HOST_PASSWORD = 'mmsn wgyv kejj kpms'
 DEFAULT_FROM_EMAIL = 'noreplycomputerconcepts@gmail.com'
 
-# Celery Configuration
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'UTC'
-CELERY_ENABLE_UTC = True
-
 # AI Analysis Configuration
 AI_ANALYSIS_ENABLED = True
 AI_ANALYSIS_AUTO_PROCESS = True  # Automatically process new applications
