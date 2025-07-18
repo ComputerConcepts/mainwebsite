@@ -1,0 +1,220 @@
+{% extends "employee/base.html" %}
+{% load static %}
+
+{% block title %}Project Boards - Computer Concepts Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .board-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .board-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .board-stats {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .create-board-btn {
+        min-height: 150px;
+        border: 2px dashed #dee2e6;
+        transition: all 0.2s;
+    }
+    .create-board-btn:hover {
+        border-color: #007bff;
+        background-color: #f8f9fa;
+    }
+    .board-owner-badge {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">Project Boards</h2>
+                    <p class="text-muted mb-0">Manage your team projects with Kanban boards</p>
+                </div>
+                <a href="{% url 'create_board' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Create Board
+                </a>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-1">{{ total_boards }}</h4>
+                                    <p class="mb-0">Total Boards</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-clipboard fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-1">{{ created_boards.count }}</h4>
+                                    <p class="mb-0">Created by You</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-user-edit fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-1">{{ member_boards.count }}</h4>
+                                    <p class="mb-0">Member Of</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-users fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Boards Section -->
+            {% if created_boards %}
+            <div class="mb-5">
+                <h4 class="mb-3">
+                    <i class="fas fa-crown text-warning me-2"></i>Boards Created by You
+                </h4>
+                <div class="row">
+                    {% for board in created_boards %}
+                    <div class="col-md-4 col-lg-3 mb-4">
+                        <div class="card board-card h-100">
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0">{{ board.title }}</h6>
+                                    <span class="board-owner-badge">Owner</span>
+                                </div>
+                                {% if board.description %}
+                                <p class="card-text text-muted small flex-grow-1">{{ board.description|truncatechars:80 }}</p>
+                                {% endif %}
+                                <div class="board-stats mb-3">
+                                    <small>
+                                        <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists
+                                        <span class="mx-2">•</span>
+                                        <i class="fas fa-users me-1"></i>{{ board.members.count }} members
+                                    </small>
+                                </div>
+                                <a href="{% url 'board_detail' board.id %}" class="btn btn-outline-primary btn-sm">
+                                    Open Board
+                                </a>
+                            </div>
+                            <div class="card-footer bg-transparent border-top-0">
+                                <small class="text-muted">
+                                    Updated {{ board.updated_at|timesince }} ago
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Member Boards Section -->
+            {% if member_boards %}
+            <div class="mb-5">
+                <h4 class="mb-3">
+                    <i class="fas fa-user-friends text-info me-2"></i>Boards You're Member Of
+                </h4>
+                <div class="row">
+                    {% for board in member_boards %}
+                    <div class="col-md-4 col-lg-3 mb-4">
+                        <div class="card board-card h-100">
+                            <div class="card-body d-flex flex-column">
+                                <h6 class="card-title">{{ board.title }}</h6>
+                                {% if board.description %}
+                                <p class="card-text text-muted small flex-grow-1">{{ board.description|truncatechars:80 }}</p>
+                                {% endif %}
+                                <div class="board-stats mb-3">
+                                    <small>
+                                        <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists
+                                        <span class="mx-2">•</span>
+                                        <i class="fas fa-users me-1"></i>{{ board.members.count }} members
+                                    </small>
+                                    <br>
+                                    <small class="text-muted">
+                                        Created by {{ board.created_by.first_name }} {{ board.created_by.last_name }}
+                                    </small>
+                                </div>
+                                <a href="{% url 'board_detail' board.id %}" class="btn btn-outline-primary btn-sm">
+                                    Open Board
+                                </a>
+                            </div>
+                            <div class="card-footer bg-transparent border-top-0">
+                                <small class="text-muted">
+                                    Updated {{ board.updated_at|timesince }} ago
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Empty State -->
+            {% if not created_boards and not member_boards %}
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">No Project Boards Yet</h4>
+                <p class="text-muted mb-4">Create your first project board to start organizing your team's work</p>
+                <a href="{% url 'create_board' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-plus me-2"></i>Create Your First Board
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Add any board-specific JavaScript here
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animate board cards on page load
+        const boardCards = document.querySelectorAll('.board-card');
+        boardCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    });
+</script>
+{% endblock %}

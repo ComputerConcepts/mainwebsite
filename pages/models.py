@@ -124,3 +124,93 @@ class Invoice(models.Model):
     date = models.DateTimeField(auto_now=True)
     first_name = models.CharField(max_length=200)
     last_name = models.CharField(max_length=200)
+
+
+# Project Board Models
+class Board(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='created_boards')
+    members = models.ManyToManyField(Employee, related_name='boards', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_archived = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.title
+
+
+class BoardList(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='lists')
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['position']
+        unique_together = ['board', 'position']
+    
+    def __str__(self):
+        return f"{self.board.title} - {self.title}"
+
+
+class Card(models.Model):
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    board_list = models.ForeignKey(BoardList, on_delete=models.CASCADE, related_name='cards')
+    created_by = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='created_cards')
+    assigned_to = models.ManyToManyField(Employee, related_name='assigned_cards', blank=True)
+    position = models.PositiveIntegerField(default=0)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
+    due_date = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_completed = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['position']
+        unique_together = ['board_list', 'position']
+    
+    def __str__(self):
+        return self.title
+
+
+class CardComment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Comment by {self.author.first_name} on {self.card.title}"
+
+
+class CardAttachment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='card_attachments/')
+    original_name = models.CharField(max_length=255)
+    uploaded_by = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Attachment: {self.original_name}"

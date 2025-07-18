@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import include, path
 from . import views
+from . import views_boards
 
 
 urlpatterns = [
@@ -50,4 +51,16 @@ urlpatterns = [
     path('employee/applications/<uuid:application_id>/', views.admin_application_detail, name='admin_application_detail'),
     path('employee/applications/<uuid:application_id>/update-status/', views.admin_application_update_status, name='admin_application_update_status'),
     path('careers/<uuid:job_id>/', views.career_apply, name='career_apply'),
+    
+    # Project Board URLs
+    path('employee/boards/', views_boards.project_boards, name='project_boards'),
+    path('employee/boards/create/', views_boards.create_board, name='create_board'),
+    path('employee/boards/<uuid:board_id>/', views_boards.board_detail, name='board_detail'),
+    path('employee/boards/<uuid:board_id>/delete/', views_boards.delete_board, name='delete_board'),
+    path('api/boards/<uuid:board_id>/lists/create/', views_boards.create_list, name='create_list'),
+    path('api/lists/<uuid:list_id>/cards/create/', views_boards.create_card, name='create_card'),
+    path('api/cards/<uuid:card_id>/', views_boards.card_detail, name='card_detail'),
+    path('api/cards/<uuid:card_id>/update/', views_boards.update_card, name='update_card'),
+    path('api/cards/<uuid:card_id>/comments/', views_boards.add_card_comment, name='add_card_comment'),
+    path('api/cards/move/', views_boards.move_card, name='move_card'),
 ]

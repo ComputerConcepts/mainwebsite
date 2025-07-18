@@ -2,6 +2,7 @@ from django.shortcuts import render, HttpResponse, redirect, get_object_or_404
 from .models import ContactForm, Events, Invoice, Ticket, Employee, Career, JobPosting
 from django.contrib.auth.models import User
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.db import IntegrityError
 import uuid
 import secrets
 from django.contrib.auth import authenticate, login as auth_login, logout
@@ -344,31 +345,47 @@ def forgotPassword(request):
             messages.error(request, 'Only @onecomputerconcepts.com email addresses are allowed.')
             return render(request, 'portal/forgotPassword.html')
             
-        # For existing users
+        # Check if user already exists
         if User.objects.filter(email=email).exists():
             user = User.objects.get(email=email)
+            is_new_user = False
         else:
             # For new users - create a basic user account
-            username = email.split('@')[0]  # Use part before @ as username
+            base_username = email.split('@')[0]  # Use part before @ as base username
+            username = base_username
+            counter = 1
+            
+            # Ensure unique username
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            
             random_password = secrets.token_urlsafe(16)  # Generate random temporary password
             
-            # Create the user
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=random_password
-            )
-            
-            # Create empty employee profile
-            employee = Employee.objects.create(
-                user=user,
-                employee_id=f"EMP{str(uuid.uuid4())[:8]}",  # Generate temporary employee ID
-                department="",
-                position="",
-                phone="",
-                is_email_verified=False,
-                email_verification_token=secrets.token_urlsafe(32)
-            )
+            try:
+                # Create the user
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=random_password
+                )
+                
+                # Create empty employee profile
+                employee = Employee.objects.create(
+                    user=user,
+                    employee_id=f"EMP{str(uuid.uuid4())[:8]}",  # Generate temporary employee ID
+                    department="",
+                    position="",
+                    phone="",
+                    is_email_verified=False,
+                    email_verification_token=secrets.token_urlsafe(32)
+                )
+                is_new_user = True
+                
+            except IntegrityError:
+                # If there's still an integrity error, it might be due to email uniqueness
+                messages.error(request, 'An account with this email may already exist. Please contact IT support.')
+                return render(request, 'portal/forgotPassword.html')
             
         # Send password reset email
         current_site = get_current_site(request)
@@ -379,7 +396,7 @@ def forgotPassword(request):
             'uid': urlsafe_base64_encode(force_bytes(user.pk)),
             'token': default_token_generator.make_token(user),
             'protocol': 'https' if request.is_secure() else 'http',
-            'is_new_user': not User.objects.filter(email=email).exists()
+            'is_new_user': is_new_user
         })
         send_mail(subject, '', 'noreplycomputerconcepts@gmail.com', [email], html_message=message)
         
