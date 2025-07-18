@@ -1,0 +1,241 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}Career Application Detail - Computer Concepts{% endblock %}
+
+{% block extra_css %}
+<style>
+    .career-detail-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    .applicant-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        margin: -2rem -2rem 2rem -2rem;
+    }
+    .info-section {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+    }
+    .info-section h5 {
+        color: #1a2533;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+    .info-row {
+        display: flex;
+        margin-bottom: 0.5rem;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #495057;
+        min-width: 150px;
+    }
+    .info-value {
+        color: #212529;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+    .resume-link {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: #e8f5e8;
+        color: #2e7d32;
+        text-decoration: none;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+    .resume-link:hover {
+        background: #c8e6c9;
+        color: #1b5e20;
+        text-decoration: none;
+    }
+    .cover-letter-section {
+        background: #fff3e0;
+        border-left: 4px solid #ff9800;
+        padding: 1.5rem;
+        border-radius: 0 10px 10px 0;
+        margin-bottom: 1.5rem;
+    }
+    .skills-section {
+        background: #e7f3ff;
+        border-left: 4px solid #2196f3;
+        padding: 1.5rem;
+        border-radius: 0 10px 10px 0;
+        margin-bottom: 1.5rem;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+    .btn-outline-primary {
+        border: 2px solid #667eea;
+        color: #667eea;
+        border-radius: 10px;
+    }
+    .btn-outline-primary:hover {
+        background: #667eea;
+        border-color: #667eea;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-user-tie me-2"></i>Career Application Detail</h2>
+            <a href="{% url 'admin_careers' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Applications
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="career-detail-card">
+            <div class="applicant-header">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h2><i class="fas fa-user me-2"></i>{{ career.first_name }} {{ career.last_name }}</h2>
+                        <p class="mb-2"><i class="fas fa-briefcase me-2"></i>{{ career.position_applied }}</p>
+                        <p class="mb-0"><i class="fas fa-calendar me-2"></i>Applied on {{ career.submitted_at|date:"F d, Y" }} at {{ career.submitted_at|time:"g:i A" }}</p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="status-badge">
+                            <i class="fas fa-clock me-1"></i>Under Review
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="info-section">
+                <h5><i class="fas fa-address-card me-2"></i>Contact Information</h5>
+                <div class="info-row">
+                    <div class="info-label">Email:</div>
+                    <div class="info-value">
+                        <a href="mailto:{{ career.email }}">{{ career.email }}</a>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Phone:</div>
+                    <div class="info-value">
+                        <a href="tel:{{ career.phone }}">{{ career.phone }}</a>
+                    </div>
+                </div>
+                {% if career.linkedin_profile %}
+                <div class="info-row">
+                    <div class="info-label">LinkedIn:</div>
+                    <div class="info-value">
+                        <a href="{{ career.linkedin_profile }}" target="_blank">{{ career.linkedin_profile }}</a>
+                    </div>
+                </div>
+                {% endif %}
+                {% if career.portfolio_website %}
+                <div class="info-row">
+                    <div class="info-label">Portfolio:</div>
+                    <div class="info-value">
+                        <a href="{{ career.portfolio_website }}" target="_blank">{{ career.portfolio_website }}</a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Professional Details -->
+            <div class="info-section">
+                <h5><i class="fas fa-user-graduate me-2"></i>Professional Details</h5>
+                <div class="info-row">
+                    <div class="info-label">Position Applied:</div>
+                    <div class="info-value">{{ career.position_applied }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Experience:</div>
+                    <div class="info-value">{{ career.experience_years }} year{{ career.experience_years|pluralize }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Education:</div>
+                    <div class="info-value">{{ career.education }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Available Start Date:</div>
+                    <div class="info-value">{{ career.available_start_date|date:"F d, Y" }}</div>
+                </div>
+                {% if career.salary_expectation %}
+                <div class="info-row">
+                    <div class="info-label">Salary Expectation:</div>
+                    <div class="info-value">${{ career.salary_expectation|floatformat:0 }}</div>
+                </div>
+                {% endif %}
+                {% if career.resume %}
+                <div class="info-row">
+                    <div class="info-label">Resume:</div>
+                    <div class="info-value">
+                        <a href="{{ career.resume.url }}" class="resume-link" target="_blank">
+                            <i class="fas fa-file-pdf me-2"></i>Download Resume
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Skills -->
+            {% if career.skills %}
+            <div class="skills-section">
+                <h5><i class="fas fa-cogs me-2"></i>Skills & Competencies</h5>
+                <p>{{ career.skills }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Cover Letter -->
+            {% if career.cover_letter %}
+            <div class="cover-letter-section">
+                <h5><i class="fas fa-envelope-open-text me-2"></i>Cover Letter</h5>
+                <p>{{ career.cover_letter|linebreaks }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Application ID -->
+            <div class="info-section">
+                <h5><i class="fas fa-id-card me-2"></i>Application Reference</h5>
+                <div class="info-row">
+                    <div class="info-label">Application ID:</div>
+                    <div class="info-value">
+                        <code>{{ career.id }}</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <a href="mailto:{{ career.email }}?subject=Regarding your application for {{ career.position_applied }}" 
+                   class="btn btn-primary">
+                    <i class="fas fa-envelope me-2"></i>Send Email
+                </a>
+                <a href="tel:{{ career.phone }}" class="btn btn-outline-primary">
+                    <i class="fas fa-phone me-2"></i>Call Applicant
+                </a>
+                <a href="{% url 'admin_careers' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-list me-2"></i>View All Applications
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

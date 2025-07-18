@@ -1,10 +1,102 @@
 from django.db import models
+from django.contrib.auth.models import User
 import uuid
 
 class ContactForm(models.Model):
     name = models.CharField(max_length=200)
     email = models.EmailField()
     message = models.TextField()
+
+class JobPosting(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    department = models.CharField(max_length=100)
+    location = models.CharField(max_length=100, default='On-site')
+    job_type = models.CharField(max_length=50, choices=[
+        ('full_time', 'Full Time'),
+        ('part_time', 'Part Time'),
+        ('contract', 'Contract'),
+        ('internship', 'Internship'),
+    ], default='full_time')
+    description = models.TextField()
+    requirements = models.TextField()
+    responsibilities = models.TextField()
+    benefits = models.TextField(blank=True, null=True)
+    salary_range = models.CharField(max_length=100, blank=True, null=True)
+    experience_level = models.CharField(max_length=50, choices=[
+        ('entry', 'Entry Level'),
+        ('mid', 'Mid Level'),
+        ('senior', 'Senior Level'),
+        ('executive', 'Executive'),
+    ], default='mid')
+    is_active = models.BooleanField(default=True)
+    posted_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    application_deadline = models.DateTimeField(blank=True, null=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.title} - {self.department}"
+
+class Career(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    job_posting = models.ForeignKey(JobPosting, on_delete=models.CASCADE, related_name='applications')
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+    position_applied = models.CharField(max_length=200)  # Keep for backward compatibility
+    experience_years = models.IntegerField()
+    education = models.CharField(max_length=200)
+    skills = models.TextField()
+    cover_letter = models.TextField()
+    resume = models.FileField(upload_to='resumes/', blank=True, null=True)
+    linkedin_profile = models.URLField(blank=True, null=True)
+    portfolio_website = models.URLField(blank=True, null=True)
+    available_start_date = models.DateField()
+    salary_expectation = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    status = models.CharField(max_length=50, choices=[
+        ('submitted', 'Submitted'),
+        ('reviewing', 'Under Review'),
+        ('interview', 'Interview Scheduled'),
+        ('hired', 'Hired'),
+        ('rejected', 'Rejected'),
+    ], default='submitted')
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    
+    class Meta:
+        ordering = ['-submitted_at']
+    
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} - {self.job_posting.title}"
+
+    def save(self, *args, **kwargs):
+        # Auto-fill position_applied from job_posting for backward compatibility
+        if self.job_posting:
+            self.position_applied = self.job_posting.title
+        super().save(*args, **kwargs)
+
+class Employee(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    employee_id = models.CharField(max_length=50, unique=True)
+    department = models.CharField(max_length=100)
+    position = models.CharField(max_length=100)
+    phone = models.CharField(max_length=20)
+    hire_date = models.DateField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    is_email_verified = models.BooleanField(default=False)
+    email_verification_token = models.CharField(max_length=100, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.user.first_name} {self.user.last_name} - {self.employee_id}"
 
 class Events(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

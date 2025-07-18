@@ -1,0 +1,335 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}{% if form.instance.id %}Edit{% else %}Create{% endif %} Job Posting - Computer Concepts{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        margin: -2rem -2rem 0 -2rem;
+    }
+    .form-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    .section-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #f0f0f0;
+    }
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .form-label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+    .form-text {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .char-counter {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-align: right;
+        margin-top: 0.25rem;
+    }
+    .required-field::after {
+        content: "*";
+        color: #dc3545;
+        margin-left: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="form-header">
+                <h2>
+                    <i class="fas fa-{% if form.instance.id %}edit{% else %}plus-circle{% endif %} me-2"></i>
+                    {% if form.instance.id %}Edit{% else %}Create{% endif %} Job Posting
+                </h2>
+                <p>{% if form.instance.id %}Update the details of an existing job posting{% else %}Create a new job posting to attract candidates{% endif %}</p>
+            </div>
+            
+            <div class="card-body">
+                <div class="form-container">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        
+                        <div class="section-title">
+                            <i class="fas fa-info-circle me-2"></i>Basic Information
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label for="{{ form.title.id_for_label }}" class="form-label required-field">Job Title</label>
+                                    {{ form.title }}
+                                    {% if form.title.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.title.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">Enter a clear and specific job title (e.g., "Senior Software Engineer")</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.department.id_for_label }}" class="form-label required-field">Department</label>
+                                    {{ form.department }}
+                                    {% if form.department.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.department.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.location.id_for_label }}" class="form-label required-field">Location</label>
+                                    {{ form.location }}
+                                    {% if form.location.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.location.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">City or "Remote"</div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.job_type.id_for_label }}" class="form-label required-field">Job Type</label>
+                                    {{ form.job_type }}
+                                    {% if form.job_type.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.job_type.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.experience_level.id_for_label }}" class="form-label required-field">Experience Level</label>
+                                    {{ form.experience_level }}
+                                    {% if form.experience_level.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.experience_level.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="section-title mt-4">
+                            <i class="fas fa-align-left me-2"></i>Job Description
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="{{ form.description.id_for_label }}" class="form-label required-field">Description</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.description.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Provide a comprehensive description of the role, responsibilities, and company information.
+                            </div>
+                            <div class="char-counter">
+                                <span id="description-counter">0</span>/5000 characters
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="{{ form.requirements.id_for_label }}" class="form-label required-field">Requirements</label>
+                            {{ form.requirements }}
+                            {% if form.requirements.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.requirements.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                List all required qualifications, skills, and experience for this position.
+                            </div>
+                            <div class="char-counter">
+                                <span id="requirements-counter">0</span>/3000 characters
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="{{ form.responsibilities.id_for_label }}" class="form-label required-field">Responsibilities</label>
+                            {{ form.responsibilities }}
+                            {% if form.responsibilities.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.responsibilities.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                List the key duties and responsibilities for this role.
+                            </div>
+                            <div class="char-counter">
+                                <span id="responsibilities-counter">0</span>/3000 characters
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="{{ form.benefits.id_for_label }}" class="form-label">Benefits & Perks</label>
+                            {{ form.benefits }}
+                            {% if form.benefits.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.benefits.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Describe benefits, perks, and other incentives for this position.
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="{{ form.salary_range.id_for_label }}" class="form-label">Salary Range</label>
+                            {{ form.salary_range }}
+                            {% if form.salary_range.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.salary_range.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Optional. Example: "$80,000 - $100,000"
+                            </div>
+                        </div>
+                        
+                        <div class="section-title mt-4">
+                            <i class="fas fa-cog me-2"></i>Settings
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.application_deadline.id_for_label }}" class="form-label">Application Deadline</label>
+                                    {{ form.application_deadline }}
+                                    {% if form.application_deadline.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.application_deadline.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Leave blank for no deadline
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-check mt-4">
+                                    {{ form.is_active }}
+                                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                        Publish and make visible to candidates
+                                    </label>
+                                    {% if form.is_active.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.is_active.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                            <a href="{% url 'admin_jobs' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Job Listings
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>
+                                {% if form.instance.id %}Update{% else %}Create{% endif %} Job Posting
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Character counter for description
+    document.addEventListener('DOMContentLoaded', function() {
+        const descriptionField = document.getElementById('{{ form.description.id_for_label }}');
+        const descriptionCounter = document.getElementById('description-counter');
+        
+        if (descriptionField && descriptionCounter) {
+            descriptionCounter.textContent = descriptionField.value.length;
+            
+            descriptionField.addEventListener('input', function() {
+                descriptionCounter.textContent = this.value.length;
+            });
+        }
+        
+        const requirementsField = document.getElementById('{{ form.requirements.id_for_label }}');
+        const requirementsCounter = document.getElementById('requirements-counter');
+        
+        if (requirementsField && requirementsCounter) {
+            requirementsCounter.textContent = requirementsField.value.length;
+            
+            requirementsField.addEventListener('input', function() {
+                requirementsCounter.textContent = this.value.length;
+            });
+        }
+        
+        const responsibilitiesField = document.getElementById('{{ form.responsibilities.id_for_label }}');
+        const responsibilitiesCounter = document.getElementById('responsibilities-counter');
+        
+        if (responsibilitiesField && responsibilitiesCounter) {
+            responsibilitiesCounter.textContent = responsibilitiesField.value.length;
+            
+            responsibilitiesField.addEventListener('input', function() {
+                responsibilitiesCounter.textContent = this.value.length;
+            });
+        }
+    });
+</script>
+{% endblock %}

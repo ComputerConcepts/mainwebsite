@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Dashboard - Computer Concepts</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            font-weight: 600;
+            color: white !important;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.8) !important;
+            transition: color 0.3s;
+        }
+        .nav-link:hover {
+            color: white !important;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            border: none;
+        }
+        .welcome-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .stat-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 10px 20px;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .event-item {
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        .event-date {
+            color: #667eea;
+            font-weight: 600;
+        }
+        .badge-status {
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+        .alert {
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'employee_dashboard' %}">
+                <i class="fas fa-laptop-code me-2"></i>
+                Computer Concepts
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{% url 'employee_events' %}">
+                    <i class="fas fa-calendar me-1"></i>
+                    Events
+                </a>
+                <a class="nav-link" href="{% url 'employee_profile' %}">
+                    <i class="fas fa-user me-1"></i>
+                    Profile
+                </a>
+                <a class="nav-link" href="{% url 'employee_logout' %}">
+                    <i class="fas fa-sign-out-alt me-1"></i>
+                    Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Welcome Card -->
+        <div class="welcome-card">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-3">Welcome back, {{ employee.user.first_name }}!</h1>
+                    <p class="mb-3">Employee ID: {{ employee.employee_id }} | Department: {{ employee.department }}</p>
+                    <p class="mb-0">Position: {{ employee.position }}</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <i class="fas fa-user-circle" style="font-size: 5rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="row">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon text-primary">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div class="stat-number text-primary">{{ total_events }}</div>
+                    <div class="stat-label">Active Events</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon text-success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-number text-success">
+                        {% if employee.is_email_verified %}1{% else %}0{% endif %}
+                    </div>
+                    <div class="stat-label">Email Verified</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon text-info">
+                        <i class="fas fa-building"></i>
+                    </div>
+                    <div class="stat-number text-info">{{ employee.department|length }}</div>
+                    <div class="stat-label">Department Length</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Events -->
+        <div class="row mt-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calendar-alt me-2"></i>
+                            Recent Events
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if events %}
+                            {% for event in events %}
+                                <div class="event-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="mb-1">{{ event.title }}</h6>
+                                            <p class="mb-1 text-muted">{{ event.description|truncatewords:10 }}</p>
+                                            <small class="event-date">{{ event.eventdate|date:"F j, Y" }}</small>
+                                        </div>
+                                        <div>
+                                            <span class="badge-status">${{ event.cost }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            <div class="text-center mt-3">
+                                <a href="{% url 'employee_events' %}" class="btn btn-primary">
+                                    <i class="fas fa-eye me-2"></i>
+                                    View All Events
+                                </a>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-3">No events available at the moment.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user-cog me-2"></i>
+                            Account Status
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Account Status:</span>
+                                <span class="badge bg-success">Active</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Email Verified:</span>
+                                {% if employee.is_email_verified %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-warning">No</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Member Since:</span>
+                                <span>{{ employee.hire_date|date:"M Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <a href="{% url 'employee_profile' %}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-edit me-2"></i>
+                                Edit Profile
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

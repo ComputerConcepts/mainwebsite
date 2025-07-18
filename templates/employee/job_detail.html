@@ -1,0 +1,381 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}{{ job.title }} - Job Details{% endblock %}
+
+{% block extra_css %}
+<style>
+    .job-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        margin: -2rem -2rem 0 -2rem;
+    }
+    .job-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+    .job-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: #f8f9fa;
+        padding: 0.5rem 1rem;
+        border-radius: 30px;
+        font-size: 0.9rem;
+    }
+    .job-status {
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+    .status-inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .section {
+        margin-bottom: 2rem;
+    }
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #f0f0f0;
+    }
+    .section-content {
+        white-space: pre-line;
+    }
+    .application-list {
+        margin-top: 2rem;
+    }
+    .application-item {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .application-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+    .application-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .application-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    .application-date {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    .application-status {
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .status-new {
+        background: #e3f2fd;
+        color: #0d47a1;
+    }
+    .status-reviewed {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .status-interviewing {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+    .status-hired {
+        background: #d4edda;
+        color: #155724;
+    }
+    .status-rejected {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .application-details {
+        margin-top: 1rem;
+    }
+    .detail-row {
+        margin-bottom: 0.75rem;
+    }
+    .detail-label {
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+    .empty-applications {
+        text-align: center;
+        padding: 3rem;
+        color: #666;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
+    .empty-applications i {
+        font-size: 3rem;
+        color: #ddd;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="job-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2><i class="fas fa-clipboard-list me-2"></i>{{ job.title }}</h2>
+                    <span class="job-status {% if job.is_active %}status-active{% else %}status-inactive{% endif %}">
+                        {% if job.is_active %}
+                            <i class="fas fa-check-circle me-1"></i>Active
+                        {% else %}
+                            <i class="fas fa-times-circle me-1"></i>Inactive
+                        {% endif %}
+                    </span>
+                </div>
+                <p>Created on {{ job.created_at|date:"F d, Y" }}</p>
+            </div>
+            
+            <div class="card-body">
+                <div class="job-meta">
+                    <div class="job-meta-item">
+                        <i class="fas fa-building"></i>
+                        <span>{{ job.department }}</span>
+                    </div>
+                    <div class="job-meta-item">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>{{ job.location }}</span>
+                    </div>
+                    <div class="job-meta-item">
+                        <i class="fas fa-briefcase"></i>
+                        <span>{{ job.get_job_type_display }}</span>
+                    </div>
+                    <div class="job-meta-item">
+                        <i class="fas fa-chart-line"></i>
+                        <span>{{ job.get_experience_level_display }}</span>
+                    </div>
+                    {% if job.salary_range %}
+                        <div class="job-meta-item">
+                            <i class="fas fa-money-bill-wave"></i>
+                            <span>{{ job.salary_range }}</span>
+                        </div>
+                    {% endif %}
+                    {% if job.application_deadline %}
+                        <div class="job-meta-item">
+                            <i class="fas fa-calendar-day"></i>
+                            <span>Deadline: {{ job.application_deadline|date:"M d, Y" }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'admin_jobs' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Jobs
+                        </a>
+                        <a href="{% url 'career_apply' job.id %}" class="btn btn-outline-info btn-sm" target="_blank">
+                            <i class="fas fa-external-link-alt me-1"></i>Preview
+                        </a>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'admin_job_edit' job.id %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-edit me-1"></i>Edit
+                        </a>
+                        {% if job.is_active %}
+                            <button class="btn btn-outline-warning btn-sm" onclick="toggleJobStatus('{{ job.id }}', false)">
+                                <i class="fas fa-pause me-1"></i>Deactivate
+                            </button>
+                        {% else %}
+                            <button class="btn btn-outline-success btn-sm" onclick="toggleJobStatus('{{ job.id }}', true)">
+                                <i class="fas fa-play me-1"></i>Activate
+                            </button>
+                        {% endif %}
+                        <a href="{% url 'admin_job_delete' job.id %}" class="btn btn-outline-danger btn-sm">
+                            <i class="fas fa-trash me-1"></i>Delete
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="section">
+                            <div class="section-title">
+                                <i class="fas fa-info-circle me-2"></i>Job Description
+                            </div>
+                            <div class="section-content">
+                                {{ job.description|linebreaks }}
+                            </div>
+                        </div>
+                        
+                        <div class="section">
+                            <div class="section-title">
+                                <i class="fas fa-list-check me-2"></i>Requirements
+                            </div>
+                            <div class="section-content">
+                                {{ job.requirements|linebreaks }}
+                            </div>
+                        </div>
+                        
+                        <div class="section">
+                            <div class="section-title">
+                                <i class="fas fa-tasks me-2"></i>Responsibilities
+                            </div>
+                            <div class="section-content">
+                                {{ job.responsibilities|linebreaks }}
+                            </div>
+                        </div>
+                        
+                        {% if job.benefits %}
+                            <div class="section">
+                                <div class="section-title">
+                                    <i class="fas fa-gift me-2"></i>Benefits & Perks
+                                </div>
+                                <div class="section-content">
+                                    {{ job.benefits|linebreaks }}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <hr class="my-4">
+                
+                <!-- Applications Section -->
+                <div class="section">
+                    <div class="section-title d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-users me-2"></i>Applications ({{ applications|length }})
+                        </div>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                Filter by Status
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="?status=all">All Applications</a></li>
+                                <li><a class="dropdown-item" href="?status=new">New</a></li>
+                                <li><a class="dropdown-item" href="?status=reviewed">Reviewed</a></li>
+                                <li><a class="dropdown-item" href="?status=interviewing">Interviewing</a></li>
+                                <li><a class="dropdown-item" href="?status=hired">Hired</a></li>
+                                <li><a class="dropdown-item" href="?status=rejected">Rejected</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    {% if applications %}
+                        <div class="application-list">
+                            {% for application in applications %}
+                                <div class="application-item">
+                                    <div class="application-header">
+                                        <div class="application-info">
+                                            <span class="application-name">{{ application.first_name }} {{ application.last_name }}</span>
+                                            <span class="application-date">Applied on {{ application.created_at|date:"M d, Y" }}</span>
+                                        </div>
+                                        <span class="application-status status-{{ application.status|lower }}">
+                                            {% if application.status == 'new' %}
+                                                <i class="fas fa-inbox me-1"></i>New
+                                            {% elif application.status == 'reviewed' %}
+                                                <i class="fas fa-eye me-1"></i>Reviewed
+                                            {% elif application.status == 'interviewing' %}
+                                                <i class="fas fa-calendar-check me-1"></i>Interviewing
+                                            {% elif application.status == 'hired' %}
+                                                <i class="fas fa-check-circle me-1"></i>Hired
+                                            {% elif application.status == 'rejected' %}
+                                                <i class="fas fa-times-circle me-1"></i>Rejected
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="application-details">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="detail-row">
+                                                    <div class="detail-label">Email Address</div>
+                                                    <div>{{ application.email }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="detail-row">
+                                                    <div class="detail-label">Phone</div>
+                                                    <div>{{ application.phone }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="detail-row">
+                                                    <div class="detail-label">Resume</div>
+                                                    <div>
+                                                        <a href="{{ application.resume.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                                            <i class="fas fa-file-pdf me-1"></i>Download Resume
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {% if application.cover_letter %}
+                                            <div class="detail-row mt-3">
+                                                <div class="detail-label">Cover Letter</div>
+                                                <div class="p-3 bg-light rounded">
+                                                    {{ application.cover_letter|linebreaks }}
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <div class="mt-3 d-flex gap-2 justify-content-end">
+                                            <a href="{% url 'admin_application_detail' application.id %}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-eye me-1"></i>View Details
+                                            </a>
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <i class="fas fa-user-check me-1"></i>Update Status
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    <li><a class="dropdown-item" href="{% url 'admin_application_update_status' application.id %}?status=new">New</a></li>
+                                                    <li><a class="dropdown-item" href="{% url 'admin_application_update_status' application.id %}?status=reviewed">Reviewed</a></li>
+                                                    <li><a class="dropdown-item" href="{% url 'admin_application_update_status' application.id %}?status=interviewing">Interviewing</a></li>
+                                                    <li><a class="dropdown-item" href="{% url 'admin_application_update_status' application.id %}?status=hired">Hired</a></li>
+                                                    <li><a class="dropdown-item" href="{% url 'admin_application_update_status' application.id %}?status=rejected">Rejected</a></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-applications">
+                            <i class="fas fa-inbox-in"></i>
+                            <h4>No Applications Yet</h4>
+                            <p>There are no applications for this job posting yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleJobStatus(jobId, activate) {
+    if (confirm(`Are you sure you want to ${activate ? 'activate' : 'deactivate'} this job posting?`)) {
+        // This would typically be an AJAX call to update the job status
+        // For now, we'll just show a message
+        alert(`Job posting ${activate ? 'activated' : 'deactivated'} successfully!`);
+        location.reload();
+    }
+}
+</script>
+{% endblock %}
