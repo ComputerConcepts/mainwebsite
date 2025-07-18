@@ -831,6 +831,17 @@ def is_hr_or_admin(user):
     except Employee.DoesNotExist:
         return False
 
+def is_employee_authenticated(request):
+    """Check if user is authenticated and has an employee profile"""
+    if not request.user.is_authenticated:
+        return False
+    
+    try:
+        employee = Employee.objects.get(user=request.user)
+        return employee.is_active and employee.is_email_verified
+    except Employee.DoesNotExist:
+        return False
+
 @user_passes_test(is_hr_or_admin)
 def admin_careers(request):
     """Admin/HR view for career applications"""
