@@ -118,7 +118,10 @@
                 <h6>Project Summary</h6>
                 <p class="mb-1">{{ total_boards }} total boards</p>
                 <p class="mb-1">{{ created_boards.count }} created by you</p>
-                <p class="mb-0">{{ member_boards.count }} shared with you</p>
+                <p class="mb-0">{{ shared_boards.count }} shared with you</p>
+                {% if debug_shared_count is not None %}
+                <small class="text-muted">Debug: {{ debug_shared_count }} shared boards found</small>
+                {% endif %}
             </div>
             
             <!-- Quick Actions -->
@@ -178,8 +181,24 @@
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 class="mb-1">Project Boards</h2>
-                    <p class="text-muted mb-0">Manage your team projects with Kanban boards</p>
+                    <h2 class="mb-1">
+                        {% if request.GET.shared %}
+                            Boards Shared with Me
+                        {% elif request.GET.recent %}
+                            Recent Boards
+                        {% else %}
+                            Project Boards
+                        {% endif %}
+                    </h2>
+                    <p class="text-muted mb-0">
+                        {% if request.GET.shared %}
+                            Boards that have been shared with you by other users
+                        {% elif request.GET.recent %}
+                            Recently updated boards from the last 30 days
+                        {% else %}
+                            Manage your team projects with Kanban boards
+                        {% endif %}
+                    </p>
                 </div>
                 <a href="{% url 'create_board' %}" class="btn btn-primary">
                     <i class="fas fa-plus me-2"></i>Create Board
@@ -188,6 +207,7 @@
 
             <!-- Stats Cards -->
             <div class="row mb-4">
+                {% if not request.GET.shared %}
                 <div class="col-md-4">
                     <div class="card bg-primary text-white">
                         <div class="card-body">
@@ -233,10 +253,43 @@
                         </div>
                     </div>
                 </div>
+                {% else %}
+                <!-- Shared view stats -->
+                <div class="col-md-6">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-1">{{ shared_boards.count }}</h4>
+                                    <p class="mb-0">Boards Shared with You</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-share-alt fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-1">{{ total_boards }}</h4>
+                                    <p class="mb-0">All Your Boards</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-clipboard fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
-            <!-- My Boards Section -->
-            {% if created_boards %}
+            <!-- Created Boards Section -->
+            {% if created_boards and not request.GET.shared %}
             <div class="mb-5">
                 <h4 class="mb-3">
                     <i class="fas fa-crown text-warning me-2"></i>Boards Created by You
@@ -277,7 +330,7 @@
             {% endif %}
 
             <!-- Member Boards Section -->
-            {% if member_boards %}
+            {% if member_boards and not request.GET.shared %}
             <div class="mb-5">
                 <h4 class="mb-3">
                     <i class="fas fa-user-friends text-info me-2"></i>Boards You're Member Of
@@ -318,8 +371,68 @@
             </div>
             {% endif %}
 
-            <!-- Shared Boards Section -->
-            {% if shared_boards %}
+            <!-- Shared Boards Section - Show when specifically viewing shared boards -->
+            {% if shared_boards and request.GET.shared %}
+            <div class="mb-5">
+                <h4 class="mb-3">
+                    <i class="fas fa-share-alt text-success me-2"></i>Boards Shared with You
+                </h4>
+                {% if debug_shared_count %}
+                <div class="alert alert-info">
+                    Debug: Found {{ debug_shared_count }} shared boards (IDs: {{ debug_shared_ids|join:", " }})
+                </div>
+                {% endif %}
+                <div class="row">
+                    {% for board in shared_boards %}
+                    <div class="col-md-4 col-lg-3 mb-4">
+                        <div class="card board-card h-100">
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0">{{ board.title }}</h6>
+                                    <span class="badge bg-success">Shared</span>
+                                </div>
+                                {% if board.description %}
+                                <p class="card-text text-muted small flex-grow-1">{{ board.description|truncatechars:80 }}</p>
+                                {% endif %}
+                                <div class="board-stats mb-3">
+                                    <small>
+                                        <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists
+                                        <span class="mx-2">•</span>
+                                        <i class="fas fa-users me-1"></i>{{ board.members.count }} members
+                                    </small>
+                                    <br>
+                                    <small class="text-muted">
+                                        Created by {{ board.created_by.first_name }} {{ board.created_by.last_name }}
+                                    </small>
+                                </div>
+                                <a href="{% url 'board_detail' board.id %}" class="btn btn-outline-success btn-sm">
+                                    Open Board
+                                </a>
+                            </div>
+                            <div class="card-footer bg-transparent border-top-0">
+                                <small class="text-muted">
+                                    Updated {{ board.updated_at|timesince }} ago
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% elif request.GET.shared %}
+            <!-- Empty state for shared boards -->
+            <div class="text-center py-5">
+                <i class="fas fa-share-alt fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">No Shared Boards</h4>
+                <p class="text-muted mb-4">No boards have been shared with you yet.</p>
+                <a href="{% url 'project_boards' %}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left me-2"></i>View All Boards
+                </a>
+            </div>
+            {% endif %}
+
+            <!-- Shared Boards Section - Show in general view only -->
+            {% if shared_boards and not request.GET.shared %}
             <div class="mb-5">
                 <h4 class="mb-3">
                     <i class="fas fa-share-alt text-success me-2"></i>Boards Shared with You
@@ -364,7 +477,7 @@
             {% endif %}
 
             <!-- Empty State -->
-            {% if not created_boards and not member_boards and not shared_boards %}
+            {% if not created_boards and not member_boards and not shared_boards and not request.GET.shared %}
             <div class="text-center py-5">
                 <i class="fas fa-clipboard fa-4x text-muted mb-3"></i>
                 <h4 class="text-muted">No Project Boards Yet</h4>

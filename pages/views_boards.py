@@ -40,16 +40,28 @@ def project_boards(request):
     created_boards = Board.objects.filter(created_by=employee, is_archived=False)
     member_boards = Board.objects.filter(members=employee, is_archived=False).exclude(created_by=employee)
     
-    # Get shared boards (boards shared via BoardShare)
+    # Get shared boards (boards shared via BoardShare) - include ALL boards shared with user
     shared_board_ids = BoardShare.objects.filter(shared_with=employee).values_list('board_id', flat=True)
-    shared_boards = Board.objects.filter(id__in=shared_board_ids, is_archived=False).exclude(created_by=employee).exclude(members=employee)
+    shared_boards = Board.objects.filter(id__in=shared_board_ids, is_archived=False).exclude(created_by=employee)
+    
+    # For "shared with me" view, we want to show ALL boards shared via BoardShare
+    # regardless of whether they're also in member_boards
+    if show_shared:
+        # Include boards where user is both a member AND has been explicitly shared
+        all_shared_boards = Board.objects.filter(id__in=shared_board_ids, is_archived=False).exclude(created_by=employee)
+        shared_boards = all_shared_boards
+        # Remove overlap from member_boards when showing shared view
+        member_boards = Board.objects.none()
+    else:
+        # For regular view, remove shared boards from member_boards to avoid duplication
+        member_boards = member_boards.exclude(id__in=shared_board_ids)
     
     # Apply filters based on navigation
     if show_shared:
-        # Show only shared boards
+        # Show only shared boards (already set above)
         created_boards = Board.objects.none()
         member_boards = Board.objects.none()
-        # Keep shared_boards as is
+        # shared_boards is already set correctly above
     elif show_recent:
         # Show recent boards from all categories (last 30 days or last accessed)
         from datetime import timedelta
@@ -81,6 +93,8 @@ def project_boards(request):
         'show_shared': show_shared,
         'show_recent': show_recent,
         'search_query': search_query,
+        'debug_shared_count': shared_boards.count(),
+        'debug_shared_ids': list(shared_board_ids),
     }
     
     return render(request, 'employee/boards/boards_list.html', context)
