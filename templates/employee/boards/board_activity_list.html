@@ -143,7 +143,7 @@
                                 </div>
                                 <div class="activity-content">
                                     <div class="activity-description">
-                                        <span class="activity-user">{{ activity.user.get_full_name|default:activity.user.username }}</span>
+                                        <span class="activity-user">{{ activity.user.get_full_name|default:activity.user.user.username }}</span>
                                         {{ activity.details }}
                                         <span class="board-badge">
                                             <i class="fas fa-clipboard me-1"></i>{{ activity.board.title }}
