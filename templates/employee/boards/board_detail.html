@@ -106,6 +106,39 @@
         border-bottom: none;
     }
     
+    .share-item-enhanced {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px 0;
+        border-bottom: 1px solid #f1f1f1;
+    }
+    
+    .share-item-enhanced:last-child {
+        border-bottom: none;
+    }
+    
+    .share-info {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+    }
+    
+    .share-permission {
+        min-width: 100px;
+    }
+    
+    .share-actions {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+    }
+    
+    .permission-select {
+        width: auto;
+        min-width: 80px;
+    }
+    
     .activity-item-mini {
         padding: 8px 0;
         border-bottom: 1px solid #f1f1f1;
@@ -1507,6 +1540,149 @@ function closeBoardInfo() {
     sidebar.classList.remove('active');
     overlay.classList.remove('active');
 }
+
+// Sharing Management Functions
+function showShareModal() {
+    // Redirect to existing share page for now
+    window.location.href = "{% url 'share_board' board.id %}";
+}
+
+function unshareBoard(boardId, shareId, userName) {
+    if (confirm(`Remove sharing with ${userName}?`)) {
+        fetch(`/employee/boards/${boardId}/unshare/${shareId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload(); // Refresh to update the UI
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error removing share');
+        });
+    }
+}
+
+function showTransferOwnershipModal() {
+    // Create modal HTML
+    const modalHtml = `
+        <div class="modal fade" id="transferOwnershipModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Transfer Board Ownership</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Warning: This action cannot be undone. You will lose owner privileges.
+                        </p>
+                        <div class="mb-3">
+                            <label class="form-label">Select New Owner:</label>
+                            <select class="form-select" id="newOwnerSelect">
+                                <option value="">Select a member...</option>
+                                {% for member in board.members.all %}
+                                {% if member != board.created_by %}
+                                <option value="{{ member.id }}">{{ member.get_full_name }} ({{ member.department|default:"Employee" }})</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-warning" onclick="transferOwnership()">Transfer Ownership</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('transferOwnershipModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('transferOwnershipModal'));
+    modal.show();
+}
+
+function transferOwnership() {
+    const newOwnerId = document.getElementById('newOwnerSelect').value;
+    if (!newOwnerId) {
+        alert('Please select a new owner');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to transfer ownership? This action cannot be undone.')) {
+        fetch(`/employee/boards/{{ board.id }}/transfer-ownership/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `new_owner_id=${newOwnerId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('transferOwnershipModal')).hide();
+                location.reload(); // Refresh to update the UI
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error transferring ownership');
+        });
+    }
+}
+
+// Handle permission changes
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('permission-select')) {
+        const shareId = e.target.dataset.shareId;
+        const boardId = e.target.dataset.boardId;
+        const newPermission = e.target.value;
+        
+        fetch(`/employee/boards/${boardId}/update-share/${shareId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `permission=${newPermission}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                alert('Error: ' + (data.error || 'Unknown error'));
+                location.reload(); // Refresh on error to reset UI
+            }
+            // On success, the change is already applied in the UI
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating permission');
+            location.reload(); // Refresh on error to reset UI
+        });
+    }
+});
 </script>
 
 <!-- Board Info Sidebar -->
@@ -1553,22 +1729,70 @@ function closeBoardInfo() {
         <!-- Sharing Information -->
         {% if board_shares %}
         <div class="info-section">
-            <h6><i class="fas fa-share-alt"></i> Shared With</h6>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0"><i class="fas fa-share-alt"></i> Shared With</h6>
+                {% if board.created_by == request.user.employee %}
+                <button class="btn btn-sm btn-outline-primary" onclick="showShareModal()">
+                    <i class="fas fa-plus"></i>
+                </button>
+                {% endif %}
+            </div>
             {% for share in board_shares %}
-            <div class="share-item">
-                <div>
-                    <strong>{{ share.shared_with.get_full_name }}</strong>
-                    <div class="text-muted small">{{ share.get_permission_display }}</div>
+            <div class="share-item-enhanced">
+                <div class="share-info">
+                    <div>
+                        <strong>{{ share.shared_with.get_full_name }}</strong>
+                        <div class="text-muted small">{{ share.shared_with.department|default:"Employee" }}</div>
+                    </div>
+                    <div class="share-permission">
+                        {% if board.created_by == request.user.employee %}
+                        <select class="form-select form-select-sm permission-select" 
+                                data-share-id="{{ share.id }}" 
+                                data-board-id="{{ board.id }}">
+                            <option value="view" {% if share.permission == 'view' %}selected{% endif %}>View</option>
+                            <option value="edit" {% if share.permission == 'edit' %}selected{% endif %}>Edit</option>
+                            <option value="admin" {% if share.permission == 'admin' %}selected{% endif %}>Admin</option>
+                        </select>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ share.get_permission_display }}</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <small class="text-muted">{{ share.created_at|date:"M d" }}</small>
+                <div class="share-actions">
+                    <small class="text-muted">{{ share.created_at|date:"M d" }}</small>
+                    {% if board.created_by == request.user.employee %}
+                    <button class="btn btn-sm btn-outline-danger ms-2" 
+                            onclick="unshareBoard('{{ board.id }}', '{{ share.id }}', '{{ share.shared_with.get_full_name }}')"
+                            title="Remove sharing">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    {% endif %}
+                </div>
             </div>
             {% endfor %}
+        </div>
+        {% elif board.created_by == request.user.employee %}
+        <div class="info-section">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6><i class="fas fa-share-alt"></i> Board Sharing</h6>
+                <button class="btn btn-sm btn-outline-primary" onclick="showShareModal()">
+                    <i class="fas fa-share-alt me-1"></i>Share
+                </button>
+            </div>
+            <p class="text-muted small mb-0">This board is not shared with anyone yet.</p>
         </div>
         {% endif %}
         
         <!-- Members -->
         <div class="info-section">
-            <h6><i class="fas fa-users"></i> Members</h6>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0"><i class="fas fa-users"></i> Members</h6>
+                {% if board.created_by == request.user.employee %}
+                <button class="btn btn-sm btn-outline-warning" onclick="showTransferOwnershipModal()" title="Transfer Ownership">
+                    <i class="fas fa-crown"></i>
+                </button>
+                {% endif %}
+            </div>
             {% for member in board.members.all %}
             <div class="share-item">
                 <div>

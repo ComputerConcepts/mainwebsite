@@ -901,3 +901,121 @@ def search_employees_for_board_sharing(request):
         })
     
     return JsonResponse({'employees': results})
+
+
+@login_required
+@require_http_methods(["POST"])
+def unshare_board(request, board_id, share_id):
+    """Remove a board share"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    employee = Employee.objects.get(user=request.user)
+    board = get_object_or_404(Board, id=board_id)
+    
+    # Check if user can manage this board (owner or admin)
+    if board.created_by != employee and not employee.is_admin():
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    try:
+        share = get_object_or_404(BoardShare, id=share_id, board=board)
+        shared_with_name = share.shared_with.get_full_name()
+        share.delete()
+        
+        # Log the activity
+        BoardActivity.objects.create(
+            board=board,
+            user=employee,
+            action='unshare',
+            details=f'removed sharing with {shared_with_name}',
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        messages.success(request, f'Board sharing removed for {shared_with_name}')
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def update_board_share(request, board_id, share_id):
+    """Update board share permission"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    employee = Employee.objects.get(user=request.user)
+    board = get_object_or_404(Board, id=board_id)
+    
+    # Check if user can manage this board (owner or admin)
+    if board.created_by != employee and not employee.is_admin():
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    try:
+        share = get_object_or_404(BoardShare, id=share_id, board=board)
+        new_permission = request.POST.get('permission')
+        
+        if new_permission not in ['view', 'edit', 'admin']:
+            return JsonResponse({'error': 'Invalid permission'}, status=400)
+        
+        old_permission = share.get_permission_display()
+        share.permission = new_permission
+        share.save()
+        
+        # Log the activity
+        BoardActivity.objects.create(
+            board=board,
+            user=employee,
+            action='share_update',
+            details=f'changed {share.shared_with.get_full_name()} permission from {old_permission} to {share.get_permission_display()}',
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        messages.success(request, f'Permission updated for {share.shared_with.get_full_name()}')
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def transfer_board_ownership(request, board_id):
+    """Transfer board ownership to another member"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    employee = Employee.objects.get(user=request.user)
+    board = get_object_or_404(Board, id=board_id)
+    
+    # Only the current owner can transfer ownership
+    if board.created_by != employee:
+        return JsonResponse({'error': 'Only the board owner can transfer ownership'}, status=403)
+    
+    try:
+        new_owner_id = request.POST.get('new_owner_id')
+        new_owner = get_object_or_404(Employee, id=new_owner_id)
+        
+        # Ensure new owner is a member of the board
+        if not board.members.filter(id=new_owner.id).exists():
+            board.members.add(new_owner)
+        
+        old_owner_name = employee.get_full_name()
+        board.created_by = new_owner
+        board.save()
+        
+        # Log the activity
+        BoardActivity.objects.create(
+            board=board,
+            user=employee,
+            action='transfer_ownership',
+            details=f'transferred ownership from {old_owner_name} to {new_owner.get_full_name()}',
+            ip_address=request.META.get('REMOTE_ADDR')
+        )
+        
+        messages.success(request, f'Board ownership transferred to {new_owner.get_full_name()}')
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
