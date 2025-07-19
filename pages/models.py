@@ -534,7 +534,7 @@ class StorageManager:
     
     @staticmethod
     def get_system_storage_info():
-        """Get system storage information"""
+        """Get system storage information with configurable limits"""
         import shutil
         import os
         from django.conf import settings
@@ -545,14 +545,47 @@ class StorageManager:
             if not os.path.exists(media_path):
                 media_path = '/'
             
-            total, used, free = shutil.disk_usage(media_path)
+            total_disk, used_disk, free_disk = shutil.disk_usage(media_path)
             
-            return {
-                'total': total,
-                'used': used,
-                'free': free,
-                'path': media_path
-            }
+            # Check if we have a configured application storage limit
+            app_storage_limit = getattr(settings, 'APPLICATION_STORAGE_LIMIT_GB', None)
+            
+            if app_storage_limit:
+                # Use configured limit instead of full disk
+                app_total = app_storage_limit * 1024 * 1024 * 1024  # Convert GB to bytes
+                
+                # Calculate actual usage by summing user storage
+                from django.db.models import Sum
+                actual_used = Employee.objects.filter(is_active=True).aggregate(
+                    total=Sum('storage_used')
+                )['total'] or 0
+                
+                # Add estimated system overhead (website files, database, etc.)
+                system_overhead = 1024 * 1024 * 1024  # 1GB for website
+                total_used = actual_used + system_overhead
+                
+                return {
+                    'total': app_total,
+                    'used': total_used,
+                    'free': app_total - total_used,
+                    'path': media_path,
+                    'is_limited': True,
+                    'disk_total': total_disk,
+                    'disk_free': free_disk,
+                    'configured_limit_gb': app_storage_limit
+                }
+            else:
+                # Fallback to disk usage (current behavior)
+                return {
+                    'total': total_disk,
+                    'used': used_disk,
+                    'free': free_disk,
+                    'path': media_path,
+                    'is_limited': False,
+                    'disk_total': total_disk,
+                    'disk_free': free_disk
+                }
+                
         except Exception as e:
             # Fallback values if unable to get disk usage
             return {
