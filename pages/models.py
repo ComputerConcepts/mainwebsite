@@ -270,3 +270,205 @@ class CardAttachment(models.Model):
     
     def __str__(self):
         return f"Attachment: {self.original_name}"
+
+
+class BoardShare(models.Model):
+    PERMISSION_CHOICES = [
+        ('view', 'View Only'),
+        ('edit', 'Edit'),
+        ('admin', 'Admin'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='shares')
+    shared_with = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='received_board_shares')
+    shared_by = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='sent_board_shares')
+    permission = models.CharField(max_length=10, choices=PERMISSION_CHOICES, default='view')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        unique_together = ['board', 'shared_with']
+    
+    def __str__(self):
+        return f"{self.board.title} shared with {self.shared_with.get_full_name()}"
+
+
+class BoardActivity(models.Model):
+    ACTION_CHOICES = [
+        ('create', 'Create'),
+        ('share', 'Share'),
+        ('edit', 'Edit'),
+        ('view', 'View'),
+        ('delete', 'Delete'),
+        ('archive', 'Archive'),
+        ('member_add', 'Member Added'),
+        ('member_remove', 'Member Removed'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='activities')
+    user = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    details = models.TextField(blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} {self.action} {self.board.title}"
+
+
+# File Management Models
+class FileFolder(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subfolders')
+    created_by = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='created_folders')
+    shared_with = models.ManyToManyField(Employee, related_name='shared_folders', blank=True)
+    is_public = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['name']
+        unique_together = ['name', 'parent', 'created_by']
+    
+    def __str__(self):
+        return self.name
+    
+    def get_path(self):
+        """Get the full path of the folder"""
+        path = []
+        folder = self
+        while folder:
+            path.append(folder.name)
+            folder = folder.parent
+        return ' / '.join(reversed(path))
+
+
+class FileDocument(models.Model):
+    FILE_TYPE_CHOICES = [
+        ('document', 'Document'),
+        ('image', 'Image'),
+        ('video', 'Video'),
+        ('audio', 'Audio'),
+        ('pdf', 'PDF'),
+        ('spreadsheet', 'Spreadsheet'),
+        ('presentation', 'Presentation'),
+        ('archive', 'Archive'),
+        ('other', 'Other'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    file = models.FileField(upload_to='documents/')
+    file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES, default='other')
+    file_size = models.BigIntegerField(help_text="File size in bytes")
+    mime_type = models.CharField(max_length=100, blank=True)
+    folder = models.ForeignKey(FileFolder, on_delete=models.CASCADE, related_name='files', null=True, blank=True)
+    uploaded_by = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='uploaded_files')
+    shared_with = models.ManyToManyField(Employee, related_name='shared_files', blank=True)
+    description = models.TextField(blank=True)
+    tags = models.CharField(max_length=500, blank=True, help_text="Comma-separated tags")
+    version = models.IntegerField(default=1)
+    is_public = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_accessed = models.DateTimeField(null=True, blank=True)
+    download_count = models.IntegerField(default=0)
+    is_favorite = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-updated_at']
+        unique_together = ['name', 'folder', 'uploaded_by']
+    
+    def __str__(self):
+        return self.name
+    
+    def get_file_size_display(self):
+        """Return human readable file size"""
+        if self.file_size < 1024:
+            return f"{self.file_size} bytes"
+        elif self.file_size < 1024 * 1024:
+            return f"{self.file_size / 1024:.1f} KB"
+        elif self.file_size < 1024 * 1024 * 1024:
+            return f"{self.file_size / (1024 * 1024):.1f} MB"
+        else:
+            return f"{self.file_size / (1024 * 1024 * 1024):.1f} GB"
+    
+    def get_file_path(self):
+        """Get the absolute path to the file"""
+        if self.file:
+            return self.file.path
+        return None
+
+
+class FileActivity(models.Model):
+    ACTION_CHOICES = [
+        ('upload', 'Uploaded'),
+        ('download', 'Downloaded'),
+        ('view', 'Viewed'),
+        ('edit', 'Edited'),
+        ('delete', 'Deleted'),
+        ('share', 'Shared'),
+        ('rename', 'Renamed'),
+        ('move', 'Moved'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(FileDocument, on_delete=models.CASCADE, related_name='activities')
+    user = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    details = models.TextField(blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} {self.action} {self.document.name}"
+
+
+class FileShare(models.Model):
+    PERMISSION_CHOICES = [
+        ('view', 'View Only'),
+        ('edit', 'Edit'),
+        ('full', 'Full Access'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(FileDocument, on_delete=models.CASCADE, related_name='shares')
+    shared_with = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='received_shares')
+    shared_by = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='sent_shares')
+    permission = models.CharField(max_length=10, choices=PERMISSION_CHOICES, default='view')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        unique_together = ['document', 'shared_with']
+    
+    def __str__(self):
+        return f"{self.document.name} shared with {self.shared_with.get_full_name()}"
+
+
+class FileVersion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(FileDocument, on_delete=models.CASCADE, related_name='versions')
+    file = models.FileField(upload_to='document_versions/')
+    version_number = models.IntegerField()
+    upload_comment = models.TextField(blank=True)
+    uploaded_by = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-version_number']
+        unique_together = ['document', 'version_number']
+    
+    def __str__(self):
+        return f"{self.document.name} v{self.version_number}"

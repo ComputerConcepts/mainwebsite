@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import Events, JobPosting, Employee
+from .models import Events, JobPosting, Employee, FileFolder, FileDocument, Board
 
 class EventImageForm(forms.ModelForm):
     class Meta:
@@ -98,3 +98,204 @@ class EmployeeProfileForm(forms.ModelForm):
         if commit:
             employee.save()
         return employee
+
+
+class FolderForm(forms.ModelForm):
+    """Form for creating and editing folders"""
+    
+    class Meta:
+        model = FileFolder
+        fields = ['name', 'parent', 'is_public']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Folder name'}),
+            'parent': forms.Select(attrs={'class': 'form-select'}),
+            'is_public': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Filter parent folders to show user's folders and shared folders
+        if user:
+            try:
+                employee = Employee.objects.get(user=user)
+                from django.db.models import Q
+                self.fields['parent'].queryset = FileFolder.objects.filter(
+                    Q(created_by=employee) | Q(shared_with=employee)
+                ).distinct()
+            except Employee.DoesNotExist:
+                self.fields['parent'].queryset = FileFolder.objects.none()
+
+
+class FileUploadForm(forms.Form):
+    """Form for uploading files - files handled via JavaScript/HTML"""
+    
+    folder = forms.ModelChoiceField(
+        queryset=FileFolder.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=False
+    )
+    description = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'File description'}),
+        required=False
+    )
+    tags = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Tags separated by commas'}),
+        required=False
+    )
+    is_public = forms.BooleanField(
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        required=False
+    )
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Filter folders to show user's folders and shared folders
+        if user:
+            try:
+                employee = Employee.objects.get(user=user)
+                from django.db.models import Q
+                self.fields['folder'].queryset = FileFolder.objects.filter(
+                    Q(created_by=employee) | Q(shared_with=employee)
+                ).distinct()
+            except Employee.DoesNotExist:
+                self.fields['folder'].queryset = FileFolder.objects.none()
+
+
+class FileShareForm(forms.Form):
+    """Form for sharing files with other users via email"""
+    
+    email = forms.EmailField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter email address',
+            'id': 'email-search',
+            'autocomplete': 'off'
+        }),
+        required=True,
+        help_text='Enter the email address of the person you want to share with'
+    )
+    permission = forms.ChoiceField(
+        choices=[
+            ('view', 'View Only'),
+            ('edit', 'Edit'),
+            ('full', 'Full Access'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        initial='view'
+    )
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Optional message'}),
+        required=False
+    )
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email:
+            # Check if user exists
+            try:
+                from django.contrib.auth.models import User
+                user = User.objects.get(email=email)
+                # Check if employee profile exists
+                Employee.objects.get(user=user)
+                return email
+            except (User.DoesNotExist, Employee.DoesNotExist):
+                raise forms.ValidationError(
+                    'No employee found with this email address. Please check the email or contact the administrator.'
+                )
+        return email
+
+
+class FileSearchForm(forms.Form):
+    """Form for searching files"""
+    
+    query = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Search files and folders...',
+            'autocomplete': 'off'
+        }),
+        required=False
+    )
+    file_type = forms.ChoiceField(
+        choices=[
+            ('', 'All Types'),
+            ('document', 'Documents'),
+            ('image', 'Images'),
+            ('video', 'Videos'),
+            ('audio', 'Audio'),
+            ('pdf', 'PDFs'),
+            ('spreadsheet', 'Spreadsheets'),
+            ('presentation', 'Presentations'),
+            ('archive', 'Archives'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=False
+    )
+    date_range = forms.ChoiceField(
+        choices=[
+            ('', 'Any Time'),
+            ('today', 'Today'),
+            ('week', 'This Week'),
+            ('month', 'This Month'),
+            ('year', 'This Year'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=False
+    )
+    tags = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Tags separated by commas'
+        }),
+        required=False
+    )
+
+
+class BoardShareForm(forms.Form):
+    """Form for sharing boards with other users via email"""
+    
+    email = forms.EmailField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter email address',
+            'id': 'email-search',
+            'autocomplete': 'off'
+        }),
+        required=True,
+        help_text='Enter the email address of the person you want to share with'
+    )
+    permission = forms.ChoiceField(
+        choices=[
+            ('view', 'View Only'),
+            ('edit', 'Edit'),
+            ('admin', 'Admin'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        initial='view'
+    )
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Optional message'}),
+        required=False
+    )
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email:
+            # Check if user exists
+            try:
+                from django.contrib.auth.models import User
+                user = User.objects.get(email=email)
+                # Check if employee profile exists
+                Employee.objects.get(user=user)
+                return email
+            except (User.DoesNotExist, Employee.DoesNotExist):
+                raise forms.ValidationError(
+                    'No employee found with this email address. Please check the email or contact the administrator.'
+                )
+        return email

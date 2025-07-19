@@ -7,7 +7,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from django.db import models
 from django.core.paginator import Paginator
-from .models import Board, BoardList, Card, CardComment, CardAttachment, Employee
+from django.utils import timezone
+from .models import Board, BoardList, Card, CardComment, CardAttachment, Employee, BoardShare, BoardActivity
+from .forms import BoardShareForm
 from .views import is_employee_authenticated
 import json
 
@@ -33,10 +35,15 @@ def project_boards(request):
     created_boards = Board.objects.filter(created_by=employee, is_archived=False)
     member_boards = Board.objects.filter(members=employee, is_archived=False).exclude(created_by=employee)
     
+    # Get shared boards (boards shared via BoardShare)
+    shared_board_ids = BoardShare.objects.filter(shared_with=employee).values_list('board_id', flat=True)
+    shared_boards = Board.objects.filter(id__in=shared_board_ids, is_archived=False).exclude(created_by=employee).exclude(members=employee)
+    
     context = {
         'created_boards': created_boards,
         'member_boards': member_boards,
-        'total_boards': created_boards.count() + member_boards.count(),
+        'shared_boards': shared_boards,
+        'total_boards': created_boards.count() + member_boards.count() + shared_boards.count(),
     }
     
     return render(request, 'employee/boards/boards_list.html', context)
@@ -89,7 +96,10 @@ def board_detail(request, board_id):
         board = Board.objects.get(id=board_id)
         
         # Check if user has access to this board
-        if board.created_by != employee and employee not in board.members.all():
+        has_direct_access = board.created_by == employee or employee in board.members.all()
+        board_share = BoardShare.objects.filter(board=board, shared_with=employee).first()
+        
+        if not (has_direct_access or board_share):
             messages.error(request, 'You do not have access to this board.')
             return redirect('project_boards')
         
@@ -99,11 +109,17 @@ def board_detail(request, board_id):
         # Get all employees for assignment dropdown
         all_employees = Employee.objects.all()
         
+        # Determine user permissions
+        user_permission = 'admin' if board.created_by == employee else (board_share.permission if board_share else 'view')
+        
         context = {
             'board': board,
             'lists': lists,
             'all_employees': all_employees,
             'is_board_owner': board.created_by == employee,
+            'user_permission': user_permission,
+            'can_edit': user_permission in ['edit', 'admin'],
+            'can_share': user_permission == 'admin' or board.created_by == employee,
         }
         
         return render(request, 'employee/boards/board_detail.html', context)
@@ -632,3 +648,149 @@ def delete_board(request, board_id):
     except Board.DoesNotExist:
         messages.error(request, 'Board not found.')
         return redirect('project_boards')
+
+
+@login_required
+def share_board(request, board_id):
+    """Share a board with other users via email"""
+    if not is_employee_authenticated(request):
+        return redirect('employee_login')
+    
+    try:
+        employee = Employee.objects.get(user=request.user)
+        board = get_object_or_404(Board, id=board_id)
+        
+        # Check if user can share this board (creator or admin)
+        if not (board.created_by == employee or 
+                BoardShare.objects.filter(board=board, shared_with=employee, permission='admin').exists()):
+            messages.error(request, 'You do not have permission to share this board.')
+            return redirect('board_detail', board_id=board_id)
+        
+        if request.method == 'POST':
+            form = BoardShareForm(request.POST)
+            if form.is_valid():
+                email = form.cleaned_data['email']
+                permission = form.cleaned_data['permission']
+                message = form.cleaned_data.get('message', '')
+                
+                # Get the user and employee by email
+                from django.contrib.auth.models import User
+                user = User.objects.get(email=email)
+                target_employee = Employee.objects.get(user=user)
+                
+                # Check if user is trying to share with themselves
+                if target_employee == employee:
+                    return JsonResponse({'success': False, 'errors': {'email': ['You cannot share a board with yourself.']}})
+                
+                # Create or update share
+                share, created = BoardShare.objects.get_or_create(
+                    board=board,
+                    shared_with=target_employee,
+                    defaults={
+                        'shared_by': employee,
+                        'permission': permission
+                    }
+                )
+                if not created:
+                    share.permission = permission
+                    share.save()
+                
+                # Add user to board members if not already
+                if target_employee not in board.members.all():
+                    board.members.add(target_employee)
+                
+                # Log activity
+                BoardActivity.objects.create(
+                    board=board,
+                    user=employee,
+                    action='share',
+                    details=f'Shared board with {target_employee.get_full_name()} ({email}) with {permission} permission',
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')
+                )
+                
+                messages.success(request, f'Board shared with {target_employee.get_full_name()} ({email}).')
+                return JsonResponse({'success': True, 'message': 'Board shared successfully'})
+            else:
+                return JsonResponse({'success': False, 'errors': form.errors})
+        
+        form = BoardShareForm()
+        context = {
+            'board': board,
+            'form': form,
+            'employee': employee,
+        }
+        
+        return render(request, 'employee/boards/board_share.html', context)
+        
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
+        return redirect('employee_dashboard')
+
+
+@login_required
+def board_activity(request, board_id):
+    """View board activity logs"""
+    if not is_employee_authenticated(request):
+        return redirect('employee_login')
+    
+    try:
+        employee = Employee.objects.get(user=request.user)
+        board = get_object_or_404(Board, id=board_id)
+        
+        # Check if user has access to this board
+        if not (board.created_by == employee or 
+                employee in board.members.all() or
+                BoardShare.objects.filter(board=board, shared_with=employee).exists()):
+            messages.error(request, 'You do not have access to this board.')
+            return redirect('project_boards')
+        
+        # Get activities for this board
+        activities = BoardActivity.objects.filter(board=board).select_related('user')
+        
+        # Pagination
+        paginator = Paginator(activities, 50)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        
+        context = {
+            'board': board,
+            'activities': page_obj,
+            'employee': employee,
+        }
+        
+        return render(request, 'employee/boards/board_activity.html', context)
+    
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
+        return redirect('employee_dashboard')
+
+
+@login_required
+@require_http_methods(["GET"])
+def search_employees_for_board_sharing(request):
+    """AJAX endpoint to search employees for board sharing"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    query = request.GET.get('query', '').strip()
+    if len(query) < 2:
+        return JsonResponse({'employees': []})
+    
+    # Search employees by name or email
+    employees = Employee.objects.filter(
+        models.Q(user__first_name__icontains=query) |
+        models.Q(user__last_name__icontains=query) |
+        models.Q(user__email__icontains=query)
+    ).select_related('user')[:10]
+    
+    results = []
+    for emp in employees:
+        results.append({
+            'id': str(emp.id),
+            'name': f'{emp.first_name} {emp.last_name}',
+            'email': emp.user.email,
+            'department': emp.get_department_display()
+        })
+    
+    return JsonResponse({'employees': results})

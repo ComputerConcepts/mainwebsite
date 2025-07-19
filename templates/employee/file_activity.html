@@ -1,0 +1,286 @@
+{% extends 'employee/base.html' %}
+{% load file_extras %}
+
+{% block title %}File Activity - File Manager{% endblock %}
+
+{% block extra_css %}
+<style>
+    .activity-container {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .activity-item {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        transition: all 0.3s ease;
+    }
+    
+    .activity-item:hover {
+        background: #f8f9fa;
+    }
+    
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        color: white;
+        font-size: 16px;
+    }
+    
+    .activity-icon.upload { background: #28a745; }
+    .activity-icon.download { background: #17a2b8; }
+    .activity-icon.view { background: #007bff; }
+    .activity-icon.edit { background: #ffc107; color: #212529; }
+    .activity-icon.delete { background: #dc3545; }
+    .activity-icon.share { background: #6f42c1; }
+    .activity-icon.rename { background: #fd7e14; }
+    .activity-icon.move { background: #20c997; }
+    
+    .activity-content {
+        flex: 1;
+    }
+    
+    .activity-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .activity-meta {
+        color: #666;
+        font-size: 14px;
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .activity-details {
+        margin-top: 5px;
+        color: #666;
+        font-size: 14px;
+    }
+    
+    .activity-time {
+        color: #999;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+    
+    .filter-bar {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .filter-form {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    .filter-form select,
+    .filter-form input {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+    
+    .filter-form button {
+        padding: 8px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    
+    .filter-form button:hover {
+        background: #0056b3;
+    }
+    
+    .no-activity {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+    
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+    
+    .pagination {
+        display: flex;
+        gap: 5px;
+    }
+    
+    .pagination a,
+    .pagination span {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        text-decoration: none;
+        color: #007bff;
+    }
+    
+    .pagination .current {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+    
+    .pagination a:hover {
+        background: #e9ecef;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2><i class="fas fa-history me-2"></i>File Activity</h2>
+                <a href="{% url 'file_manager' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to File Manager
+                </a>
+            </div>
+            
+            <div class="filter-bar">
+                <form method="get" class="filter-form">
+                    <select name="action" class="form-select" style="width: auto;">
+                        <option value="">All Actions</option>
+                        <option value="upload" {% if request.GET.action == 'upload' %}selected{% endif %}>Upload</option>
+                        <option value="download" {% if request.GET.action == 'download' %}selected{% endif %}>Download</option>
+                        <option value="view" {% if request.GET.action == 'view' %}selected{% endif %}>View</option>
+                        <option value="edit" {% if request.GET.action == 'edit' %}selected{% endif %}>Edit</option>
+                        <option value="delete" {% if request.GET.action == 'delete' %}selected{% endif %}>Delete</option>
+                        <option value="share" {% if request.GET.action == 'share' %}selected{% endif %}>Share</option>
+                        <option value="rename" {% if request.GET.action == 'rename' %}selected{% endif %}>Rename</option>
+                        <option value="move" {% if request.GET.action == 'move' %}selected{% endif %}>Move</option>
+                    </select>
+                    
+                    <input type="date" name="date" value="{{ request.GET.date }}" 
+                           class="form-control" style="width: auto;">
+                    
+                    <input type="text" name="user" placeholder="Filter by user..." 
+                           value="{{ request.GET.user }}" class="form-control" style="width: auto;">
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter me-2"></i>Filter
+                    </button>
+                    
+                    <a href="{% url 'file_activity' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-2"></i>Clear
+                    </a>
+                </form>
+            </div>
+            
+            <div class="activity-container">
+                {% if activities %}
+                    {% for activity in activities %}
+                        <div class="activity-item">
+                            <div class="activity-icon {{ activity.action }}">
+                                {% if activity.action == 'upload' %}
+                                    <i class="fas fa-upload"></i>
+                                {% elif activity.action == 'download' %}
+                                    <i class="fas fa-download"></i>
+                                {% elif activity.action == 'view' %}
+                                    <i class="fas fa-eye"></i>
+                                {% elif activity.action == 'edit' %}
+                                    <i class="fas fa-edit"></i>
+                                {% elif activity.action == 'delete' %}
+                                    <i class="fas fa-trash"></i>
+                                {% elif activity.action == 'share' %}
+                                    <i class="fas fa-share"></i>
+                                {% elif activity.action == 'rename' %}
+                                    <i class="fas fa-pen"></i>
+                                {% elif activity.action == 'move' %}
+                                    <i class="fas fa-arrows-alt"></i>
+                                {% else %}
+                                    <i class="fas fa-file"></i>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="activity-content">
+                                <div class="activity-title">
+                                    {{ activity.user.get_full_name }} {{ activity.get_action_display|lower }} "{{ activity.document.name }}"
+                                </div>
+                                
+                                <div class="activity-meta">
+                                    <span>
+                                        <i class="fas fa-calendar me-1"></i>{{ activity.created_at|date:"M d, Y" }}
+                                    </span>
+                                    <span>
+                                        <i class="fas fa-clock me-1"></i>{{ activity.created_at|time:"g:i A" }}
+                                    </span>
+                                    {% if activity.ip_address %}
+                                        <span>
+                                            <i class="fas fa-globe me-1"></i>{{ activity.ip_address }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                
+                                {% if activity.details %}
+                                    <div class="activity-details">
+                                        {{ activity.details }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="activity-time">
+                                {{ activity.created_at|timesince }} ago
+                            </div>
+                        </div>
+                    {% endfor %}
+                    
+                    <!-- Pagination -->
+                    {% if activities.has_other_pages %}
+                        <div class="pagination-container">
+                            <div class="pagination">
+                                {% if activities.has_previous %}
+                                    <a href="?page=1{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}">&laquo; First</a>
+                                    <a href="?page={{ activities.previous_page_number }}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}">Previous</a>
+                                {% endif %}
+                                
+                                <span class="current">
+                                    Page {{ activities.number }} of {{ activities.paginator.num_pages }}
+                                </span>
+                                
+                                {% if activities.has_next %}
+                                    <a href="?page={{ activities.next_page_number }}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}">Next</a>
+                                    <a href="?page={{ activities.paginator.num_pages }}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}{% if request.GET.user %}&user={{ request.GET.user }}{% endif %}">Last &raquo;</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="no-activity">
+                        <i class="fas fa-history fa-3x mb-3 text-muted"></i>
+                        <h4>No Activity Found</h4>
+                        <p>No file activity matches your current filters.</p>
+                        <p class="text-muted">Try adjusting your filters or check back later.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

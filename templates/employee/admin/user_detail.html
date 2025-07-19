@@ -100,6 +100,28 @@
                             <i class="fas fa-edit me-2"></i>
                             Edit User
                         </button>
+                        
+                        {% if is_super_admin %}
+                            {% if employee.is_email_verified %}
+                                <button data-user-id="{{ employee.id }}" 
+                                        class="btn btn-outline-warning unverify-email-btn">
+                                    <i class="fas fa-times-circle me-2"></i>
+                                    Unverify Email
+                                </button>
+                            {% else %}
+                                <button data-user-id="{{ employee.id }}" 
+                                        class="btn btn-outline-success verify-email-btn">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Verify Email
+                                </button>
+                            {% endif %}
+                            
+                            <button data-user-id="{{ employee.id }}" 
+                                    class="btn btn-outline-info send-verification-btn">
+                                <i class="fas fa-envelope me-2"></i>
+                                Send Verification Email
+                            </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -360,6 +382,98 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+    
+    // Verify email
+    const verifyEmailBtn = document.querySelector('.verify-email-btn');
+    if (verifyEmailBtn) {
+        verifyEmailBtn.addEventListener('click', function() {
+            const userId = this.dataset.userId;
+            
+            if (confirm('Are you sure you want to verify this user\'s email?')) {
+                fetch(`/employee/admin/users/${userId}/verify-email/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while verifying the email.');
+                });
+            }
+        });
+    }
+    
+    // Unverify email
+    const unverifyEmailBtn = document.querySelector('.unverify-email-btn');
+    if (unverifyEmailBtn) {
+        unverifyEmailBtn.addEventListener('click', function() {
+            const userId = this.dataset.userId;
+            
+            if (confirm('Are you sure you want to unverify this user\'s email?')) {
+                fetch(`/employee/admin/users/${userId}/unverify-email/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while unverifying the email.');
+                });
+            }
+        });
+    }
+    
+    // Send verification email
+    const sendVerificationBtn = document.querySelector('.send-verification-btn');
+    if (sendVerificationBtn) {
+        sendVerificationBtn.addEventListener('click', function() {
+            const userId = this.dataset.userId;
+            
+            if (confirm('Send verification email to this user?')) {
+                fetch(`/employee/admin/users/${userId}/send-verification/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while sending the verification email.');
+                });
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

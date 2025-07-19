@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-vb5l=&vr@t0vpx+!(n9of2x-46e7a$1n0!6f4_ya&%sajbjt28
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 AUTHENTICATION_BACKENDS = [

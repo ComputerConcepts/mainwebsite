@@ -3,6 +3,7 @@ from django.urls import include, path
 from . import views
 from . import views_boards
 from . import views_admin
+from . import views_files
 
 
 urlpatterns = [
@@ -60,6 +61,9 @@ urlpatterns = [
     path('employee/admin/users/create/', views_admin.create_user, name='create_user'),
     path('employee/admin/users/<uuid:user_id>/toggle-status/', views_admin.toggle_user_status, name='toggle_user_status'),
     path('employee/admin/users/<uuid:user_id>/reset-password/', views_admin.reset_user_password, name='reset_user_password'),
+    path('employee/admin/users/<uuid:user_id>/verify-email/', views_admin.verify_user_email, name='verify_user_email'),
+    path('employee/admin/users/<uuid:user_id>/unverify-email/', views_admin.unverify_user_email, name='unverify_user_email'),
+    path('employee/admin/users/<uuid:user_id>/send-verification/', views_admin.send_verification_email, name='send_verification_email'),
     path('employee/admin/bulk-action/', views_admin.bulk_action, name='bulk_action'),
     
     # Project Board URLs
@@ -67,14 +71,38 @@ urlpatterns = [
     path('employee/boards/create/', views_boards.create_board, name='create_board'),
     path('employee/boards/<uuid:board_id>/', views_boards.board_detail, name='board_detail'),
     path('employee/boards/<uuid:board_id>/delete/', views_boards.delete_board, name='delete_board'),
+    path('employee/boards/<uuid:board_id>/share/', views_boards.share_board, name='share_board'),
+    path('employee/boards/<uuid:board_id>/activity/', views_boards.board_activity, name='board_activity'),
     path('api/boards/<uuid:board_id>/lists/create/', views_boards.create_list, name='create_list'),
     path('api/boards/<uuid:board_id>/members/', views_boards.get_board_members, name='get_board_members'),
     path('api/boards/<uuid:board_id>/members/add/', views_boards.add_board_member, name='add_board_member'),
     path('api/boards/<uuid:board_id>/members/remove/', views_boards.remove_board_member, name='remove_board_member'),
     path('api/employees/search/', views_boards.search_employees, name='search_employees'),
+    path('api/employees/search-for-sharing/', views_boards.search_employees_for_board_sharing, name='search_employees_for_board_sharing'),
     path('api/lists/<uuid:list_id>/cards/create/', views_boards.create_card, name='create_card'),
     path('api/cards/<uuid:card_id>/', views_boards.card_detail, name='card_detail'),
     path('api/cards/<uuid:card_id>/update/', views_boards.update_card, name='update_card'),
     path('api/cards/<uuid:card_id>/comments/', views_boards.add_card_comment, name='add_card_comment'),
     path('api/cards/move/', views_boards.move_card, name='move_card'),
+    
+    # File Management URLs
+    path('employee/files/', views_files.file_manager, name='file_manager'),
+    path('employee/files/upload/', views_files.upload_file, name='upload_file'),
+    path('employee/files/create-folder/', views_files.create_folder, name='create_folder'),
+    path('employee/files/move/', views_files.move_file, name='move_file'),
+    path('employee/files/download/<uuid:file_id>/', views_files.download_file, name='download_file'),
+    path('employee/files/serve/<uuid:file_id>/', views_files.serve_file, name='serve_file'),
+    path('employee/files/test/<uuid:file_id>/', views_files.test_file_serve, name='test_file_serve'),
+    path('employee/files/view/<uuid:file_id>/', views_files.view_file, name='view_file'),
+    path('employee/files/delete/<uuid:file_id>/', views_files.delete_file, name='delete_file'),
+    path('employee/files/share/<uuid:file_id>/', views_files.share_file, name='share_file'),
+    path('employee/files/search/', views_files.search_files, name='search_files'),
+    path('employee/files/activity/', views_files.file_activity, name='file_activity'),
+    path('api/employees/search-email/', views_files.search_employees_by_email, name='search_employees_by_email'),
+    
+    # AI Assistant URLs
+    path('employee/ai-assistant/', views_files.ai_assistant_page, name='ai_assistant'),
+    path('api/ai/chat/', views_files.ai_chat, name='ai_chat'),
+    path('api/ai/analyze/<uuid:file_id>/', views_files.analyze_file_ai, name='analyze_file_ai'),
+    path('api/files/<uuid:file_id>/analysis/', views_files.get_file_analysis, name='get_file_analysis'),
 ]

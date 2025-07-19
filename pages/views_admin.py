@@ -405,3 +405,99 @@ def bulk_action(request):
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def verify_user_email(request, user_id):
+    """Verify a user's email"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        current_employee = Employee.objects.get(user=request.user)
+        if not current_employee.is_super_admin():
+            return JsonResponse({'error': 'Only super administrators can verify emails'}, status=403)
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee record not found'}, status=404)
+    
+    try:
+        employee = get_object_or_404(Employee, id=user_id)
+        employee.is_email_verified = True
+        employee.email_verification_token = None
+        employee.save()
+        
+        return JsonResponse({
+            'success': True, 
+            'message': f'Email verified for {employee.user.get_full_name() or employee.user.username}'
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def unverify_user_email(request, user_id):
+    """Unverify a user's email"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        current_employee = Employee.objects.get(user=request.user)
+        if not current_employee.is_super_admin():
+            return JsonResponse({'error': 'Only super administrators can unverify emails'}, status=403)
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee record not found'}, status=404)
+    
+    try:
+        employee = get_object_or_404(Employee, id=user_id)
+        employee.is_email_verified = False
+        employee.save()
+        
+        return JsonResponse({
+            'success': True, 
+            'message': f'Email unverified for {employee.user.get_full_name() or employee.user.username}'
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def send_verification_email(request, user_id):
+    """Send verification email to user"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        current_employee = Employee.objects.get(user=request.user)
+        if not current_employee.is_super_admin():
+            return JsonResponse({'error': 'Only super administrators can send verification emails'}, status=403)
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee record not found'}, status=404)
+    
+    try:
+        employee = get_object_or_404(Employee, id=user_id)
+        
+        # Generate verification token if not exists
+        if not employee.email_verification_token:
+            import secrets
+            employee.email_verification_token = secrets.token_urlsafe(32)
+            employee.save()
+        
+        # Import email sending function
+        from .views import send_verification_email_to_user
+        
+        # Send verification email
+        success = send_verification_email_to_user(employee)
+        
+        if success:
+            return JsonResponse({
+                'success': True, 
+                'message': f'Verification email sent to {employee.user.email}'
+            })
+        else:
+            return JsonResponse({'error': 'Failed to send verification email'}, status=500)
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

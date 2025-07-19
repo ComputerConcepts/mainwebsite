@@ -529,6 +529,33 @@ def send_employee_verification_email(employee, request):
         fail_silently=False,
     )
 
+
+def send_verification_email_to_user(employee):
+    """Send verification email to user without request object"""
+    try:
+        from django.contrib.sites.models import Site
+        current_site = Site.objects.get_current()
+        subject = 'Verify Your Computer Concepts Employee Account'
+        message = render_to_string('employee/email_verification.html', {
+            'employee': employee,
+            'domain': current_site.domain,
+            'protocol': 'https',  # Assume HTTPS for production
+            'token': employee.email_verification_token,
+        })
+        
+        send_mail(
+            subject,
+            '',
+            settings.DEFAULT_FROM_EMAIL,
+            [employee.user.email],
+            html_message=message,
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        print(f"Failed to send verification email: {e}")
+        return False
+
 def employee_verify_email(request, employee_id):
     """Employee email verification view"""
     try:
@@ -537,9 +564,22 @@ def employee_verify_email(request, employee_id):
         messages.error(request, 'Employee not found.')
         return redirect('employee_login')
     
+    # If employee is already verified, redirect to login
+    if employee.is_email_verified:
+        messages.info(request, 'Your email is already verified. You can log in.')
+        return redirect('employee_login')
+    
+    # If no verification token exists, generate one
+    if not employee.email_verification_token:
+        import secrets
+        employee.email_verification_token = secrets.token_urlsafe(32)
+        employee.save()
+    
     if request.method == 'POST':
         if 'resend' in request.POST:
-            # Resend verification email
+            # Generate new token and resend verification email
+            employee.email_verification_token = secrets.token_urlsafe(32)
+            employee.save()
             send_employee_verification_email(employee, request)
             messages.success(request, 'Verification email sent again.')
     
@@ -548,15 +588,29 @@ def employee_verify_email(request, employee_id):
 def employee_email_confirm(request, employee_id, token):
     """Confirm email verification"""
     try:
-        employee = Employee.objects.get(id=employee_id, email_verification_token=token)
+        # First check if employee exists
+        employee = Employee.objects.get(id=employee_id)
+        
+        # Check if already verified
+        if employee.is_email_verified:
+            messages.info(request, 'Your email is already verified. You can log in.')
+            return redirect('employee_login')
+        
+        # Check if token matches
+        if employee.email_verification_token != token:
+            messages.error(request, 'Invalid or expired verification link. Please request a new verification email.')
+            return redirect('employee_verify_email', employee_id=employee_id)
+        
+        # Verify the employee
         employee.is_email_verified = True
-        employee.email_verification_token = None
+        employee.email_verification_token = None  # Clear the token
         employee.save()
         
         messages.success(request, 'Email verified successfully! You can now log in.')
         return redirect('employee_login')
+        
     except Employee.DoesNotExist:
-        messages.error(request, 'Invalid verification link.')
+        messages.error(request, 'Employee not found.')
         return redirect('employee_login')
 
 @login_required
@@ -574,6 +628,12 @@ def employee_dashboard(request):
         # Get recent cards assigned to user
         assigned_cards = Card.objects.filter(assigned_to=employee, is_completed=False)[:5]
         
+        # File Manager statistics
+        from .models import FileDocument, FileActivity
+        uploaded_files_count = FileDocument.objects.filter(uploaded_by=employee).count()
+        shared_files_count = FileDocument.objects.filter(shared_with=employee).count()
+        recent_file_activities = FileActivity.objects.filter(user=employee).order_by('-created_at')[:5]
+        
         # HR statistics (if user is HR)
         context = {
             'employee': employee,
@@ -584,6 +644,9 @@ def employee_dashboard(request):
             'member_boards_count': member_boards.count(),
             'assigned_cards': assigned_cards,
             'assigned_cards_count': assigned_cards.count(),
+            'uploaded_files_count': uploaded_files_count,
+            'shared_files_count': shared_files_count,
+            'recent_file_activities': recent_file_activities,
         }
         
         # Add HR-specific statistics if user is HR

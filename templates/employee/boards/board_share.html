@@ -1,0 +1,341 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}Share {{ board.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .email-search-container {
+        position: relative;
+    }
+    
+    .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-top: none;
+        border-radius: 0 0 5px 5px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+    }
+    
+    .search-result-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f1f1;
+        transition: background-color 0.2s;
+    }
+    
+    .search-result-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .search-result-item:last-child {
+        border-bottom: none;
+    }
+    
+    .result-name {
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .result-email {
+        color: #666;
+        font-size: 0.9em;
+    }
+    
+    .result-department {
+        color: #999;
+        font-size: 0.8em;
+    }
+    
+    .selected-user {
+        display: none;
+        background-color: #e3f2fd;
+        border: 1px solid #1976d2;
+        border-radius: 5px;
+        padding: 10px;
+        margin-top: 10px;
+    }
+    
+    .selected-user.show {
+        display: block;
+    }
+    
+    .board-info {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 10px;
+        color: #666;
+    }
+    
+    .no-results {
+        text-align: center;
+        padding: 10px;
+        color: #666;
+        font-style: italic;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-share-alt me-2"></i>
+                        Share Board: {{ board.title }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Board Information -->
+                    <div class="board-info">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3">
+                                <i class="fas fa-columns fa-2x"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">{{ board.title }}</h6>
+                                <small>
+                                    {{ board.lists.count }} lists • 
+                                    {{ board.members.count }} members •
+                                    Created {{ board.created_at|date:"M d, Y" }}
+                                    {% if board.description %}
+                                        <br>{{ board.description }}
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <form method="post" id="share-form">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Share with</label>
+                            <div class="email-search-container">
+                                <input type="text" name="search_user" class="form-control" 
+                                       id="email-search" placeholder="Start typing name or email to find employees..." 
+                                       autocomplete="off" required>
+                                <input type="hidden" name="email" id="selected-email-hidden">
+                                <div class="search-results" id="search-results"></div>
+                            </div>
+                            <small class="form-text text-muted">
+                                Start typing to search for employees by name, email, or department
+                            </small>
+                        </div>
+                        
+                        <div class="selected-user" id="selected-user">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="result-name" id="selected-name"></div>
+                                    <div class="result-email" id="selected-email"></div>
+                                    <div class="result-department" id="selected-department"></div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Permission Level</label>
+                            {{ form.permission }}
+                            <small class="form-text text-muted">
+                                <strong>View Only:</strong> Can view the board and its content<br>
+                                <strong>Edit:</strong> Can view, add cards, and edit existing content<br>
+                                <strong>Admin:</strong> Can do everything including managing members and sharing
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Message (Optional)</label>
+                            {{ form.message }}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'board_detail' board.id %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary" id="share-btn">
+                                <i class="fas fa-share-alt me-2"></i>Share Board
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let searchTimeout;
+let selectedUser = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const emailInput = document.getElementById('email-search');
+    const searchResults = document.getElementById('search-results');
+    const selectedUserDiv = document.getElementById('selected-user');
+    
+    emailInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        // Clear the hidden email field when user types
+        document.getElementById('selected-email-hidden').value = '';
+        document.getElementById('selected-user').classList.remove('show');
+        
+        if (query.length < 2) {
+            searchResults.style.display = 'none';
+            return;
+        }
+        
+        // Clear previous timeout
+        clearTimeout(searchTimeout);
+        
+        // Add loading
+        searchResults.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+        searchResults.style.display = 'block';
+        
+        // Set new timeout
+        searchTimeout = setTimeout(() => {
+            fetch(`/api/employees/search-email/?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    displaySearchResults(data.results);
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    searchResults.innerHTML = '<div class="no-results">Error searching users</div>';
+                });
+        }, 300);
+    });
+    
+    emailInput.addEventListener('blur', function() {
+        // Hide results after a delay to allow for clicks
+        setTimeout(() => {
+            if (!searchResults.matches(':hover')) {
+                searchResults.style.display = 'none';
+            }
+        }, 200);
+    });
+    
+    emailInput.addEventListener('focus', function() {
+        if (searchResults.children.length > 0 && this.value.length >= 2) {
+            searchResults.style.display = 'block';
+        }
+    });
+});
+
+function displaySearchResults(results) {
+    const searchResults = document.getElementById('search-results');
+    
+    if (results.length === 0) {
+        searchResults.innerHTML = '<div class="no-results">No employees found</div>';
+        return;
+    }
+    
+    let html = '';
+    results.forEach(user => {
+        html += `
+            <div class="search-result-item" onclick="selectUser('${user.email}', '${user.name}', '${user.department}')">
+                <div class="result-name">${user.name}</div>
+                <div class="result-email">${user.email}</div>
+                <div class="result-department">${user.department}</div>
+            </div>
+        `;
+    });
+    
+    searchResults.innerHTML = html;
+}
+
+function selectUser(email, name, department) {
+    selectedUser = { email, name, department };
+    
+    // Update input fields
+    document.getElementById('email-search').value = name; // Show name instead of email
+    document.getElementById('selected-email-hidden').value = email; // Store email in hidden field
+    
+    // Show selected user
+    document.getElementById('selected-name').textContent = name;
+    document.getElementById('selected-email').textContent = email;
+    document.getElementById('selected-department').textContent = department;
+    document.getElementById('selected-user').classList.add('show');
+    
+    // Hide search results
+    document.getElementById('search-results').style.display = 'none';
+}
+
+function clearSelection() {
+    selectedUser = null;
+    document.getElementById('email-search').value = '';
+    document.getElementById('selected-email-hidden').value = '';
+    document.getElementById('selected-user').classList.remove('show');
+    document.getElementById('search-results').style.display = 'none';
+}
+
+// Form submission
+document.getElementById('share-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Check if a user is selected
+    const hiddenEmail = document.getElementById('selected-email-hidden').value;
+    if (!hiddenEmail) {
+        alert('Please select a user from the dropdown');
+        return;
+    }
+    
+    const formData = new FormData(this);
+    const shareBtn = document.getElementById('share-btn');
+    
+    shareBtn.disabled = true;
+    shareBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sharing...';
+    
+    fetch(this.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            alert('Board shared successfully!');
+            // Redirect back to board detail
+            window.location.href = '{% url "board_detail" board.id %}';
+        } else {
+            // Show errors
+            let errorMsg = 'Error sharing board:\n';
+            if (data.errors) {
+                Object.keys(data.errors).forEach(key => {
+                    errorMsg += `${key}: ${data.errors[key].join(', ')}\n`;
+                });
+            }
+            alert(errorMsg);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error sharing board. Please try again.');
+    })
+    .finally(() => {
+        shareBtn.disabled = false;
+        shareBtn.innerHTML = '<i class="fas fa-share-alt me-2"></i>Share Board';
+    });
+});
+</script>
+{% endblock %}

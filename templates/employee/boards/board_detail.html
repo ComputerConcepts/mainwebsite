@@ -342,6 +342,14 @@
                 {% endif %}
             </div>
             <div class="board-actions">
+                <a href="{% url 'board_activity' board.id %}" class="btn btn-light btn-sm">
+                    <i class="fas fa-history"></i> Activity
+                </a>
+                {% if can_share %}
+                <a href="{% url 'share_board' board.id %}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-share-alt"></i> Share
+                </a>
+                {% endif %}
                 <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#boardSettingsModal">
                     <i class="fas fa-cog"></i> Settings
                 </button>

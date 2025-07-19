@@ -1,0 +1,258 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}{{ board.title }} - Activity{% endblock %}
+
+{% block extra_css %}
+<style>
+    .activity-container {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .activity-item {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        transition: all 0.3s ease;
+    }
+    
+    .activity-item:hover {
+        background: #f8f9fa;
+    }
+    
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        color: white;
+        font-size: 16px;
+    }
+    
+    .activity-icon.create { background: #28a745; }
+    .activity-icon.share { background: #007bff; }
+    .activity-icon.edit { background: #ffc107; color: #333; }
+    .activity-icon.view { background: #6c757d; }
+    .activity-icon.delete { background: #dc3545; }
+    .activity-icon.archive { background: #6f42c1; }
+    .activity-icon.member_add { background: #17a2b8; }
+    .activity-icon.member_remove { background: #fd7e14; }
+    
+    .activity-content {
+        flex: 1;
+    }
+    
+    .activity-title {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .activity-details {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 5px;
+    }
+    
+    .activity-time {
+        color: #999;
+        font-size: 0.8em;
+    }
+    
+    .board-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+    }
+    
+    .filter-bar {
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .filter-form {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Board Header -->
+    <div class="board-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-2">{{ board.title }} - Activity</h1>
+                <p class="mb-0 opacity-90">Track all changes and activities on this board</p>
+            </div>
+            <div>
+                <a href="{% url 'board_detail' board.id %}" class="btn btn-light">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Board
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Activity Content -->
+    <div class="row">
+        <div class="col-12">
+            <div class="activity-container">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Activity
+                    </h4>
+                    <div class="text-muted">
+                        {{ activities.paginator.count }} total activities
+                    </div>
+                </div>
+                
+                <!-- Filter Bar -->
+                <div class="filter-bar">
+                    <form method="get" class="filter-form">
+                        <label class="form-label mb-0">Filter by action:</label>
+                        <select name="action" class="form-select" style="width: auto;">
+                            <option value="">All Actions</option>
+                            <option value="create" {% if request.GET.action == 'create' %}selected{% endif %}>Create</option>
+                            <option value="share" {% if request.GET.action == 'share' %}selected{% endif %}>Share</option>
+                            <option value="edit" {% if request.GET.action == 'edit' %}selected{% endif %}>Edit</option>
+                            <option value="view" {% if request.GET.action == 'view' %}selected{% endif %}>View</option>
+                            <option value="delete" {% if request.GET.action == 'delete' %}selected{% endif %}>Delete</option>
+                            <option value="archive" {% if request.GET.action == 'archive' %}selected{% endif %}>Archive</option>
+                            <option value="member_add" {% if request.GET.action == 'member_add' %}selected{% endif %}>Member Added</option>
+                            <option value="member_remove" {% if request.GET.action == 'member_remove' %}selected{% endif %}>Member Removed</option>
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+                        <a href="{% url 'board_activity' board.id %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    </form>
+                </div>
+                
+                <!-- Activity List -->
+                {% if activities %}
+                <div class="activity-list">
+                    {% for activity in activities %}
+                    <div class="activity-item">
+                        <div class="activity-icon {{ activity.action }}">
+                            {% if activity.action == 'create' %}
+                                <i class="fas fa-plus"></i>
+                            {% elif activity.action == 'share' %}
+                                <i class="fas fa-share-alt"></i>
+                            {% elif activity.action == 'edit' %}
+                                <i class="fas fa-edit"></i>
+                            {% elif activity.action == 'view' %}
+                                <i class="fas fa-eye"></i>
+                            {% elif activity.action == 'delete' %}
+                                <i class="fas fa-trash"></i>
+                            {% elif activity.action == 'archive' %}
+                                <i class="fas fa-archive"></i>
+                            {% elif activity.action == 'member_add' %}
+                                <i class="fas fa-user-plus"></i>
+                            {% elif activity.action == 'member_remove' %}
+                                <i class="fas fa-user-minus"></i>
+                            {% else %}
+                                <i class="fas fa-info"></i>
+                            {% endif %}
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">
+                                {{ activity.user.get_full_name }} {{ activity.get_action_display|lower }}d the board
+                            </div>
+                            {% if activity.details %}
+                            <div class="activity-details">
+                                {{ activity.details }}
+                            </div>
+                            {% endif %}
+                            <div class="activity-time">
+                                {{ activity.created_at|timesince }} ago
+                                {% if activity.ip_address %}
+                                • from {{ activity.ip_address }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Pagination -->
+                {% if activities.has_other_pages %}
+                <div class="d-flex justify-content-center mt-4">
+                    <nav aria-label="Activity pagination">
+                        <ul class="pagination">
+                            {% if activities.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ activities.previous_page_number }}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for num in activities.paginator.page_range %}
+                                {% if activities.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > activities.number|add:'-3' and num < activities.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if activities.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ activities.next_page_number }}{% if request.GET.action %}&action={{ request.GET.action }}{% endif %}">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+                
+                {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-history fa-3x mb-3 text-muted"></i>
+                    <h5>No Activity Yet</h5>
+                    <p class="text-muted">Board activity will appear here as team members interact with the board.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh activity every 30 seconds
+    setInterval(function() {
+        // Only refresh if user is still on the page and visible
+        if (!document.hidden) {
+            window.location.reload();
+        }
+    }, 30000);
+});
+</script>
+{% endblock %}
