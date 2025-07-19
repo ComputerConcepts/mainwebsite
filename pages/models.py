@@ -139,6 +139,10 @@ class Employee(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    # Storage management fields
+    storage_used = models.BigIntegerField(default=0, help_text="Storage used in bytes")
+    storage_quota = models.BigIntegerField(null=True, blank=True, help_text="Storage quota in bytes")
+    
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name} - {self.employee_id}"
     
@@ -153,6 +157,57 @@ class Employee(models.Model):
     
     def can_manage_users(self):
         return self.role in ['admin', 'super_admin']
+    
+    def get_storage_used_display(self):
+        """Return human-readable storage used"""
+        return self._format_bytes(self.storage_used)
+    
+    def get_storage_quota_display(self):
+        """Return human-readable storage quota"""
+        if self.storage_quota:
+            return self._format_bytes(self.storage_quota)
+        return "No limit"
+    
+    def get_storage_percentage(self):
+        """Return storage usage percentage"""
+        if not self.storage_quota or self.storage_quota == 0:
+            return 0
+        return min(100, (self.storage_used / self.storage_quota) * 100)
+    
+    def get_available_storage(self):
+        """Return available storage in bytes"""
+        if not self.storage_quota:
+            return float('inf')
+        return max(0, self.storage_quota - self.storage_used)
+    
+    def can_upload_file(self, file_size):
+        """Check if user can upload a file of given size"""
+        if not self.storage_quota:
+            return True
+        return self.storage_used + file_size <= self.storage_quota
+    
+    def update_storage_used(self):
+        """Recalculate and update storage used from files"""
+        from .models import FileDocument
+        total_size = FileDocument.objects.filter(uploaded_by=self).aggregate(
+            total=models.Sum('file_size')
+        )['total'] or 0
+        self.storage_used = total_size
+        self.save(update_fields=['storage_used'])
+        return total_size
+    
+    @staticmethod
+    def _format_bytes(bytes_value):
+        """Format bytes into human-readable string"""
+        if bytes_value == 0:
+            return "0 B"
+        
+        size_names = ["B", "KB", "MB", "GB", "TB"]
+        import math
+        i = int(math.floor(math.log(bytes_value, 1024)))
+        p = math.pow(1024, i)
+        s = round(bytes_value / p, 2)
+        return f"{s} {size_names[i]}"
 
 class Events(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -472,3 +527,107 @@ class FileVersion(models.Model):
     
     def __str__(self):
         return f"{self.document.name} v{self.version_number}"
+
+
+class StorageManager:
+    """Utility class for managing storage quotas and allocation"""
+    
+    @staticmethod
+    def get_system_storage_info():
+        """Get system storage information"""
+        import shutil
+        import os
+        from django.conf import settings
+        
+        try:
+            # Get storage info for the media directory
+            media_path = getattr(settings, 'MEDIA_ROOT', '/tmp')
+            if not os.path.exists(media_path):
+                media_path = '/'
+            
+            total, used, free = shutil.disk_usage(media_path)
+            
+            return {
+                'total': total,
+                'used': used,
+                'free': free,
+                'path': media_path
+            }
+        except Exception as e:
+            # Fallback values if unable to get disk usage
+            return {
+                'total': 10 * 1024 * 1024 * 1024,  # 10GB fallback
+                'used': 5 * 1024 * 1024 * 1024,   # 5GB fallback
+                'free': 5 * 1024 * 1024 * 1024,   # 5GB fallback
+                'path': 'unknown',
+                'error': str(e)
+            }
+    
+    @staticmethod
+    def calculate_user_quota():
+        """Calculate storage quota per user based on available space"""
+        storage_info = StorageManager.get_system_storage_info()
+        active_users = Employee.objects.filter(is_active=True).count()
+        
+        # Reserve 1GB for website purposes
+        reserved_space = 1 * 1024 * 1024 * 1024  # 1GB in bytes
+        
+        # Calculate available space for users
+        available_for_users = max(0, storage_info['free'] - reserved_space)
+        
+        # If no active users, return 0
+        if active_users == 0:
+            return 0
+        
+        # Calculate quota per user
+        quota_per_user = available_for_users // active_users
+        
+        # Minimum quota of 10MB per user
+        min_quota = 10 * 1024 * 1024  # 10MB
+        
+        return max(min_quota, quota_per_user)
+    
+    @staticmethod
+    def update_all_user_quotas():
+        """Update storage quotas for all active users"""
+        quota_per_user = StorageManager.calculate_user_quota()
+        
+        active_employees = Employee.objects.filter(is_active=True)
+        updated_count = active_employees.update(storage_quota=quota_per_user)
+        
+        return {
+            'quota_per_user': quota_per_user,
+            'updated_users': updated_count,
+            'quota_display': Employee._format_bytes(quota_per_user)
+        }
+    
+    @staticmethod
+    def get_storage_stats():
+        """Get comprehensive storage statistics"""
+        storage_info = StorageManager.get_system_storage_info()
+        
+        # Get user storage usage
+        total_user_storage = Employee.objects.filter(is_active=True).aggregate(
+            total=models.Sum('storage_used')
+        )['total'] or 0
+        
+        # Get file count
+        total_files = FileDocument.objects.count()
+        
+        # Calculate quotas
+        quota_per_user = StorageManager.calculate_user_quota()
+        active_users = Employee.objects.filter(is_active=True).count()
+        total_allocated = quota_per_user * active_users
+        
+        return {
+            'system': storage_info,
+            'total_user_storage': total_user_storage,
+            'total_files': total_files,
+            'quota_per_user': quota_per_user,
+            'active_users': active_users,
+            'total_allocated': total_allocated,
+            'reserved_space': 1 * 1024 * 1024 * 1024,  # 1GB
+            'quota_per_user_display': Employee._format_bytes(quota_per_user),
+            'total_user_storage_display': Employee._format_bytes(total_user_storage),
+            'total_allocated_display': Employee._format_bytes(total_allocated),
+        }

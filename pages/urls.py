@@ -100,9 +100,16 @@ urlpatterns = [
     path('employee/files/view/<uuid:file_id>/', views_files.view_file, name='view_file'),
     path('employee/files/delete/<uuid:file_id>/', views_files.delete_file, name='delete_file'),
     path('employee/files/share/<uuid:file_id>/', views_files.share_file, name='share_file'),
+    path('employee/files/unshare/<uuid:file_id>/<uuid:share_id>/', views_files.unshare_file, name='unshare_file'),
+    path('employee/files/update-share/<uuid:file_id>/<uuid:share_id>/', views_files.update_file_share, name='update_file_share'),
+    path('employee/files/transfer-ownership/<uuid:file_id>/', views_files.transfer_file_ownership, name='transfer_file_ownership'),
+    path('employee/files/storage-management/', views_files.storage_management, name='storage_management'),
+    path('api/files/<uuid:file_id>/details/', views_files.get_file_details, name='get_file_details'),
+    path('api/storage/info/', views_files.get_storage_info, name='get_storage_info'),
     path('employee/files/search/', views_files.search_files, name='search_files'),
     path('employee/files/activity/', views_files.file_activity, name='file_activity'),
     path('api/employees/search-email/', views_files.search_employees_by_email, name='search_employees_by_email'),
+    path('api/files/<uuid:file_id>/details/', views_files.get_file_details, name='get_file_details'),
     
     # AI Assistant URLs
     path('employee/ai-assistant/', views_files.ai_assistant_page, name='ai_assistant'),

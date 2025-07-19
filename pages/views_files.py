@@ -179,11 +179,62 @@ def create_folder(request):
 
 @login_required
 def upload_file(request):
-    """Upload files"""
+    """Upload files with real-time storage quota enforcement"""
     if request.method == 'POST':
         try:
             employee = Employee.objects.get(user=request.user)
             uploaded_files = []
+            
+            # STEP 1: Update storage quotas first to ensure we have the latest allocation
+            from .models import StorageManager
+            try:
+                quota_result = StorageManager.update_all_user_quotas()
+                print(f"[QUOTA UPDATE] Updated {quota_result['updated_users']} users with latest quotas")
+            except Exception as e:
+                print(f"[QUOTA WARNING] Failed to update quotas: {str(e)}")
+                # Continue with existing quota if update fails
+            
+            # Refresh employee data to get updated quota
+            employee.refresh_from_db()
+            
+            # STEP 2: Ensure user has a quota set
+            if employee.storage_quota is None or employee.storage_quota == 0:
+                employee.storage_quota = StorageManager.calculate_user_quota()
+                employee.save()
+                print(f"[QUOTA SET] Set initial quota for {employee.get_full_name()}: {employee.get_storage_quota_display()}")
+            
+            # STEP 3: Calculate total size of files being uploaded
+            total_upload_size = sum(file.size for file in request.FILES.getlist('files'))
+            
+            # STEP 4: Check if user has enough storage space after quota update
+            if not employee.can_upload_file(total_upload_size):
+                available_space = employee.get_available_storage()
+                
+                # Provide detailed error message with current quota info
+                storage_info = {
+                    'current_used': employee.get_storage_used_display(),
+                    'total_quota': employee.get_storage_quota_display(),
+                    'available': employee._format_bytes(available_space),
+                    'required': employee._format_bytes(total_upload_size),
+                    'percentage_used': employee.get_storage_percentage()
+                }
+                
+                error_message = (
+                    f"Upload denied: Insufficient storage space.\n"
+                    f"• You need: {storage_info['required']}\n"
+                    f"• Available: {storage_info['available']}\n"
+                    f"• Current usage: {storage_info['current_used']} / {storage_info['total_quota']} "
+                    f"({storage_info['percentage_used']:.1f}%)\n"
+                    f"• Storage quotas were updated to latest allocation before this check."
+                )
+                
+                return JsonResponse({
+                    'success': False, 
+                    'message': error_message,
+                    'storage_error': True,
+                    'storage_info': storage_info,
+                    'quota_updated': True
+                })
             
             # Handle multiple file uploads
             for file in request.FILES.getlist('files'):
@@ -270,8 +321,31 @@ def upload_file(request):
                 
                 uploaded_files.append(file_doc.name)
             
-            messages.success(request, f'Successfully uploaded {len(uploaded_files)} file(s).')
-            return JsonResponse({'success': True, 'files': uploaded_files})
+            # Update user's storage usage
+            employee.update_storage_used()
+            
+            # Get updated storage information for response
+            updated_storage_info = {
+                'used': employee.get_storage_used_display(),
+                'quota': employee.get_storage_quota_display(),
+                'percentage': employee.get_storage_percentage(),
+                'available': employee._format_bytes(employee.get_available_storage())
+            }
+            
+            success_message = (
+                f'Successfully uploaded {len(uploaded_files)} file(s). '
+                f'Storage: {updated_storage_info["used"]} / {updated_storage_info["quota"]} used '
+                f'({updated_storage_info["percentage"]:.1f}%)'
+            )
+            
+            messages.success(request, success_message)
+            return JsonResponse({
+                'success': True, 
+                'files': uploaded_files,
+                'storage_info': updated_storage_info,
+                'quota_updated': True,
+                'message': success_message
+            })
             
         except Employee.DoesNotExist:
             return JsonResponse({'success': False, 'message': 'Employee profile not found'})
@@ -503,8 +577,17 @@ def delete_file(request, file_id):
             file_name = file_doc.name
             file_doc.delete()
             
+            # Update user's storage usage
+            employee.update_storage_used()
+            
             messages.success(request, f'File "{file_name}" deleted successfully.')
-            return JsonResponse({'success': True, 'message': 'File deleted successfully'})
+            return JsonResponse({
+                'success': True, 
+                'message': 'File deleted successfully',
+                'storage_used': employee.get_storage_used_display(),
+                'storage_quota': employee.get_storage_quota_display(),
+                'storage_percentage': employee.get_storage_percentage()
+            })
             
         except Employee.DoesNotExist:
             return JsonResponse({'success': False, 'message': 'Employee profile not found'})
@@ -982,3 +1065,254 @@ def move_file(request):
             'success': False,
             'message': f'An error occurred: {str(e)}'
         })
+
+
+@login_required
+@require_http_methods(["POST"])
+def unshare_file(request, file_id, share_id):
+    """Remove a file share"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        file_doc = get_object_or_404(FileDocument, id=file_id)
+        
+        # Check if user can manage this file (owner or admin)
+        if file_doc.uploaded_by != employee and not employee.is_admin():
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        share = get_object_or_404(FileShare, id=share_id, document=file_doc)
+        shared_with_name = share.shared_with.get_full_name()
+        share.delete()
+        
+        # Log the activity
+        FileActivity.objects.create(
+            document=file_doc,
+            user=employee,
+            action='unshare',
+            details=f'removed sharing with {shared_with_name}',
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+        
+        messages.success(request, f'File sharing removed for {shared_with_name}')
+        return JsonResponse({'success': True})
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee profile not found'}, status=401)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def update_file_share(request, file_id, share_id):
+    """Update file share permission"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        file_doc = get_object_or_404(FileDocument, id=file_id)
+        
+        # Check if user can manage this file (owner or admin)
+        if file_doc.uploaded_by != employee and not employee.is_admin():
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        share = get_object_or_404(FileShare, id=share_id, document=file_doc)
+        new_permission = request.POST.get('permission')
+        
+        if new_permission not in ['view', 'edit', 'full']:
+            return JsonResponse({'error': 'Invalid permission'}, status=400)
+        
+        old_permission = share.get_permission_display()
+        share.permission = new_permission
+        share.save()
+        
+        # Log the activity
+        FileActivity.objects.create(
+            document=file_doc,
+            user=employee,
+            action='share_update',
+            details=f'changed {share.shared_with.get_full_name()} permission from {old_permission} to {share.get_permission_display()}',
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+        
+        messages.success(request, f'Permission updated for {share.shared_with.get_full_name()}')
+        return JsonResponse({'success': True})
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee profile not found'}, status=401)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def transfer_file_ownership(request, file_id):
+    """Transfer file ownership to another user"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        file_doc = get_object_or_404(FileDocument, id=file_id)
+        
+        # Only the current owner can transfer ownership
+        if file_doc.uploaded_by != employee:
+            return JsonResponse({'error': 'Only the file owner can transfer ownership'}, status=403)
+        
+        new_owner_id = request.POST.get('new_owner_id')
+        new_owner = get_object_or_404(Employee, id=new_owner_id)
+        
+        old_owner_name = employee.get_full_name()
+        file_doc.uploaded_by = new_owner
+        file_doc.save()
+        
+        # Log the activity
+        FileActivity.objects.create(
+            document=file_doc,
+            user=employee,
+            action='transfer_ownership',
+            details=f'transferred ownership from {old_owner_name} to {new_owner.get_full_name()}',
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
+        
+        messages.success(request, f'File ownership transferred to {new_owner.get_full_name()}')
+        return JsonResponse({'success': True})
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee profile not found'}, status=401)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def get_file_details(request, file_id):
+    """Get detailed file information including sharing data"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        file_doc = get_object_or_404(FileDocument, id=file_id)
+        
+        # Check if user has access to this file
+        has_access = (
+            file_doc.uploaded_by == employee or
+            file_doc.shares.filter(shared_with=employee).exists() or
+            employee.is_admin()
+        )
+        
+        if not has_access:
+            return JsonResponse({'error': 'Access denied'}, status=403)
+        
+        # Get file shares if user is owner
+        shares_data = []
+        if file_doc.uploaded_by == employee:
+            shares = file_doc.shares.all().select_related('shared_with')
+            shares_data = [{
+                'id': str(share.id),
+                'shared_with_name': share.shared_with.get_full_name(),
+                'shared_with_department': share.shared_with.department,
+                'permission': share.permission,
+                'created_at': share.created_at.strftime('%b %d, %Y')
+            } for share in shares]
+        
+        file_data = {
+            'id': str(file_doc.id),
+            'name': file_doc.name,
+            'size': file_doc.get_file_size_display(),
+            'content_type': file_doc.content_type,
+            'file_type': file_doc.file_type,
+            'owner_name': file_doc.uploaded_by.get_full_name(),
+            'is_owner': file_doc.uploaded_by == employee,
+            'created_at': file_doc.created_at.strftime('%b %d, %Y %I:%M %p'),
+            'updated_at': file_doc.updated_at.strftime('%b %d, %Y %I:%M %p'),
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'file': file_data,
+            'shares': shares_data
+        })
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee profile not found'}, status=401)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def storage_management(request):
+    """Storage management view for admins"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        
+        # Only admins can access storage management
+        if not employee.is_admin():
+            messages.error(request, 'Access denied. Admin privileges required.')
+            return redirect('file_manager')
+        
+        from .models import StorageManager
+        
+        if request.method == 'POST':
+            action = request.POST.get('action')
+            
+            if action == 'update_quotas':
+                # Update all user quotas
+                result = StorageManager.update_all_user_quotas()
+                messages.success(request, 
+                    f'Updated storage quotas for {result["updated_users"]} users. '
+                    f'New quota per user: {result["quota_display"]}')
+            
+            elif action == 'recalculate_usage':
+                # Recalculate storage usage for all users
+                updated_count = 0
+                for emp in Employee.objects.filter(is_active=True):
+                    emp.update_storage_used()
+                    updated_count += 1
+                messages.success(request, f'Recalculated storage usage for {updated_count} users.')
+        
+        # Get storage statistics
+        storage_stats = StorageManager.get_storage_stats()
+        
+        # Get top storage users
+        top_users = Employee.objects.filter(is_active=True).order_by('-storage_used')[:10]
+        
+        # Get users over quota
+        over_quota_users = []
+        for emp in Employee.objects.filter(is_active=True):
+            if emp.storage_quota and emp.storage_used > emp.storage_quota:
+                over_quota_users.append(emp)
+        
+        context = {
+            'storage_stats': storage_stats,
+            'top_users': top_users,
+            'over_quota_users': over_quota_users,
+            'employee': employee,
+        }
+        
+        return render(request, 'employee/storage_management.html', context)
+        
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
+        return redirect('employee_dashboard')
+
+
+@login_required
+def get_storage_info(request):
+    """API endpoint to get current user's storage information"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        
+        # Update quota if not set
+        if employee.storage_quota is None:
+            from .models import StorageManager
+            employee.storage_quota = StorageManager.calculate_user_quota()
+            employee.save()
+        
+        return JsonResponse({
+            'success': True,
+            'storage_used': employee.storage_used,
+            'storage_quota': employee.storage_quota,
+            'storage_used_display': employee.get_storage_used_display(),
+            'storage_quota_display': employee.get_storage_quota_display(),
+            'storage_percentage': employee.get_storage_percentage(),
+            'available_storage': employee.get_available_storage(),
+            'available_storage_display': employee._format_bytes(employee.get_available_storage())
+        })
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee profile not found'}, status=401)

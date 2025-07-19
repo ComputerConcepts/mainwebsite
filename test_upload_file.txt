@@ -1,0 +1,18 @@
+This is a test file to verify that the enhanced upload system works correctly.
+
+The upload process now includes:
+1. Real-time quota updates before validation
+2. Enhanced error messages with detailed storage information
+3. Better user feedback about quota status
+4. Automatic refresh of storage quotas to ensure fair allocation
+
+Test file created on: July 19, 2025
+
+Storage Management Features:
+- Dynamic quota allocation based on VM capacity
+- 1GB reserved for website operations
+- Fair distribution among all active users
+- Real-time validation during uploads
+- Comprehensive logging and monitoring
+
+This file can be used to test the upload functionality!

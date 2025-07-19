@@ -121,6 +121,34 @@
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
     }
+    
+    .share-item-enhanced {
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        background: #f8f9fa;
+    }
+    
+    .share-item-enhanced .form-select {
+        width: auto;
+        min-width: 100px;
+    }
+    
+    .storage-progress .progress-bar {
+        transition: width 0.3s ease;
+    }
+    
+    .storage-progress .progress-bar.bg-danger {
+        background-color: #dc3545 !important;
+    }
+    
+    .storage-progress .progress-bar.bg-warning {
+        background-color: #ffc107 !important;
+    }
+    
+    .storage-progress .progress-bar.bg-success {
+        background-color: #28a745 !important;
+    }
 </style>
 {% endblock %}
 
@@ -156,15 +184,30 @@
             
             <!-- Storage Stats -->
             <div class="stats-card">
-                <h6>Storage Used</h6>
-                <p class="mb-1">{{ total_files }} files</p>
-                <p class="mb-0">
-                    {% if total_size %}
-                        {{ total_size|filesizeformat }}
-                    {% else %}
-                        0 bytes
-                    {% endif %}
-                </p>
+                <h6>Storage Usage</h6>
+                <div id="storageInfo">
+                    <p class="mb-1">{{ total_files }} files</p>
+                    <p class="mb-1">
+                        {% if total_size %}
+                            {{ total_size|filesizeformat }}
+                        {% else %}
+                            0 bytes
+                        {% endif %}
+                    </p>
+                    <div class="storage-progress">
+                        <div class="progress mb-2" style="height: 10px;">
+                            <div class="progress-bar" role="progressbar" style="width: 0%" id="storageProgressBar"></div>
+                        </div>
+                        <small class="text-muted" id="storageQuotaText">Loading quota...</small>
+                    </div>
+                </div>
+                {% if request.user.employee.is_admin %}
+                <div class="mt-2">
+                    <a href="{% url 'storage_management' %}" class="btn btn-sm btn-outline-warning">
+                        <i class="fas fa-cog me-1"></i>Manage Storage
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -225,15 +268,20 @@
                         </div>
                         
                         <div class="file-actions">
-                            <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); downloadFile('{{ file.id }}')">
+                            <button class="btn btn-sm btn-outline-info" onclick="event.stopPropagation(); showFileDetails('{{ file.id }}')" title="File Details">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); downloadFile('{{ file.id }}')" title="Download">
                                 <i class="fas fa-download"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-success" onclick="event.stopPropagation(); shareFile('{{ file.id }}')">
+                            <button class="btn btn-sm btn-outline-success" onclick="event.stopPropagation(); shareFile('{{ file.id }}')" title="Share">
                                 <i class="fas fa-share-alt"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFile('{{ file.id }}')">
+                            {% if file.uploaded_by == request.user.employee %}
+                            <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFile('{{ file.id }}')" title="Delete">
                                 <i class="fas fa-trash"></i>
                             </button>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -290,6 +338,26 @@
     </div>
 </div>
 
+<!-- File Details Modal -->
+<div class="modal fade" id="fileDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle me-2"></i>
+                    File Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="fileDetailsContent">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 console.log('=== FILE MANAGER SCRIPT LOADING ===');
 
@@ -297,13 +365,20 @@ console.log('=== FILE MANAGER SCRIPT LOADING ===');
 document.addEventListener('DOMContentLoaded', function() {
     console.log('File manager loaded successfully');
     initializeFileUploadDragDrop();
+    loadStorageInfo();
 });
 
-// Upload form handling
+// Upload form handling with real-time quota validation
 document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const formData = new FormData(this);
+    const submitButton = this.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+    
+    // Show loading state
+    submitButton.disabled = true;
+    submitButton.textContent = 'Checking quotas and uploading...';
     
     fetch('{% url "upload_file" %}', {
         method: 'POST',
@@ -314,17 +389,72 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     })
     .then(response => response.json())
     .then(data => {
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+        
         if (data.success) {
+            // Show success message with quota info if available
+            if (data.storage_info) {
+                const message = `Files uploaded successfully!\n` +
+                    `Storage: ${data.storage_info.used} / ${data.storage_info.quota} ` +
+                    `(${data.storage_info.percentage.toFixed(1)}% used)\n` +
+                    `Available: ${data.storage_info.available}`;
+                alert(message);
+            }
+            
+            // Update storage display if it exists
+            updateStorageDisplay(data.storage_info);
+            
+            // Reload to show new files
             location.reload();
         } else {
-            alert('Error: ' + (data.message || 'Upload failed'));
+            // Handle storage quota errors with detailed information
+            if (data.storage_error && data.storage_info) {
+                let errorMsg = data.message;
+                if (data.quota_updated) {
+                    errorMsg += '\n\n✅ Note: Storage quotas were automatically updated before this check to ensure you have the latest allocation.';
+                }
+                alert(errorMsg);
+            } else {
+                alert('Error: ' + (data.message || 'Upload failed'));
+            }
         }
     })
     .catch(error => {
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
         console.error('Error:', error);
-        alert('An error occurred during upload');
+        alert('An error occurred during upload. Please try again.');
     });
 });
+
+// Helper function to update storage display
+function updateStorageDisplay(storageInfo) {
+    if (!storageInfo) return;
+    
+    // Update progress bar if it exists
+    const progressBar = document.querySelector('.storage-progress .progress-bar');
+    if (progressBar) {
+        progressBar.style.width = storageInfo.percentage + '%';
+        progressBar.setAttribute('aria-valuenow', storageInfo.percentage);
+        
+        // Update color based on usage
+        progressBar.classList.remove('bg-success', 'bg-warning', 'bg-danger');
+        if (storageInfo.percentage < 70) {
+            progressBar.classList.add('bg-success');
+        } else if (storageInfo.percentage < 90) {
+            progressBar.classList.add('bg-warning');
+        } else {
+            progressBar.classList.add('bg-danger');
+        }
+    }
+    
+    // Update storage text if it exists
+    const storageText = document.querySelector('.storage-info');
+    if (storageText) {
+        storageText.textContent = `${storageInfo.used} / ${storageInfo.quota} used (${storageInfo.percentage.toFixed(1)}%)`;
+    }
+}
 
 // File operations
 function downloadFile(fileId) {
@@ -408,6 +538,220 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// File management functions
+function showFileDetails(fileId) {
+    fetch(`/api/files/${fileId}/details/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const fileData = data.file;
+                const shares = data.shares || [];
+                
+                let sharesHtml = '';
+                if (fileData.is_owner) {
+                    sharesHtml = `
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0"><i class="fas fa-share-alt me-2"></i>Shared With</h6>
+                                <button class="btn btn-sm btn-outline-primary" onclick="showShareFileModal('${fileId}')">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            ${shares.length > 0 ? shares.map(share => `
+                                <div class="share-item-enhanced mb-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>${share.shared_with_name}</strong>
+                                            <div class="text-muted small">${share.shared_with_department || 'Employee'}</div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <select class="form-select form-select-sm" 
+                                                    onchange="updateFileShare('${fileId}', '${share.id}', this.value)">
+                                                <option value="view" ${share.permission === 'view' ? 'selected' : ''}>View</option>
+                                                <option value="edit" ${share.permission === 'edit' ? 'selected' : ''}>Edit</option>
+                                                <option value="full" ${share.permission === 'full' ? 'selected' : ''}>Full Access</option>
+                                            </select>
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    onclick="unshareFile('${fileId}', '${share.id}', '${share.shared_with_name}')"
+                                                    title="Remove sharing">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">Shared ${share.created_at}</small>
+                                </div>
+                            `).join('') : '<p class="text-muted small">This file is not shared with anyone yet.</p>'}
+                        </div>
+                    `;
+                }
+                
+                const modalContent = `
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            <i class="fas fa-${fileData.file_type || 'file'} fa-4x text-primary mb-3"></i>
+                            <h5>${fileData.name}</h5>
+                        </div>
+                        <div class="col-md-8">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Size:</strong></td>
+                                    <td>${fileData.size}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Type:</strong></td>
+                                    <td>${fileData.content_type || 'Unknown'}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Owner:</strong></td>
+                                    <td>${fileData.owner_name}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Uploaded:</strong></td>
+                                    <td>${fileData.created_at}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Modified:</strong></td>
+                                    <td>${fileData.updated_at}</td>
+                                </tr>
+                            </table>
+                            
+                            ${sharesHtml}
+                            
+                            ${fileData.is_owner ? `
+                                <div class="mt-3">
+                                    <h6><i class="fas fa-crown me-2"></i>Ownership</h6>
+                                    <button class="btn btn-sm btn-outline-warning" onclick="showTransferFileOwnershipModal('${fileId}')">
+                                        Transfer Ownership
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('fileDetailsContent').innerHTML = modalContent;
+                const modal = new bootstrap.Modal(document.getElementById('fileDetailsModal'));
+                modal.show();
+            } else {
+                alert('Error loading file details: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading file details');
+        });
+}
+
+function unshareFile(fileId, shareId, userName) {
+    if (confirm(`Remove sharing with ${userName}?`)) {
+        fetch(`/employee/files/unshare/${fileId}/${shareId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showFileDetails(fileId); // Refresh the details modal
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error removing share');
+        });
+    }
+}
+
+function updateFileShare(fileId, shareId, newPermission) {
+    fetch(`/employee/files/update-share/${fileId}/${shareId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `permission=${newPermission}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            alert('Error: ' + (data.error || 'Unknown error'));
+            showFileDetails(fileId); // Refresh on error
+        }
+        // On success, the change is already applied in the UI
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating permission');
+        showFileDetails(fileId); // Refresh on error
+    });
+}
+
+function showTransferFileOwnershipModal(fileId) {
+    // This would require fetching available employees - for now, simple implementation
+    const newOwnerEmail = prompt('Enter the email of the new owner:');
+    if (newOwnerEmail) {
+        // You would need to implement employee lookup by email first
+        alert('Transfer ownership functionality needs employee lookup implementation');
+    }
+}
+
+// Storage management functions
+function loadStorageInfo() {
+    fetch('/api/storage/info/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateStorageDisplay(data);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading storage info:', error);
+        });
+}
+
+function updateStorageDisplay(storageData) {
+    const progressBar = document.getElementById('storageProgressBar');
+    const quotaText = document.getElementById('storageQuotaText');
+    
+    if (progressBar && quotaText) {
+        const percentage = storageData.storage_percentage;
+        
+        // Update progress bar
+        progressBar.style.width = percentage + '%';
+        
+        // Set color based on usage
+        progressBar.className = 'progress-bar';
+        if (percentage >= 90) {
+            progressBar.classList.add('bg-danger');
+        } else if (percentage >= 75) {
+            progressBar.classList.add('bg-warning');
+        } else {
+            progressBar.classList.add('bg-success');
+        }
+        
+        // Update text
+        quotaText.textContent = `${storageData.storage_used_display} of ${storageData.storage_quota_display} used`;
+        
+        // Show warning if near quota
+        if (percentage >= 90) {
+            quotaText.style.color = '#dc3545';
+        } else if (percentage >= 75) {
+            quotaText.style.color = '#ffc107';
+        } else {
+            quotaText.style.color = '#6c757d';
+        }
+    }
+}
+
+// Update storage info after file operations
+function refreshStorageInfo() {
+    loadStorageInfo();
+}
 </script>
 </script>
 {% endblock %}
