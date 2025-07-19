@@ -5,6 +5,25 @@
 
 {% block extra_css %}
 <style>
+    .boards-manager {
+        background: #f8f9fa;
+        min-height: 100vh;
+    }
+    
+    .sidebar {
+        background: white;
+        border-right: 1px solid #dee2e6;
+        height: 100vh;
+        position: fixed;
+        width: 250px;
+        overflow-y: auto;
+    }
+    
+    .main-content {
+        margin-left: 250px;
+        padding: 20px;
+    }
+    
     .board-card {
         transition: transform 0.2s, box-shadow 0.2s;
         border: none;
@@ -34,10 +53,125 @@
         padding: 2px 8px;
         border-radius: 12px;
     }
+    
+    .stats-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    
+    .search-bar {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .breadcrumb {
+        background: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .sidebar a.active {
+        background-color: #e3f2fd;
+        color: #1976d2;
+        font-weight: 500;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="boards-manager">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="p-3">
+            <h5 class="mb-3">
+                <i class="fas fa-project-diagram me-2"></i>
+                Projects
+            </h5>
+            
+            <!-- Navigation -->
+            <div class="mb-3">
+                <h6>Quick Access</h6>
+                <ul class="list-unstyled">
+                    <li><a href="{% url 'project_boards' %}" class="text-decoration-none d-block py-1 {% if not request.GET.shared and not request.GET.recent %}active{% endif %}">
+                        <i class="fas fa-home me-2"></i>My Boards
+                    </a></li>
+                    <li><a href="{% url 'project_boards' %}?shared=true" class="text-decoration-none d-block py-1 {% if request.GET.shared %}active{% endif %}">
+                        <i class="fas fa-share-alt me-2"></i>Shared with me
+                    </a></li>
+                    <li><a href="{% url 'project_boards' %}?recent=true" class="text-decoration-none d-block py-1 {% if request.GET.recent %}active{% endif %}">
+                        <i class="fas fa-clock me-2"></i>Recent
+                    </a></li>
+                    <li><a href="{% url 'board_activity_list' %}" class="text-decoration-none d-block py-1">
+                        <i class="fas fa-history me-2"></i>Activity
+                    </a></li>
+                </ul>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="stats-card">
+                <h6>Project Summary</h6>
+                <p class="mb-1">{{ total_boards }} total boards</p>
+                <p class="mb-1">{{ created_boards.count }} created by you</p>
+                <p class="mb-0">{{ member_boards.count }} shared with you</p>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="d-grid">
+                <a href="{% url 'create_board' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Create Board
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item active">
+                    <i class="fas fa-project-diagram"></i> 
+                    {% if request.GET.shared %}
+                        Shared with me
+                    {% elif request.GET.recent %}
+                        Recent boards
+                    {% else %}
+                        My Boards
+                    {% endif %}
+                </li>
+            </ol>
+        </nav>
+        
+        <!-- Search Bar -->
+        <div class="search-bar">
+            <form method="get" action="{% url 'project_boards' %}">
+                {% if request.GET.shared %}<input type="hidden" name="shared" value="true">{% endif %}
+                {% if request.GET.recent %}<input type="hidden" name="recent" value="true">{% endif %}
+                <div class="input-group">
+                    <input type="text" class="form-control" name="search" placeholder="Search boards..." value="{{ request.GET.search }}">
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
@@ -241,6 +375,7 @@
             </div>
             {% endif %}
         </div>
+    </div>
     </div>
 </div>
 {% endblock %}

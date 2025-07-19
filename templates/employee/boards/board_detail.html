@@ -49,6 +49,87 @@
         color: #495057;
         flex-grow: 1;
     }
+    
+    /* Board Info Sidebar */
+    .board-info-sidebar {
+        position: fixed;
+        right: -400px;
+        top: 0;
+        width: 400px;
+        height: 100vh;
+        background: white;
+        box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+        z-index: 1050;
+        transition: right 0.3s ease;
+        overflow-y: auto;
+    }
+    
+    .board-info-sidebar.active {
+        right: 0;
+    }
+    
+    .info-sidebar-content {
+        padding: 20px;
+    }
+    
+    .info-sidebar-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .info-section {
+        margin-bottom: 25px;
+    }
+    
+    .info-section h6 {
+        color: #495057;
+        font-weight: 600;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .share-item {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid #f1f1f1;
+    }
+    
+    .share-item:last-child {
+        border-bottom: none;
+    }
+    
+    .activity-item-mini {
+        padding: 8px 0;
+        border-bottom: 1px solid #f1f1f1;
+        font-size: 0.9rem;
+    }
+    
+    .activity-item-mini:last-child {
+        border-bottom: none;
+    }
+    
+    .board-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1040;
+        display: none;
+    }
+    
+    .board-overlay.active {
+        display: block;
+    }
 
     .card-count {
         background: #6c757d;
@@ -352,6 +433,9 @@
                 {% endif %}
                 <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#boardSettingsModal">
                     <i class="fas fa-cog"></i> Settings
+                </button>
+                <button class="btn btn-light btn-sm" onclick="toggleBoardInfo()">
+                    <i class="fas fa-info-circle"></i> Info
                 </button>
                 {% if is_board_owner %}
                 <button class="btn btn-outline-light btn-sm" onclick="inviteMembers()">
@@ -1406,5 +1490,135 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// Board info sidebar functions
+function toggleBoardInfo() {
+    const sidebar = document.getElementById('boardInfoSidebar');
+    const overlay = document.getElementById('boardOverlay');
+    
+    sidebar.classList.toggle('active');
+    overlay.classList.toggle('active');
+}
+
+function closeBoardInfo() {
+    const sidebar = document.getElementById('boardInfoSidebar');
+    const overlay = document.getElementById('boardOverlay');
+    
+    sidebar.classList.remove('active');
+    overlay.classList.remove('active');
+}
 </script>
+
+<!-- Board Info Sidebar -->
+<div class="board-overlay" id="boardOverlay" onclick="closeBoardInfo()"></div>
+<div class="board-info-sidebar" id="boardInfoSidebar">
+    <div class="info-sidebar-content">
+        <div class="info-sidebar-header">
+            <h5 class="mb-0">
+                <i class="fas fa-info-circle me-2"></i>
+                Board Information
+            </h5>
+            <button class="btn btn-sm btn-outline-secondary" onclick="closeBoardInfo()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <!-- Board Details -->
+        <div class="info-section">
+            <h6><i class="fas fa-clipboard"></i> Board Details</h6>
+            <table class="table table-borderless table-sm">
+                <tr>
+                    <td><strong>Created:</strong></td>
+                    <td>{{ board.created_at|date:"M d, Y H:i" }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Updated:</strong></td>
+                    <td>{{ board.updated_at|date:"M d, Y H:i" }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Owner:</strong></td>
+                    <td>{{ board.created_by.get_full_name }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Lists:</strong></td>
+                    <td>{{ lists.count }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Members:</strong></td>
+                    <td>{{ board.members.count }}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- Sharing Information -->
+        {% if board_shares %}
+        <div class="info-section">
+            <h6><i class="fas fa-share-alt"></i> Shared With</h6>
+            {% for share in board_shares %}
+            <div class="share-item">
+                <div>
+                    <strong>{{ share.shared_with.get_full_name }}</strong>
+                    <div class="text-muted small">{{ share.get_permission_display }}</div>
+                </div>
+                <small class="text-muted">{{ share.created_at|date:"M d" }}</small>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <!-- Members -->
+        <div class="info-section">
+            <h6><i class="fas fa-users"></i> Members</h6>
+            {% for member in board.members.all %}
+            <div class="share-item">
+                <div>
+                    <strong>{{ member.get_full_name }}</strong>
+                    <div class="text-muted small">{{ member.department|default:"Employee" }}</div>
+                </div>
+                {% if member == board.created_by %}
+                    <span class="badge bg-primary">Owner</span>
+                {% else %}
+                    <span class="badge bg-secondary">Member</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Recent Activity -->
+        {% if recent_activities %}
+        <div class="info-section">
+            <h6><i class="fas fa-history"></i> Recent Activity</h6>
+            {% for activity in recent_activities %}
+            <div class="activity-item-mini">
+                <div class="d-flex justify-content-between">
+                    <strong>{{ activity.user.get_full_name }}</strong>
+                    <small class="text-muted">{{ activity.created_at|date:"M d, H:i" }}</small>
+                </div>
+                <div class="text-muted small">{{ activity.details }}</div>
+            </div>
+            {% endfor %}
+            <div class="mt-2">
+                <a href="{% url 'board_activity' board.id %}" class="btn btn-sm btn-outline-primary">
+                    View All Activity
+                </a>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Quick Actions -->
+        {% if can_share %}
+        <div class="info-section">
+            <h6><i class="fas fa-bolt"></i> Quick Actions</h6>
+            <div class="d-grid gap-2">
+                <a href="{% url 'share_board' board.id %}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-share-alt me-2"></i>Share Board
+                </a>
+                <a href="{% url 'board_activity' board.id %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-history me-2"></i>View Activity
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}

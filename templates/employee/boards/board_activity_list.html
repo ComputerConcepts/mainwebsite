@@ -1,0 +1,228 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}Board Activity - Computer Concepts{% endblock %}
+
+{% block extra_css %}
+<style>
+    .activity-item {
+        border-left: 3px solid #007bff;
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+    
+    .activity-item:hover {
+        transform: translateX(5px);
+    }
+    
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        flex-shrink: 0;
+    }
+    
+    .activity-icon.create { background: #d4edda; color: #155724; }
+    .activity-icon.update { background: #d1ecf1; color: #0c5460; }
+    .activity-icon.delete { background: #f8d7da; color: #721c24; }
+    .activity-icon.share { background: #fff3cd; color: #856404; }
+    .activity-icon.comment { background: #e2e3e5; color: #383d41; }
+    
+    .activity-content {
+        flex: 1;
+    }
+    
+    .activity-time {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .board-badge {
+        display: inline-block;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 15px;
+        padding: 2px 8px;
+        font-size: 0.8rem;
+        color: #495057;
+        margin-left: 10px;
+    }
+    
+    .activity-user {
+        font-weight: 500;
+        color: #007bff;
+    }
+    
+    .no-activities {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-history me-2"></i>
+                        Board Activity
+                    </h2>
+                    <p class="text-muted mb-0">Recent activities across all your boards</p>
+                </div>
+                <a href="{% url 'project_boards' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Boards
+                </a>
+            </div>
+            
+            <!-- Stats -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-1">{{ total_boards }}</h4>
+                                    <p class="mb-0">Accessible Boards</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-clipboard fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-1">{{ activities.paginator.count }}</h4>
+                                    <p class="mb-0">Total Activities</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-chart-line fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Activities -->
+            {% if activities %}
+                <div class="activity-list">
+                    {% for activity in activities %}
+                        <div class="activity-item">
+                            <div class="d-flex">
+                                <div class="activity-icon {{ activity.action }}">
+                                    {% if activity.action == 'create' %}
+                                        <i class="fas fa-plus"></i>
+                                    {% elif activity.action == 'update' %}
+                                        <i class="fas fa-edit"></i>
+                                    {% elif activity.action == 'delete' %}
+                                        <i class="fas fa-trash"></i>
+                                    {% elif activity.action == 'share' %}
+                                        <i class="fas fa-share-alt"></i>
+                                    {% elif activity.action == 'comment' %}
+                                        <i class="fas fa-comment"></i>
+                                    {% else %}
+                                        <i class="fas fa-info"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="activity-content">
+                                    <div class="activity-description">
+                                        <span class="activity-user">{{ activity.user.get_full_name|default:activity.user.username }}</span>
+                                        {{ activity.details }}
+                                        <span class="board-badge">
+                                            <i class="fas fa-clipboard me-1"></i>{{ activity.board.title }}
+                                        </span>
+                                    </div>
+                                    <div class="activity-time">
+                                        <i class="fas fa-clock me-1"></i>
+                                        {{ activity.created_at|timesince }} ago
+                                        •
+                                        {{ activity.created_at|date:"M d, Y g:i A" }}
+                                        {% if activity.ip_address %}
+                                            • IP: {{ activity.ip_address }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Pagination -->
+                {% if activities.has_other_pages %}
+                    <nav aria-label="Activity pagination">
+                        <ul class="pagination justify-content-center">
+                            {% if activities.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1">First</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ activities.previous_page_number }}">Previous</a>
+                                </li>
+                            {% endif %}
+                            
+                            <li class="page-item active">
+                                <span class="page-link">
+                                    Page {{ activities.number }} of {{ activities.paginator.num_pages }}
+                                </span>
+                            </li>
+                            
+                            {% if activities.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ activities.next_page_number }}">Next</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ activities.paginator.num_pages }}">Last</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+            {% else %}
+                <div class="no-activities">
+                    <i class="fas fa-history fa-4x mb-3"></i>
+                    <h4>No Activities Yet</h4>
+                    <p>Board activities will appear here as you and your team work on projects.</p>
+                    <a href="{% url 'project_boards' %}" class="btn btn-primary">
+                        <i class="fas fa-clipboard me-2"></i>View Boards
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animate activity items on page load
+    const activityItems = document.querySelectorAll('.activity-item');
+    activityItems.forEach((item, index) => {
+        item.style.opacity = '0';
+        item.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            item.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            item.style.opacity = '1';
+            item.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+});
+</script>
+{% endblock %}

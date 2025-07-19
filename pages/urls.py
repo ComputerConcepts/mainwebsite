@@ -73,6 +73,7 @@ urlpatterns = [
     path('employee/boards/<uuid:board_id>/delete/', views_boards.delete_board, name='delete_board'),
     path('employee/boards/<uuid:board_id>/share/', views_boards.share_board, name='share_board'),
     path('employee/boards/<uuid:board_id>/activity/', views_boards.board_activity, name='board_activity'),
+    path('employee/boards/activity/', views_boards.board_activity_list, name='board_activity_list'),
     path('api/boards/<uuid:board_id>/lists/create/', views_boards.create_list, name='create_list'),
     path('api/boards/<uuid:board_id>/members/', views_boards.get_board_members, name='get_board_members'),
     path('api/boards/<uuid:board_id>/members/add/', views_boards.add_board_member, name='add_board_member'),

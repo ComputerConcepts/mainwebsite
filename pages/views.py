@@ -1209,8 +1209,10 @@ def career_apply(request, job_id):
         except Exception as e:
             messages.error(request, 'There was an error submitting your application. Please try again.')
     
-    return render(request, 'career_apply.html', {'job': job})@login_required
+    return render(request, 'career_apply.html', {'job': job})
 
+
+@login_required
 def admin_application_update_status(request, application_id):
 
     """Employee portal - update application status"""

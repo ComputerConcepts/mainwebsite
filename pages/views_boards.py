@@ -31,7 +31,12 @@ def project_boards(request):
     
     employee = Employee.objects.get(user=request.user)
     
-    # Get boards where user is creator or member
+    # Get URL parameters
+    show_shared = request.GET.get('shared', False)
+    show_recent = request.GET.get('recent', False)
+    search_query = request.GET.get('search', '').strip()
+    
+    # Base querysets
     created_boards = Board.objects.filter(created_by=employee, is_archived=False)
     member_boards = Board.objects.filter(members=employee, is_archived=False).exclude(created_by=employee)
     
@@ -39,11 +44,43 @@ def project_boards(request):
     shared_board_ids = BoardShare.objects.filter(shared_with=employee).values_list('board_id', flat=True)
     shared_boards = Board.objects.filter(id__in=shared_board_ids, is_archived=False).exclude(created_by=employee).exclude(members=employee)
     
+    # Apply filters based on navigation
+    if show_shared:
+        # Show only shared boards
+        created_boards = Board.objects.none()
+        member_boards = Board.objects.none()
+        # Keep shared_boards as is
+    elif show_recent:
+        # Show recent boards from all categories (last 30 days or last accessed)
+        from datetime import timedelta
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        
+        created_boards = created_boards.filter(updated_at__gte=thirty_days_ago).order_by('-updated_at')
+        member_boards = member_boards.filter(updated_at__gte=thirty_days_ago).order_by('-updated_at')
+        shared_boards = shared_boards.filter(updated_at__gte=thirty_days_ago).order_by('-updated_at')
+    
+    # Apply search filter
+    if search_query:
+        from django.db.models import Q
+        search_filter = Q(title__icontains=search_query) | Q(description__icontains=search_query)
+        created_boards = created_boards.filter(search_filter)
+        member_boards = member_boards.filter(search_filter)
+        shared_boards = shared_boards.filter(search_filter)
+    
+    # Order by update time if not showing recent (which is already ordered)
+    if not show_recent:
+        created_boards = created_boards.order_by('-updated_at')
+        member_boards = member_boards.order_by('-updated_at')
+        shared_boards = shared_boards.order_by('-updated_at')
+    
     context = {
         'created_boards': created_boards,
         'member_boards': member_boards,
         'shared_boards': shared_boards,
         'total_boards': created_boards.count() + member_boards.count() + shared_boards.count(),
+        'show_shared': show_shared,
+        'show_recent': show_recent,
+        'search_query': search_query,
     }
     
     return render(request, 'employee/boards/boards_list.html', context)
@@ -112,6 +149,12 @@ def board_detail(request, board_id):
         # Determine user permissions
         user_permission = 'admin' if board.created_by == employee else (board_share.permission if board_share else 'view')
         
+        # Get sharing information
+        board_shares = BoardShare.objects.filter(board=board).select_related('shared_with', 'shared_by')
+        
+        # Get recent activity
+        recent_activities = BoardActivity.objects.filter(board=board).select_related('user').order_by('-created_at')[:10]
+        
         context = {
             'board': board,
             'lists': lists,
@@ -120,6 +163,8 @@ def board_detail(request, board_id):
             'user_permission': user_permission,
             'can_edit': user_permission in ['edit', 'admin'],
             'can_share': user_permission == 'admin' or board.created_by == employee,
+            'board_shares': board_shares,
+            'recent_activities': recent_activities,
         }
         
         return render(request, 'employee/boards/board_detail.html', context)
@@ -760,10 +805,58 @@ def board_activity(request, board_id):
         }
         
         return render(request, 'employee/boards/board_activity.html', context)
-    
+        
     except Employee.DoesNotExist:
         messages.error(request, 'Employee profile not found.')
-        return redirect('employee_dashboard')
+        return redirect('employee_login')
+
+
+@login_required
+def board_activity_list(request):
+    """Display all board activities for the user"""
+    if not is_employee_authenticated(request):
+        return redirect('employee_login')
+    
+    try:
+        employee = Employee.objects.get(user=request.user)
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
+        return redirect('employee_login')
+    
+    # Get all boards the user has access to
+    accessible_boards = []
+    
+    # Boards created by user
+    created_boards = Board.objects.filter(created_by=employee, is_archived=False)
+    accessible_boards.extend(created_boards)
+    
+    # Boards user is a member of
+    member_boards = Board.objects.filter(members=employee, is_archived=False).exclude(created_by=employee)
+    accessible_boards.extend(member_boards)
+    
+    # Boards shared with user
+    shared_board_ids = BoardShare.objects.filter(shared_with=employee).values_list('board_id', flat=True)
+    shared_boards = Board.objects.filter(id__in=shared_board_ids, is_archived=False).exclude(created_by=employee).exclude(members=employee)
+    accessible_boards.extend(shared_boards)
+    
+    # Get activities from all accessible boards
+    board_ids = [board.id for board in accessible_boards]
+    activities = BoardActivity.objects.filter(
+        board_id__in=board_ids
+    ).select_related('board', 'user').order_by('-created_at')
+    
+    # Pagination
+    paginator = Paginator(activities, 50)  # Show 50 activities per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'activities': page_obj,
+        'employee': employee,
+        'total_boards': len(accessible_boards),
+    }
+    
+    return render(request, 'employee/boards/board_activity_list.html', context)
 
 
 @login_required
