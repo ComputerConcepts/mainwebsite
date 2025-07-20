@@ -1,0 +1,355 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}AI Settings - Computer Concepts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-cog text-primary me-2"></i>
+                        AI Settings
+                    </h2>
+                    <p class="text-muted mb-0">Configure your AI notification preferences and workflow settings</p>
+                </div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'ai_dashboard' %}">AI Dashboard</a></li>
+                        <li class="breadcrumb-item active">Settings</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" class="needs-validation" novalidate>
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- General Notification Settings -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-bell me-2"></i>
+                            General Notifications
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Email Notifications -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="email_notifications" 
+                                       name="email_notifications" {% if preferences.email_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="email_notifications">
+                                    <strong>Email Notifications</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Receive AI insights and alerts via email</small>
+                        </div>
+
+                        <!-- Push Notifications -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="push_notifications" 
+                                       name="push_notifications" {% if preferences.push_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="push_notifications">
+                                    <strong>Push Notifications</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Receive real-time browser notifications</small>
+                        </div>
+
+                        <!-- Priority Threshold -->
+                        <div class="mb-3">
+                            <label for="priority_threshold" class="form-label"><strong>Minimum Priority Level</strong></label>
+                            <select class="form-select" id="priority_threshold" name="priority_threshold">
+                                {% for value, label in priority_choices %}
+                                    <option value="{{ value }}" {% if preferences.priority_threshold == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Only receive notifications above this priority level</small>
+                        </div>
+
+                        <!-- Quiet Hours -->
+                        <div class="row">
+                            <div class="col-6">
+                                <label for="quiet_hours_start" class="form-label"><strong>Quiet Hours Start</strong></label>
+                                <input type="time" class="form-control" id="quiet_hours_start" 
+                                       name="quiet_hours_start" value="{{ preferences.quiet_hours_start|time:'H:i' }}">
+                            </div>
+                            <div class="col-6">
+                                <label for="quiet_hours_end" class="form-label"><strong>Quiet Hours End</strong></label>
+                                <input type="time" class="form-control" id="quiet_hours_end" 
+                                       name="quiet_hours_end" value="{{ preferences.quiet_hours_end|time:'H:i' }}">
+                            </div>
+                        </div>
+                        <small class="text-muted">No notifications will be sent during these hours</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Preferences -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-tags me-2"></i>
+                            Notification Categories
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Choose which types of AI notifications you want to receive</p>
+
+                        <!-- Security Notifications -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="security_notifications" 
+                                       name="security_notifications" {% if preferences.security_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="security_notifications">
+                                    <i class="fas fa-shield-alt text-danger me-2"></i>
+                                    <strong>Security Alerts</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">File security issues and access anomalies</small>
+                        </div>
+
+                        <!-- Storage Notifications -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="storage_notifications" 
+                                       name="storage_notifications" {% if preferences.storage_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="storage_notifications">
+                                    <i class="fas fa-hdd text-warning me-2"></i>
+                                    <strong>Storage Management</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Storage optimization and quota alerts</small>
+                        </div>
+
+                        <!-- Collaboration Notifications -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="collaboration_notifications" 
+                                       name="collaboration_notifications" {% if preferences.collaboration_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="collaboration_notifications">
+                                    <i class="fas fa-users text-info me-2"></i>
+                                    <strong>Collaboration</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Team sharing and collaboration insights</small>
+                        </div>
+
+                        <!-- Duplicate Detection -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="duplicate_notifications" 
+                                       name="duplicate_notifications" {% if preferences.duplicate_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="duplicate_notifications">
+                                    <i class="fas fa-copy text-secondary me-2"></i>
+                                    <strong>Duplicate Detection</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Duplicate file detection and cleanup suggestions</small>
+                        </div>
+
+                        <!-- Content Quality -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="quality_notifications" 
+                                       name="quality_notifications" {% if preferences.quality_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="quality_notifications">
+                                    <i class="fas fa-star text-warning me-2"></i>
+                                    <strong>Content Quality</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">File quality analysis and improvement suggestions</small>
+                        </div>
+
+                        <!-- File Management -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="file_management_notifications" 
+                                       name="file_management_notifications" {% if preferences.file_management_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="file_management_notifications">
+                                    <i class="fas fa-folder text-primary me-2"></i>
+                                    <strong>File Management</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">File organization and management recommendations</small>
+                        </div>
+
+                        <!-- Workflow Notifications -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="workflow_notifications" 
+                                       name="workflow_notifications" {% if preferences.workflow_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="workflow_notifications">
+                                    <i class="fas fa-cogs text-success me-2"></i>
+                                    <strong>Workflow Optimization</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Workflow automation and optimization suggestions</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Insights Preview -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            AI Insights Preview
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                        <i class="fas fa-chart-line text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">Smart Analytics</h6>
+                                        <small class="text-muted">Get insights on your file usage patterns</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="bg-success bg-opacity-10 rounded-circle p-2 me-3">
+                                        <i class="fas fa-robot text-success"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">Automated Workflows</h6>
+                                        <small class="text-muted">AI will suggest workflow optimizations</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="bg-warning bg-opacity-10 rounded-circle p-2 me-3">
+                                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">Proactive Alerts</h6>
+                                        <small class="text-muted">Receive alerts before issues become problems</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <button type="submit" class="btn btn-primary btn-lg me-3">
+                            <i class="fas fa-save me-2"></i>
+                            Save Preferences
+                        </button>
+                        <a href="{% url 'ai_dashboard' %}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-arrow-left me-2"></i>
+                            Back to AI Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Success/Error Messages -->
+{% if messages %}
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+        {% for message in messages %}
+            <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header">
+                    <strong class="me-auto">
+                        {% if message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
+                            <i class="fas fa-check-circle text-success me-1"></i>Success
+                        {% elif message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
+                            <i class="fas fa-exclamation-circle text-danger me-1"></i>Error
+                        {% else %}
+                            <i class="fas fa-info-circle text-info me-1"></i>Info
+                        {% endif %}
+                    </strong>
+                    <small class="text-muted">Just now</small>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">
+                    {{ message }}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<style>
+    .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    
+    .form-check-input:focus {
+        border-color: #86b7fe;
+        outline: 0;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .toast {
+        min-width: 300px;
+    }
+</style>
+
+<script>
+    // Auto-hide toasts after 5 seconds
+    document.addEventListener('DOMContentLoaded', function() {
+        const toasts = document.querySelectorAll('.toast');
+        toasts.forEach(function(toast) {
+            setTimeout(function() {
+                toast.classList.remove('show');
+            }, 5000);
+        });
+    });
+    
+    // Form validation
+    (function() {
+        'use strict';
+        window.addEventListener('load', function() {
+            var forms = document.getElementsByClassName('needs-validation');
+            var validation = Array.prototype.filter.call(forms, function(form) {
+                form.addEventListener('submit', function(event) {
+                    if (form.checkValidity() === false) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    form.classList.add('was-validated');
+                }, false);
+            });
+        }, false);
+    })();
+</script>
+{% endblock %}

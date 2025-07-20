@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Dashboard - Computer Concepts</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            font-weight: 600;
+            color: white !important;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.8) !important;
+            transition: color 0.3s;
+        }
+        .nav-link:hover {
+            color: white !important;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            border: none;
+        }
+        .ai-hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stat-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        .progress-circular {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: conic-gradient(#667eea 0deg, #667eea var(--percentage, 0deg), #e9ecef var(--percentage, 0deg));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            position: relative;
+        }
+        .progress-circular::before {
+            content: '';
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: white;
+            position: absolute;
+        }
+        .progress-text {
+            position: relative;
+            z-index: 1;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .notification-item {
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 0 10px 10px 0;
+        }
+        .notification-item.unread {
+            background: #f0f8ff;
+            border-left-color: #ff6b6b;
+        }
+        .ai-feature-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        .ai-feature-card:hover {
+            border-color: #667eea;
+            transform: translateY(-3px);
+        }
+        .badge-ai {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'employee_dashboard' %}">
+                <i class="fas fa-laptop-code me-2"></i>
+                Computer Concepts
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{% url 'employee_dashboard' %}">
+                    <i class="fas fa-home me-1"></i>
+                    Dashboard
+                </a>
+                <a class="nav-link active" href="{% url 'ai_dashboard' %}">
+                    <i class="fas fa-brain me-1"></i>
+                    AI Dashboard
+                </a>
+                <a class="nav-link" href="{% url 'ai_notifications' %}">
+                    <i class="fas fa-bell me-1"></i>
+                    Notifications
+                    {% if unread_notifications_count > 0 %}
+                        <span class="badge bg-danger ms-1">{{ unread_notifications_count }}</span>
+                    {% endif %}
+                </a>
+                <a class="nav-link" href="{% url 'employee_profile' %}">
+                    <i class="fas fa-user me-1"></i>
+                    Profile
+                </a>
+                <a class="nav-link" href="{% url 'employee_logout' %}">
+                    <i class="fas fa-sign-out-alt me-1"></i>
+                    Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- AI Hero Section -->
+        <div class="ai-hero">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-3">
+                        <i class="fas fa-brain me-3"></i>
+                        AI-Powered Insights
+                    </h1>
+                    <p class="mb-3 fs-5">Welcome to your intelligent workspace, {{ employee.user.first_name }}!</p>
+                    <p class="mb-0 opacity-75">Leverage advanced artificial intelligence to enhance productivity, automate workflows, and gain valuable insights from your data.</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <i class="fas fa-robot" style="font-size: 6rem; opacity: 0.3;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Statistics Row -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon text-primary">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div class="stat-number text-primary">{{ unread_notifications_count|default:0 }}</div>
+                    <div class="stat-label">Unread Notifications</div>
+                    <small class="text-muted">AI-generated alerts</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon text-success">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <div class="stat-number text-success">{{ ai_features.files_analyzed|default:0 }}</div>
+                    <div class="stat-label">Files Analyzed</div>
+                    <small class="text-muted">AI processing complete</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon text-warning">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <div class="stat-number text-warning">{{ ai_features.total_executions|default:0 }}</div>
+                    <div class="stat-label">Workflow Executions</div>
+                    <small class="text-muted">Automated processes</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon text-info">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-number text-info">{{ ai_features.workflows_active|default:0 }}</div>
+                    <div class="stat-label">Active Workflows</div>
+                    <small class="text-muted">Running rules</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Row -->
+        <div class="row mt-4">
+            <!-- Recent AI Notifications -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-bell me-2"></i>
+                            Recent AI Insights
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_notifications %}
+                            {% for notification in recent_notifications %}
+                                <div class="notification-item {% if not notification.is_read %}unread{% endif %}">
+                                    <div class="d-flex align-items-start">
+                                        <div class="me-3">
+                                            {% if notification.notification_type == 'duplicate_detected' %}
+                                                <i class="fas fa-copy text-warning"></i>
+                                            {% elif notification.notification_type == 'file_analyzed' %}
+                                                <i class="fas fa-file-alt text-info"></i>
+                                            {% elif notification.notification_type == 'recommendation' %}
+                                                <i class="fas fa-lightbulb text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-info-circle text-primary"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ notification.title }}</h6>
+                                            <p class="mb-1 small">{{ notification.message }}</p>
+                                            <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+                                            {% if not notification.is_read %}
+                                                <span class="badge badge-ai ms-2">New</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            <div class="text-center mt-3">
+                                <a href="{% url 'ai_notifications' %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-eye me-1"></i>View All Notifications
+                                </a>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-bell-slash text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-3">No AI notifications yet</p>
+                                <small class="text-muted">AI insights will appear here as you use the system</small>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent File Analyses -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-alt me-2"></i>
+                            Recent AI Analysis
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_analyses %}
+                            {% for analysis in recent_analyses %}
+                                <div class="d-flex align-items-center mb-3 p-3 border rounded">
+                                    <div class="me-3">
+                                        <i class="fas fa-file text-primary" style="font-size: 1.5rem;"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">{{ analysis.document.name }}</h6>
+                                        <small class="text-muted">
+                                            Analyzed {{ analysis.analysis_completed_at|timesince }} ago
+                                        </small>
+                                        {% if analysis.suggested_category %}
+                                            <br><span class="badge bg-secondary">{{ analysis.suggested_category }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-end">
+                                        {% if analysis.quality_score %}
+                                            <div class="progress-circular" style="--percentage: {{ analysis.quality_score|floatformat:0 }}deg;">
+                                                <span class="progress-text">{{ analysis.quality_score|floatformat:0 }}%</span>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            <div class="text-center mt-3">
+                                <a href="{% url 'file_manager' %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-folder-open me-1"></i>View File Manager
+                                </a>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-file-alt text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-3">No files analyzed yet</p>
+                                <small class="text-muted">Upload files to see AI analysis results</small>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Features Row -->
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="ai-feature-card text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-upload text-primary" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5>Smart File Upload</h5>
+                    <p class="text-muted">Upload files and get instant AI analysis with duplicate detection, categorization, and quality assessment.</p>
+                    <a href="{% url 'file_manager' %}" class="btn btn-primary">
+                        <i class="fas fa-upload me-1"></i>Upload Files
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="ai-feature-card text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-search text-success" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5>AI-Powered Search</h5>
+                    <p class="text-muted">Find content using natural language queries powered by semantic understanding and knowledge graphs.</p>
+                    <a href="{% url 'search_files' %}" class="btn btn-success">
+                        <i class="fas fa-search me-1"></i>Smart Search
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="ai-feature-card text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-cogs text-warning" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5>Workflow Automation</h5>
+                    <p class="text-muted">Configure intelligent workflows to automate repetitive tasks and receive smart notifications.</p>
+                    <a href="{% url 'ai_settings' %}" class="btn btn-warning">
+                        <i class="fas fa-cogs me-1"></i>Configure
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Storage Management with AI -->
+        {% if storage_warning %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="alert alert-warning" role="alert">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-3" style="font-size: 1.5rem;"></i>
+                        <div>
+                            <h6 class="alert-heading mb-1">Storage Warning</h6>
+                            <p class="mb-0">Your storage is {{ storage_percentage }}% full. Consider archiving old files or upgrading your storage quota.</p>
+                        </div>
+                        <div class="ms-auto">
+                            <a href="{% url 'file_manager' %}" class="btn btn-outline-warning btn-sm">Manage Files</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Workflow Suggestions -->
+        {% if workflow_suggestions %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            AI Workflow Suggestions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for suggestion in workflow_suggestions %}
+                                <div class="col-md-4">
+                                    <div class="border rounded p-3 mb-3">
+                                        <h6 class="text-primary">{{ suggestion.title }}</h6>
+                                        <p class="small text-muted mb-2">{{ suggestion.description }}</p>
+                                        <span class="badge bg-light text-dark">{{ suggestion.priority|capfirst }} Priority</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="text-center">
+                            <a href="{% url 'ai_settings' %}" class="btn btn-outline-primary">
+                                <i class="fas fa-cogs me-1"></i>Configure Workflows
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Update circular progress indicators
+        document.querySelectorAll('.progress-circular').forEach(function(element) {
+            const percentage = element.style.getPropertyValue('--percentage');
+            if (percentage) {
+                const degrees = (parseFloat(percentage) / 100) * 360;
+                element.style.setProperty('--percentage', degrees + 'deg');
+            }
+        });
+
+        // Auto-refresh notifications every 30 seconds
+        setInterval(function() {
+            // You can implement AJAX refresh here if needed
+        }, 30000);
+    </script>
+</body>
+</html>

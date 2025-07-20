@@ -4,6 +4,7 @@ from . import views
 from . import views_boards
 from . import views_admin
 from . import views_files
+from . import views_ai
 
 
 urlpatterns = [
@@ -115,6 +116,7 @@ urlpatterns = [
     path('api/storage/info/', views_files.get_storage_info, name='get_storage_info'),
     path('employee/files/search/', views_files.search_files, name='search_files'),
     path('employee/files/activity/', views_files.file_activity, name='file_activity'),
+    path('api/files/<uuid:file_id>/trigger-analysis/', views_files.trigger_ai_analysis, name='trigger_ai_analysis'),
     path('api/employees/search-email/', views_files.search_employees_by_email, name='search_employees_by_email'),
     path('api/files/<uuid:file_id>/details/', views_files.get_file_details, name='get_file_details'),
     
@@ -123,6 +125,19 @@ urlpatterns = [
     path('api/ai/chat/', views_files.ai_chat, name='ai_chat'),
     path('api/ai/analyze/<uuid:file_id>/', views_files.analyze_file_ai, name='analyze_file_ai'),
     path('api/files/<uuid:file_id>/analysis/', views_files.get_file_analysis, name='get_file_analysis'),
+    
+    # AI Workflow URLs
+    path('employee/ai/', views_ai.ai_dashboard, name='ai_dashboard'),
+    path('employee/ai/notifications/', views_ai.ai_notifications, name='ai_notifications'),
+    path('employee/ai/notifications/<uuid:notification_id>/read/', views_ai.mark_notification_read, name='mark_notification_read'),
+    path('employee/ai/notifications/read-all/', views_ai.mark_all_notifications_read, name='mark_all_notifications_read'),
+    path('employee/ai/workflows/', views_ai.ai_workflows, name='ai_workflows'),
+    path('employee/ai/workflows/<uuid:rule_id>/toggle/', views_ai.toggle_workflow_rule, name='toggle_workflow_rule'),
+    path('employee/ai/analytics/', views_ai.ai_analytics, name='ai_analytics'),
+    path('employee/ai/settings/', views_ai.ai_settings, name='ai_settings'),
+    path('employee/ai/analysis/<int:analysis_id>/', views_ai.file_analysis_detail, name='file_analysis_detail'),
+    path('employee/ai/execution/<uuid:execution_id>/', views_ai.ai_workflow_execution_detail, name='ai_workflow_execution_detail'),
+    path('api/ai/analyze-file/<uuid:file_id>/', views_ai.trigger_manual_analysis, name='trigger_manual_analysis'),
     
     # Storage Management Admin URLs
     path('admin/storage/update-quota/<int:user_id>/', views_admin.update_user_quota, name='admin_update_user_quota'),

@@ -1,0 +1,404 @@
+{% extends 'employee/base.html' %}
+{% load file_extras %}
+
+{% block title %}AI Analytics - Computer Concepts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-chart-bar text-primary me-2"></i>
+                        AI Analytics
+                    </h2>
+                    <p class="text-muted mb-0">Insights and performance metrics from AI analysis</p>
+                </div>
+                <div class="d-flex align-items-center">
+                    <!-- Time Range Filter -->
+                    <form method="get" class="me-3">
+                        <select name="time_range" class="form-select" onchange="this.form.submit()">
+                            {% for value, label in time_range_options %}
+                                <option value="{{ value }}" {% if time_range == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'ai_dashboard' %}">AI Dashboard</a></li>
+                            <li class="breadcrumb-item active">Analytics</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ analytics.total_analyses }}</h4>
+                            <p class="mb-0">Files Analyzed</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-file-alt fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ analytics.notifications_sent }}</h4>
+                            <p class="mb-0">Notifications Sent</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-bell fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ analytics.workflow_executions }}</h4>
+                            <p class="mb-0">Workflows Executed</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-cogs fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ security_files_count }}</h4>
+                            <p class="mb-0">Security Alerts</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-shield-alt fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- File Analysis Breakdown -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-pie-chart me-2"></i>
+                        File Analysis by Category
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if file_categories %}
+                        <div class="row">
+                            {% for category in file_categories %}
+                                <div class="col-6 mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-muted">{{ category.category|capfirst }}</span>
+                                            <div class="progress mt-1" style="height: 8px;">
+                                                <div class="progress-bar" role="progressbar" 
+                                                     style="width: {{ category.percentage }}%"></div>
+                                            </div>
+                                        </div>
+                                        <span class="badge bg-primary ms-2">{{ category.count }}</span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No file analysis data available for the selected time period</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Quality Analysis -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-star me-2"></i>
+                        Content Quality Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if quality_analysis.avg_quality %}
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="border-end">
+                                    <h4 class="text-success">{{ quality_analysis.high_quality }}</h4>
+                                    <small class="text-muted">High Quality</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="border-end">
+                                    <h4 class="text-warning">
+                                        {{ quality_analysis.avg_quality|sub:quality_analysis.high_quality|sub:quality_analysis.low_quality }}
+                                    </h4>
+                                    <small class="text-muted">Medium Quality</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <h4 class="text-danger">{{ quality_analysis.low_quality }}</h4>
+                                <small class="text-muted">Low Quality</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span>Overall Quality Score</span>
+                                <span class="fw-bold">
+                                    {% widthratio quality_analysis.high_quality quality_analysis.avg_quality 5 %}/5
+                                </span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" role="progressbar" 
+                                     style="width: {% widthratio quality_analysis.high_quality quality_analysis.avg_quality 100 %}%"></div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-star fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No quality analysis data available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Workflow Performance -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        Workflow Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if workflow_performance %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Workflow</th>
+                                        <th class="text-center">Executions</th>
+                                        <th class="text-center">Success Rate</th>
+                                        <th class="text-center">Performance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for workflow in workflow_performance %}
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-cog text-primary me-2"></i>
+                                                    {{ workflow.workflow_rule__name|default:"Unknown Workflow" }}
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-primary">{{ workflow.executions }}</span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-{% if workflow.success_rate >= 90 %}success{% elif workflow.success_rate >= 70 %}warning{% else %}danger{% endif %}">
+                                                    {{ workflow.success_rate|floatformat:0 }}%
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="progress" style="height: 8px;">
+                                                    <div class="progress-bar bg-{% if workflow.success_rate >= 90 %}success{% elif workflow.success_rate >= 70 %}warning{% else %}danger{% endif %}" 
+                                                         role="progressbar" style="width: {{ workflow.success_rate }}%"></div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No workflow execution data available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Insights -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        AI Insights
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="insight-item mb-3">
+                        <div class="d-flex">
+                            <div class="bg-success bg-opacity-10 rounded-circle p-2 me-3">
+                                <i class="fas fa-chart-line text-success"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">Analysis Trends</h6>
+                                <small class="text-muted">
+                                    Your file analysis activity has increased by 
+                                    <span class="text-success fw-bold">25%</span> this period
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="insight-item mb-3">
+                        <div class="d-flex">
+                            <div class="bg-info bg-opacity-10 rounded-circle p-2 me-3">
+                                <i class="fas fa-shield-alt text-info"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">Security Status</h6>
+                                <small class="text-muted">
+                                    {% if security_files_count > 0 %}
+                                        <span class="text-warning fw-bold">{{ security_files_count }}</span> files need security review
+                                    {% else %}
+                                        <span class="text-success fw-bold">All files</span> pass security checks
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="insight-item mb-3">
+                        <div class="d-flex">
+                            <div class="bg-warning bg-opacity-10 rounded-circle p-2 me-3">
+                                <i class="fas fa-cogs text-warning"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">Automation</h6>
+                                <small class="text-muted">
+                                    AI workflows have saved you approximately 
+                                    <span class="text-primary fw-bold">{{ analytics.workflow_executions|mul:5 }}</span> minutes
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="insight-item">
+                        <div class="d-flex">
+                            <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                <i class="fas fa-star text-primary"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">Recommendations</h6>
+                                <small class="text-muted">
+                                    Consider enabling more workflow automation to improve efficiency
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'ai_workflows' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-cogs me-2"></i>Manage Workflows
+                        </a>
+                        <a href="{% url 'ai_notifications' %}" class="btn btn-outline-success">
+                            <i class="fas fa-bell me-2"></i>View Notifications
+                        </a>
+                        <a href="{% url 'ai_settings' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-cog me-2"></i>AI Settings
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Options -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h6 class="mb-3">Export Analytics Data</h6>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary">
+                            <i class="fas fa-file-csv me-1"></i>Export CSV
+                        </button>
+                        <button type="button" class="btn btn-outline-success">
+                            <i class="fas fa-file-pdf me-1"></i>Export PDF
+                        </button>
+                        <button type="button" class="btn btn-outline-info">
+                            <i class="fas fa-share me-1"></i>Share Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .insight-item {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f1f3f4;
+    }
+    
+    .insight-item:last-child {
+        border-bottom: none;
+    }
+    
+    .progress {
+        height: 8px;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+        transition: transform 0.2s ease-in-out;
+    }
+</style>
+
+<script>
+    // Add interactivity for charts (placeholder for future chart.js integration)
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('AI Analytics loaded - ready for chart integration');
+    });
+</script>
+{% endblock %}

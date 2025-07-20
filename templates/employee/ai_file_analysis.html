@@ -1,0 +1,454 @@
+{% extends 'employee/base.html' %}
+{% load file_extras %}
+
+{% block title %}AI File Analysis - Computer Concepts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-microscope text-primary me-2"></i>
+                        AI File Analysis
+                    </h2>
+                    <p class="text-muted mb-0">Detailed analysis results for {{ document.name }}</p>
+                </div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'ai_dashboard' %}">AI Dashboard</a></li>
+                        <li class="breadcrumb-item active">File Analysis</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Information -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary bg-opacity-10 rounded-circle p-3 me-3">
+                                    <i class="fas fa-file-alt fa-2x text-primary"></i>
+                                </div>
+                                <div>
+                                    <h4 class="mb-1">{{ document.name }}</h4>
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-secondary me-2">{{ document.file_type|upper }}</span>
+                                        <span class="text-muted me-3">{{ document.file_size|filesizeformat }}</span>
+                                        <small class="text-muted">
+                                            <i class="fas fa-calendar me-1"></i>
+                                            Uploaded {{ document.uploaded_at|timesince }} ago
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="btn-group">
+                                <a href="{% url 'view_file' document.id %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-eye me-1"></i>View File
+                                </a>
+                                <a href="{% url 'download_file' document.id %}" class="btn btn-outline-success">
+                                    <i class="fas fa-download me-1"></i>Download
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Analysis Status
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                {% if analysis.analysis_completed %}
+                                    <i class="fas fa-check-circle fa-3x text-success mb-2"></i>
+                                    <h6 class="text-success">Analysis Complete</h6>
+                                {% else %}
+                                    <i class="fas fa-spinner fa-spin fa-3x text-primary mb-2"></i>
+                                    <h6 class="text-primary">Analysis in Progress</h6>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-9">
+                            <dl class="row">
+                                <dt class="col-sm-3">Started:</dt>
+                                <dd class="col-sm-9">{{ analysis.analysis_started_at|date:"M d, Y H:i" }}</dd>
+                                
+                                {% if analysis.analysis_completed_at %}
+                                    <dt class="col-sm-3">Completed:</dt>
+                                    <dd class="col-sm-9">{{ analysis.analysis_completed_at|date:"M d, Y H:i" }}</dd>
+                                    
+                                    <dt class="col-sm-3">Duration:</dt>
+                                    <dd class="col-sm-9">
+                                        {{ analysis.analysis_completed_at|timesince:analysis.analysis_started_at }}
+                                    </dd>
+                                {% endif %}
+                                
+                                <dt class="col-sm-3">Analysis ID:</dt>
+                                <dd class="col-sm-9"><code>{{ analysis.id }}</code></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if analysis.analysis_completed %}
+        <!-- Analysis Results -->
+        <div class="row">
+            <!-- Content Analysis -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-search me-2"></i>
+                            Content Analysis
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Content Type -->
+                        {% if analysis.content_type %}
+                            <div class="mb-3">
+                                <h6>Content Type</h6>
+                                <span class="badge bg-primary">{{ analysis.content_type|capfirst }}</span>
+                            </div>
+                        {% endif %}
+
+                        <!-- Language -->
+                        {% if analysis.detected_language %}
+                            <div class="mb-3">
+                                <h6>Detected Language</h6>
+                                <span class="badge bg-info">{{ analysis.detected_language|upper }}</span>
+                            </div>
+                        {% endif %}
+
+                        <!-- Quality Score -->
+                        {% if analysis.quality_score %}
+                            <div class="mb-3">
+                                <h6>Quality Score</h6>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1 me-3" style="height: 20px;">
+                                        <div class="progress-bar bg-{% if analysis.quality_score >= 4 %}success{% elif analysis.quality_score >= 3 %}warning{% else %}danger{% endif %}" 
+                                             role="progressbar" style="width: {{ analysis.quality_score|mul:20 }}%">
+                                            {{ analysis.quality_score }}/5
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-{% if analysis.quality_score >= 4 %}success{% elif analysis.quality_score >= 3 %}warning{% else %}danger{% endif %}">
+                                        {% if analysis.quality_score >= 4 %}High{% elif analysis.quality_score >= 3 %}Medium{% else %}Low{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Word Count -->
+                        {% if analysis.word_count %}
+                            <div class="mb-3">
+                                <h6>Word Count</h6>
+                                <p class="mb-0">{{ analysis.word_count|floatformat:0 }} words</p>
+                            </div>
+                        {% endif %}
+
+                        <!-- Summary -->
+                        {% if analysis.content_summary %}
+                            <div class="mb-3">
+                                <h6>Content Summary</h6>
+                                <p class="text-muted">{{ analysis.content_summary }}</p>
+                            </div>
+                        {% endif %}
+
+                        <!-- Key Topics -->
+                        {% if analysis.key_topics %}
+                            <div class="mb-3">
+                                <h6>Key Topics</h6>
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for topic in analysis.key_topics %}
+                                        <span class="badge bg-outline-secondary">{{ topic }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Analysis -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            Security Analysis
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Sensitive Information -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6>Sensitive Information</h6>
+                                {% if analysis.contains_sensitive_info %}
+                                    <span class="badge bg-warning">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>Detected
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Clean
+                                    </span>
+                                {% endif %}
+                            </div>
+                            {% if analysis.sensitive_info_types %}
+                                <div class="mt-2">
+                                    <small class="text-muted">Types detected:</small>
+                                    <div class="d-flex flex-wrap gap-1 mt-1">
+                                        {% for info_type in analysis.sensitive_info_types %}
+                                            <span class="badge bg-warning">{{ info_type }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- PII Detection -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6>Personal Information (PII)</h6>
+                                {% if analysis.contains_sensitive_info %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-user-secret me-1"></i>Detected
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-user-check me-1"></i>None Found
+                                    </span>
+                                {% endif %}
+                            </div>
+                            {% if analysis.contains_sensitive_info and analysis.sensitive_info_types %}
+                                <div class="mt-2">
+                                    <small class="text-muted">Types detected:</small>
+                                    <div class="mt-1">
+                                        {% for info_type in analysis.sensitive_info_types %}
+                                            <span class="badge bg-warning text-dark me-1">{{ info_type }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Compliance Status -->
+                        {% if analysis.compliance_status %}
+                            <div class="mb-3">
+                                <h6>Compliance Status</h6>
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for standard, status in analysis.compliance_status.items %}
+                                        <span class="badge bg-{% if status == 'compliant' %}success{% elif status == 'warning' %}warning{% else %}danger{% endif %}">
+                                            {{ standard|upper }}: {{ status|capfirst }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Security Score -->
+                        {% if analysis.security_score %}
+                            <div class="mb-3">
+                                <h6>Security Score</h6>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1 me-3" style="height: 20px;">
+                                        <div class="progress-bar bg-{% if analysis.security_score >= 8 %}success{% elif analysis.security_score >= 6 %}warning{% else %}danger{% endif %}" 
+                                             role="progressbar" style="width: {{ analysis.security_score|mul:10 }}%">
+                                            {{ analysis.security_score }}/10
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-{% if analysis.security_score >= 8 %}success{% elif analysis.security_score >= 6 %}warning{% else %}danger{% endif %}">
+                                        {% if analysis.security_score >= 8 %}Secure{% elif analysis.security_score >= 6 %}Moderate{% else %}Risk{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        {% if analysis.recommendations %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-lightbulb me-2"></i>
+                                AI Recommendations
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for recommendation in analysis.recommendations %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="recommendation-item p-3 border rounded">
+                                            <div class="d-flex">
+                                                <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                    <i class="fas fa-star text-primary"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-1">{{ recommendation.title }}</h6>
+                                                    <p class="text-muted mb-0">{{ recommendation.description }}</p>
+                                                    {% if recommendation.priority %}
+                                                        <span class="badge bg-{% if recommendation.priority == 'high' %}danger{% elif recommendation.priority == 'medium' %}warning{% else %}info{% endif %} mt-2">
+                                                            {{ recommendation.priority|capfirst }} Priority
+                                                        </span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Analysis Metadata -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-cogs me-2"></i>
+                            Analysis Metadata
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <dl class="row">
+                                    <dt class="col-sm-4">Analysis Version:</dt>
+                                    <dd class="col-sm-8">{{ analysis.analysis_version|default:"1.0" }}</dd>
+                                    
+                                    <dt class="col-sm-4">Processing Time:</dt>
+                                    <dd class="col-sm-8">
+                                        {% if analysis.analysis_completed_at %}
+                                            {{ analysis.analysis_completed_at|timesince:analysis.analysis_started_at }}
+                                        {% else %}
+                                            Processing...
+                                        {% endif %}
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4">Confidence:</dt>
+                                    <dd class="col-sm-8">
+                                        {% if analysis.confidence_score %}
+                                            {{ analysis.confidence_score|floatformat:1 }}%
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </dd>
+                                </dl>
+                            </div>
+                            <div class="col-md-6">
+                                <dl class="row">
+                                    <dt class="col-sm-4">Model Used:</dt>
+                                    <dd class="col-sm-8">{{ analysis.ai_model_used|default:"Standard AI Model" }}</dd>
+                                    
+                                    <dt class="col-sm-4">Last Updated:</dt>
+                                    <dd class="col-sm-8">{{ analysis.analysis_completed_at|date:"M d, Y H:i" }}</dd>
+                                    
+                                    <dt class="col-sm-4">File Hash:</dt>
+                                    <dd class="col-sm-8">
+                                        <code class="small">{{ analysis.file_hash|default:"N/A"|truncatechars:20 }}</code>
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- Analysis in Progress -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-spinner fa-spin fa-3x text-primary mb-3"></i>
+                        <h4>Analysis in Progress</h4>
+                        <p class="text-muted">Our AI is currently analyzing your file. This usually takes a few minutes.</p>
+                        <button class="btn btn-outline-primary" onclick="location.reload()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh Status
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'ai_dashboard' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left me-1"></i>Back to AI Dashboard
+                        </a>
+                        {% if analysis.analysis_completed %}
+                            <button class="btn btn-outline-success" onclick="window.print()">
+                                <i class="fas fa-print me-1"></i>Print Report
+                            </button>
+                            <button class="btn btn-outline-info">
+                                <i class="fas fa-share me-1"></i>Share Analysis
+                            </button>
+                        {% endif %}
+                        <a href="{% url 'trigger_manual_analysis' document.id %}" class="btn btn-outline-warning">
+                            <i class="fas fa-redo me-1"></i>Re-analyze File
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .recommendation-item {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .recommendation-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .progress {
+        height: 20px;
+    }
+    
+    @media print {
+        .btn, .breadcrumb, .card:last-child {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}

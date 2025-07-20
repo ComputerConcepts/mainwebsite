@@ -1,0 +1,396 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}Workflow Execution Detail - Computer Concepts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-cog text-primary me-2"></i>
+                        Workflow Execution Detail
+                    </h2>
+                    <p class="text-muted mb-0">{{ workflow_rule.name }} - Execution {{ execution.id|slice:":8" }}...</p>
+                </div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'ai_dashboard' %}">AI Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'ai_workflows' %}">Workflows</a></li>
+                        <li class="breadcrumb-item active">Execution Detail</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Execution Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    {% if execution.status == 'completed' %}
+                                        <i class="fas fa-check-circle fa-3x text-success"></i>
+                                    {% elif execution.status == 'failed' %}
+                                        <i class="fas fa-times-circle fa-3x text-danger"></i>
+                                    {% elif execution.status == 'running' %}
+                                        <i class="fas fa-spinner fa-spin fa-3x text-primary"></i>
+                                    {% else %}
+                                        <i class="fas fa-clock fa-3x text-warning"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h4 class="mb-1">
+                                        {% if execution.status == 'completed' %}
+                                            Execution Completed Successfully
+                                        {% elif execution.status == 'failed' %}
+                                            Execution Failed
+                                        {% elif execution.status == 'running' %}
+                                            Execution in Progress
+                                        {% else %}
+                                            Execution {{ execution.status|capfirst }}
+                                        {% endif %}
+                                    </h4>
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-{% if execution.status == 'completed' %}success{% elif execution.status == 'failed' %}danger{% elif execution.status == 'running' %}primary{% else %}warning{% endif %} me-2">
+                                            {{ execution.status|capfirst }}
+                                        </span>
+                                        <small class="text-muted">
+                                            Started {{ execution.started_at|timesince }} ago
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            {% if execution.status == 'running' %}
+                                <button class="btn btn-outline-primary" onclick="location.reload()">
+                                    <i class="fas fa-sync-alt me-1"></i>Refresh Status
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Execution Details -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Execution Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">Execution ID:</dt>
+                        <dd class="col-sm-9"><code>{{ execution.id }}</code></dd>
+                        
+                        <dt class="col-sm-3">Workflow Rule:</dt>
+                        <dd class="col-sm-9">{{ workflow_rule.name }}</dd>
+                        
+                        <dt class="col-sm-3">Trigger Type:</dt>
+                        <dd class="col-sm-9">
+                            <span class="badge bg-secondary">{{ workflow_rule.get_trigger_type_display }}</span>
+                        </dd>
+                        
+                        <dt class="col-sm-3">Category:</dt>
+                        <dd class="col-sm-9">
+                            <span class="badge bg-primary">{{ workflow_rule.category }}</span>
+                        </dd>
+                        
+                        <dt class="col-sm-3">Started At:</dt>
+                        <dd class="col-sm-9">{{ execution.started_at|date:"M d, Y H:i:s" }}</dd>
+                        
+                        {% if execution.completed_at %}
+                            <dt class="col-sm-3">Completed At:</dt>
+                            <dd class="col-sm-9">{{ execution.completed_at|date:"M d, Y H:i:s" }}</dd>
+                            
+                            <dt class="col-sm-3">Duration:</dt>
+                            <dd class="col-sm-9">
+                                {{ execution.completed_at|timesince:execution.started_at }}
+                            </dd>
+                        {% endif %}
+                        
+                        <dt class="col-sm-3">Triggered By:</dt>
+                        <dd class="col-sm-9">
+                            <i class="fas fa-user me-1"></i>
+                            {{ execution.triggered_by.user.get_full_name|default:execution.triggered_by.user.username }}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Context Data -->
+            {% if context_data %}
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-database me-2"></i>
+                            Context Data
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-light p-3 rounded"><code>{{ context_data }}</code></pre>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Result Data -->
+            {% if result_data and execution.status == 'completed' %}
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-file-alt me-2"></i>
+                            Execution Results
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-light p-3 rounded"><code>{{ result_data }}</code></pre>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Error Information -->
+            {% if execution.error_message %}
+                <div class="card mt-4 border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Error Details
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-danger mb-3">
+                            <strong>Error Message:</strong><br>
+                            {{ execution.error_message }}
+                        </div>
+                        
+                        {% if execution.error_details %}
+                            <h6>Technical Details:</h6>
+                            <pre class="bg-light p-3 rounded"><code>{{ execution.error_details }}</code></pre>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Workflow Rule Details -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        Workflow Rule
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>{{ workflow_rule.name }}</h6>
+                    <p class="text-muted">{{ workflow_rule.description }}</p>
+                    
+                    <dl class="row">
+                        <dt class="col-6">Status:</dt>
+                        <dd class="col-6">
+                            <span class="badge bg-{% if workflow_rule.is_active %}success{% else %}secondary{% endif %}">
+                                {{ workflow_rule.is_active|yesno:"Active,Disabled" }}
+                            </span>
+                        </dd>
+                        
+                        <dt class="col-6">Created:</dt>
+                        <dd class="col-6">{{ workflow_rule.created_at|date:"M d, Y" }}</dd>
+                        
+                        <dt class="col-6">Created By:</dt>
+                        <dd class="col-6">{{ workflow_rule.created_by.user.username }}</dd>
+                    </dl>
+
+                    <!-- Workflow Configuration -->
+                    {% if workflow_rule.conditions %}
+                        <div class="mt-3">
+                            <h6>Conditions:</h6>
+                            <div class="bg-light p-2 rounded small">
+                                {{ workflow_rule.conditions|truncatechars:200 }}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if workflow_rule.actions %}
+                        <div class="mt-3">
+                            <h6>Actions:</h6>
+                            <div class="bg-light p-2 rounded small">
+                                {{ workflow_rule.actions|truncatechars:200 }}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Execution Statistics -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Execution Stats
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h5 class="text-primary">{{ workflow_rule.executions.count }}</h5>
+                            <small class="text-muted">Total Runs</small>
+                        </div>
+                        <div class="col-4">
+                            <h5 class="text-success">
+                                {{ workflow_rule.executions.filter:status='completed'|length }}
+                            </h5>
+                            <small class="text-muted">Successful</small>
+                        </div>
+                        <div class="col-4">
+                            <h5 class="text-danger">
+                                {{ workflow_rule.executions.filter:status='failed'|length }}
+                            </h5>
+                            <small class="text-muted">Failed</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Success Rate</span>
+                            <span class="fw-bold">
+                                {% widthratio workflow_rule.executions.filter:status='completed'|length workflow_rule.executions.count 100 %}%
+                            </span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {% widthratio workflow_rule.executions.filter:status='completed'|length workflow_rule.executions.count 100 %}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'ai_workflows' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Workflows
+                        </a>
+                        {% if execution.status == 'failed' %}
+                            <button class="btn btn-outline-warning">
+                                <i class="fas fa-redo me-2"></i>Retry Execution
+                            </button>
+                        {% endif %}
+                        <button class="btn btn-outline-info" onclick="window.print()">
+                            <i class="fas fa-print me-2"></i>Print Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Executions of Same Workflow -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>
+                        Recent Executions of This Workflow
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Execution ID</th>
+                                    <th>Status</th>
+                                    <th>Started</th>
+                                    <th>Duration</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for exec in workflow_rule.executions.all|slice:":10" %}
+                                    <tr {% if exec.id == execution.id %}class="table-active"{% endif %}>
+                                        <td>
+                                            <code class="small">{{ exec.id|slice:":8" }}...</code>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{% if exec.status == 'completed' %}success{% elif exec.status == 'failed' %}danger{% elif exec.status == 'running' %}primary{% else %}warning{% endif %}">
+                                                {{ exec.status|capfirst }}
+                                            </span>
+                                        </td>
+                                        <td>{{ exec.started_at|timesince }} ago</td>
+                                        <td>
+                                            {% if exec.completed_at %}
+                                                {{ exec.completed_at|timesince:exec.started_at }}
+                                            {% else %}
+                                                Running...
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if exec.id != execution.id %}
+                                                <a href="{% url 'ai_workflow_execution_detail' exec.id %}" 
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    View Details
+                                                </a>
+                                            {% else %}
+                                                <span class="badge bg-info">Current</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    pre {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    code {
+        font-size: 0.875em;
+    }
+    
+    .table-active {
+        background-color: rgba(13, 110, 253, 0.1) !important;
+    }
+    
+    @media print {
+        .btn, .breadcrumb, .card:last-child {
+            display: none !important;
+        }
+    }
+</style>
+
+<script>
+    // Auto-refresh for running executions
+    {% if execution.status == 'running' %}
+        setTimeout(function() {
+            location.reload();
+        }, 30000); // Refresh every 30 seconds
+    {% endif %}
+</script>
+{% endblock %}

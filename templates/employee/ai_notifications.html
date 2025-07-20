@@ -1,0 +1,356 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}AI Notifications - Computer Concepts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-bell text-primary me-2"></i>
+                        AI Notifications
+                    </h2>
+                    <p class="text-muted mb-0">Stay updated with AI insights and alerts</p>
+                </div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'ai_dashboard' %}">AI Dashboard</a></li>
+                        <li class="breadcrumb-item active">Notifications</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ summary.total }}</h4>
+                            <p class="mb-0">Total Notifications</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-bell fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ summary.unread }}</h4>
+                            <p class="mb-0">Unread</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-envelope fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ summary.urgent }}</h4>
+                            <p class="mb-0">Urgent</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exclamation-triangle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ summary.high }}</h4>
+                            <p class="mb-0">High Priority</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-arrow-up fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters and Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <form method="get" class="d-flex flex-wrap gap-2">
+                                <!-- Category Filter -->
+                                <select name="category" class="form-select" style="width: auto;">
+                                    <option value="">All Categories</option>
+                                    {% for value, label in category_choices %}
+                                        <option value="{{ value }}" {% if current_category == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+
+                                <!-- Priority Filter -->
+                                <select name="priority" class="form-select" style="width: auto;">
+                                    <option value="">All Priorities</option>
+                                    {% for value, label in priority_choices %}
+                                        <option value="{{ value }}" {% if current_priority == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+
+                                <!-- Unread Only -->
+                                <div class="form-check align-self-center">
+                                    <input class="form-check-input" type="checkbox" name="unread_only" value="1" 
+                                           id="unread_only" {% if unread_only %}checked{% endif %}>
+                                    <label class="form-check-label" for="unread_only">
+                                        Unread only
+                                    </label>
+                                </div>
+
+                                <button type="submit" class="btn btn-outline-primary">
+                                    <i class="fas fa-filter me-1"></i>Filter
+                                </button>
+                            </form>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{% url 'mark_all_notifications_read' %}" class="btn btn-success">
+                                <i class="fas fa-check-double me-1"></i>Mark All as Read
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications List -->
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Notifications</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if page_obj %}
+                        {% for notification in page_obj %}
+                            <div class="notification-item p-3 border-bottom {% if not notification.is_read %}bg-light{% endif %}" 
+                                 data-notification-id="{{ notification.id }}">
+                                <div class="d-flex">
+                                    <div class="flex-shrink-0">
+                                        {% if notification.priority == 'urgent' %}
+                                            <div class="bg-danger bg-opacity-10 rounded-circle p-2">
+                                                <i class="fas fa-exclamation-triangle text-danger"></i>
+                                            </div>
+                                        {% elif notification.priority == 'high' %}
+                                            <div class="bg-warning bg-opacity-10 rounded-circle p-2">
+                                                <i class="fas fa-exclamation-circle text-warning"></i>
+                                            </div>
+                                        {% elif notification.priority == 'medium' %}
+                                            <div class="bg-info bg-opacity-10 rounded-circle p-2">
+                                                <i class="fas fa-info-circle text-info"></i>
+                                            </div>
+                                        {% else %}
+                                            <div class="bg-secondary bg-opacity-10 rounded-circle p-2">
+                                                <i class="fas fa-bell text-secondary"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-grow-1 ms-3">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="mb-1 {% if not notification.is_read %}fw-bold{% endif %}">
+                                                    {{ notification.title }}
+                                                </h6>
+                                                <p class="mb-1 text-muted">{{ notification.message }}</p>
+                                                <div class="d-flex align-items-center">
+                                                    <span class="badge bg-secondary me-2">{{ notification.get_category_display }}</span>
+                                                    <span class="badge bg-primary me-2">{{ notification.get_priority_display }}</span>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-clock me-1"></i>
+                                                        {{ notification.created_at|timesince }} ago
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                                                        type="button" data-bs-toggle="dropdown">
+                                                    Actions
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    {% if not notification.is_read %}
+                                                        <li>
+                                                            <a class="dropdown-item mark-read" 
+                                                               href="{% url 'mark_notification_read' notification.id %}">
+                                                                <i class="fas fa-check me-2"></i>Mark as Read
+                                                            </a>
+                                                        </li>
+                                                    {% endif %}
+                                                    {% if notification.related_object_id %}
+                                                        <li>
+                                                            <a class="dropdown-item" href="{{ notification.get_related_url }}">
+                                                                <i class="fas fa-external-link-alt me-2"></i>View Details
+                                                            </a>
+                                                        </li>
+                                                    {% endif %}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+
+                        <!-- Pagination -->
+                        {% if page_obj.has_other_pages %}
+                            <div class="p-3">
+                                <nav aria-label="Notifications pagination">
+                                    <ul class="pagination justify-content-center mb-0">
+                                        {% if page_obj.has_previous %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page=1{% if current_category %}&category={{ current_category }}{% endif %}{% if current_priority %}&priority={{ current_priority }}{% endif %}{% if unread_only %}&unread_only=1{% endif %}">First</a>
+                                            </li>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_priority %}&priority={{ current_priority }}{% endif %}{% if unread_only %}&unread_only=1{% endif %}">Previous</a>
+                                            </li>
+                                        {% endif %}
+
+                                        <li class="page-item active">
+                                            <span class="page-link">
+                                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                                            </span>
+                                        </li>
+
+                                        {% if page_obj.has_next %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_priority %}&priority={{ current_priority }}{% endif %}{% if unread_only %}&unread_only=1{% endif %}">Next</a>
+                                            </li>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_priority %}&priority={{ current_priority }}{% endif %}{% if unread_only %}&unread_only=1{% endif %}">Last</a>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No notifications found</h5>
+                            <p class="text-muted">Check back later for AI insights and alerts</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Breakdown Sidebar -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Category Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    {% if categories %}
+                        {% for category in categories %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span>{{ category.category|capfirst }}</span>
+                                <span class="badge bg-primary">{{ category.count }}</span>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No notifications yet</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'ai_settings' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-cog me-2"></i>Notification Settings
+                        </a>
+                        <a href="{% url 'ai_workflows' %}" class="btn btn-outline-success">
+                            <i class="fas fa-cogs me-2"></i>Manage Workflows
+                        </a>
+                        <a href="{% url 'ai_analytics' %}" class="btn btn-outline-info">
+                            <i class="fas fa-chart-bar me-2"></i>View Analytics
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .notification-item {
+        transition: background-color 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .notification-item:hover {
+        background-color: #f8f9fa !important;
+    }
+    
+    .notification-item.unread {
+        border-left: 4px solid #0d6efd;
+    }
+</style>
+
+<script>
+    // Mark notification as read when clicked
+    document.querySelectorAll('.mark-read').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const url = this.href;
+            const notificationItem = this.closest('.notification-item');
+            
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    notificationItem.classList.remove('bg-light');
+                    this.closest('.dropdown').remove();
+                }
+            });
+        });
+    });
+
+    // Auto-submit filter form on change
+    document.querySelectorAll('select[name="category"], select[name="priority"]').forEach(function(select) {
+        select.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+</script>
+{% endblock %}

@@ -1,261 +1,886 @@
 {% extends 'employee/base.html' %}
 {% load file_extras %}
 
-{% block title %}Search Files - File Manager{% endblock %}
+{% block title %}AI-Powered File Search - File Manager{% endblock %}
 
 {% block extra_css %}
 <style>
     .search-container {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 20px;
-        margin-bottom: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        color: white;
     }
     
     .search-form {
         display: flex;
-        gap: 10px;
+        gap: 15px;
         align-items: center;
+        margin-bottom: 20px;
     }
     
     .search-input {
         flex: 1;
-        padding: 12px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
+        padding: 15px;
+        border: none;
+        border-radius: 10px;
         font-size: 16px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
     
     .search-btn {
-        padding: 12px 24px;
-        background: #007bff;
-        color: white;
+        padding: 15px 30px;
+        background: white;
+        color: #667eea;
         border: none;
-        border-radius: 5px;
+        border-radius: 10px;
         cursor: pointer;
         font-size: 16px;
+        font-weight: 600;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
     }
     
     .search-btn:hover {
-        background: #0056b3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }
     
-    .search-results {
-        margin-top: 20px;
+    .ai-powered-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255,255,255,0.2);
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 14px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .search-suggestions {
+        margin-top: 15px;
+    }
+    
+    .suggestion-item {
+        display: inline-block;
+        background: rgba(255,255,255,0.15);
+        color: white;
+        padding: 5px 12px;
+        margin: 3px;
+        border-radius: 15px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background 0.2s;
+        text-decoration: none;
+    }
+    
+    .suggestion-item:hover {
+        background: rgba(255,255,255,0.25);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .search-results-header {
+        display: flex;
+        justify-content-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 10px;
     }
     
     .file-item {
         display: flex;
-        align-items: center;
-        padding: 15px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        margin-bottom: 10px;
+        align-items: flex-start;
+        padding: 20px;
         background: white;
-        transition: all 0.3s ease;
+        border-radius: 12px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid #e9ecef;
     }
     
     .file-item:hover {
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+    
+    .file-item.high-relevance {
+        border-left-color: #28a745;
+    }
+    
+    .file-item.medium-relevance {
+        border-left-color: #ffc107;
+    }
+    
+    .file-item.low-relevance {
+        border-left-color: #6c757d;
     }
     
     .file-icon {
-        width: 40px;
-        height: 40px;
         margin-right: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 5px;
-        color: white;
-        font-size: 20px;
+        font-size: 32px;
+        min-width: 50px;
     }
     
-    .file-icon.image { background: #28a745; }
-    .file-icon.document { background: #007bff; }
-    .file-icon.pdf { background: #dc3545; }
-    .file-icon.video { background: #6f42c1; }
-    .file-icon.audio { background: #fd7e14; }
-    .file-icon.other { background: #6c757d; }
-    
-    .file-info {
+    .file-details {
         flex: 1;
     }
     
-    .file-name {
-        font-weight: bold;
-        margin-bottom: 5px;
+    .file-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #2c3e50;
+    }
+    
+    .relevance-score {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #e9ecef;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-left: 10px;
+    }
+    
+    .relevance-score.high {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .relevance-score.medium {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .relevance-score.low {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .match-reasons {
+        margin-top: 10px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 3px solid #007bff;
+    }
+    
+    .match-reason {
+        display: inline-block;
+        background: #e3f2fd;
+        color: #1565c0;
+        padding: 2px 8px;
+        margin: 2px;
+        border-radius: 12px;
+        font-size: 11px;
+    }
+    
+    .ai-insights {
+        margin-top: 10px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .ai-insight {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #e8f5e8;
+        color: #2e7d32;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
     }
     
     .file-meta {
-        color: #666;
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        color: #6c757d;
         font-size: 14px;
+    }
+    
+    .file-tags {
+        margin-top: 10px;
     }
     
     .file-actions {
         display: flex;
-        gap: 10px;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 120px;
     }
     
-    .file-actions a {
+    .btn-view, .btn-download {
         padding: 8px 15px;
-        border-radius: 5px;
+        border-radius: 8px;
         text-decoration: none;
+        text-align: center;
         font-size: 14px;
-        transition: all 0.3s ease;
+        font-weight: 500;
+        transition: all 0.2s;
     }
     
     .btn-view {
-        background: #28a745;
+        background: #007bff;
         color: white;
     }
     
     .btn-view:hover {
-        background: #218838;
+        background: #0056b3;
         color: white;
+        text-decoration: none;
     }
     
     .btn-download {
-        background: #17a2b8;
+        background: #28a745;
         color: white;
     }
     
     .btn-download:hover {
-        background: #138496;
+        background: #1e7e34;
         color: white;
+        text-decoration: none;
     }
     
     .no-results {
         text-align: center;
-        padding: 40px;
-        color: #666;
+        padding: 60px 20px;
+        color: #6c757d;
     }
     
-    .search-stats {
-        color: #666;
-        margin-bottom: 20px;
+    .search-tips {
+        background: #e7f3ff;
+        border: 1px solid #b3d7ff;
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 20px;
     }
     
-    .file-tags {
-        margin-top: 5px;
+    .search-tip {
+        margin-bottom: 8px;
+        color: #0066cc;
     }
     
-    .file-tags .badge {
-        font-size: 12px;
-        margin-right: 5px;
+    .ai-suggestion-header {
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 10px;
+        opacity: 0.9;
+    }
+    
+    @media (max-width: 768px) {
+        .file-item {
+            flex-direction: column;
+        }
+        
+        .file-actions {
+            flex-direction: row;
+            margin-top: 15px;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2><i class="fas fa-search me-2"></i>Search Files</h2>
-                <a href="{% url 'file_manager' %}" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left me-2"></i>Back to File Manager
-                </a>
+    <!-- Enhanced Search Header -->
+    <div class="search-container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="mb-0">
+                <i class="fas fa-robot me-2"></i>
+                AI-Powered File Search
+            </h2>
+            <div class="ai-powered-badge">
+                <i class="fas fa-magic"></i>
+                <span>Enhanced with AI</span>
             </div>
-            
-            <div class="search-container">
-                <form method="get" class="search-form">
-                    <input type="text" name="query" class="search-input" 
-                           placeholder="Search files by name, description, or tags..." 
-                           value="{{ request.GET.query }}" required>
-                    <button type="submit" class="search-btn">
-                        <i class="fas fa-search me-2"></i>Search
-                    </button>
+        </div>
+        
+        <form method="get" class="search-form">
+            <input 
+                type="text" 
+                name="query" 
+                class="search-input" 
+                placeholder="Search files by name, content, topics, or describe what you're looking for..."
+                value="{{ search_query }}"
+                autocomplete="off"
+            >
+            <button type="submit" class="search-btn">
+                <i class="fas fa-search me-2"></i>Search
+            </button>
+        </form>
+        
+        {% if ai_suggestions %}
+            <div class="search-suggestions">
+                <div class="ai-suggestion-header">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    AI Suggestions based on your files:
+                </div>
+                {% for suggestion in ai_suggestions %}
+                    <a href="?query={{ suggestion.text }}" class="suggestion-item">
+                        <i class="{{ suggestion.icon }} me-1"></i>{{ suggestion.text }}
+                    </a>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Advanced Search Filters -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#advancedFilters">
+                <i class="fas fa-filter me-2"></i>Advanced Filters
+            </button>
+        </div>
+        <div class="collapse" id="advancedFilters">
+            <div class="card-body">
+                <form method="get">
+                    <input type="hidden" name="query" value="{{ search_query }}">
+                    <div class="row">
+                        <div class="col-md-3">
+                            {{ form.file_type.label_tag }}
+                            {{ form.file_type }}
+                        </div>
+                        <div class="col-md-3">
+                            {{ form.date_range.label_tag }}
+                            {{ form.date_range }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.tags.label_tag }}
+                            {{ form.tags }}
+                        </div>
+                        <div class="col-md-2">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">Apply</button>
+                        </div>
+                    </div>
                 </form>
             </div>
-            
-            {% if request.GET.query %}
-                <div class="search-results">
-                    {% if files %}
-                        <div class="search-stats">
-                            Found {{ files.count }} file{{ files.count|pluralize }} matching "{{ request.GET.query }}"
+        </div>
+    </div>
+
+    <!-- Search Results -->
+    <div class="row">
+        <div class="col-12">
+            {% if search_performed %}
+                {% if files %}
+                    <div class="search-results-header">
+                        <div>
+                            <h5 class="mb-0">
+                                <i class="fas fa-search-plus me-2"></i>
+                                Search Results for "{{ search_query }}"
+                            </h5>
+                            <small class="text-muted">
+                                Found {{ total_results }} file{{ total_results|pluralize }} 
+                                {% if total_results != files.paginator.count %}
+                                    (showing {{ files.start_index }}-{{ files.end_index }})
+                                {% endif %}
+                            </small>
                         </div>
-                        
+                        <div>
+                            <span class="badge bg-success">
+                                <i class="fas fa-robot me-1"></i>AI Enhanced
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="search-results">
                         {% for file in files %}
-                            <div class="file-item">
-                                <div class="file-icon {% if file.is_image %}image{% elif file.is_document %}document{% elif file.is_pdf %}pdf{% elif file.is_video %}video{% elif file.is_audio %}audio{% else %}other{% endif %}">
-                                    {% if file.is_image %}
-                                        <i class="fas fa-image"></i>
-                                    {% elif file.is_document %}
-                                        <i class="fas fa-file-alt"></i>
-                                    {% elif file.is_pdf %}
-                                        <i class="fas fa-file-pdf"></i>
-                                    {% elif file.is_video %}
-                                        <i class="fas fa-video"></i>
-                                    {% elif file.is_audio %}
-                                        <i class="fas fa-music"></i>
-                                    {% else %}
-                                        <i class="fas fa-file"></i>
-                                    {% endif %}
-                                </div>
-                                
-                                <div class="file-info">
-                                    <div class="file-name">{{ file.name }}</div>
-                                    <div class="file-meta">
-                                        <span class="me-3">
-                                            <i class="fas fa-hdd me-1"></i>{{ file.get_file_size_display }}
-                                        </span>
-                                        <span class="me-3">
-                                            <i class="fas fa-user me-1"></i>{{ file.uploaded_by.get_full_name }}
-                                        </span>
-                                        <span class="me-3">
-                                            <i class="fas fa-calendar me-1"></i>{{ file.created_at|date:"M d, Y" }}
-                                        </span>
-                                        {% if file.folder %}
-                                            <span class="me-3">
-                                                <i class="fas fa-folder me-1"></i>{{ file.folder.get_path }}
+                            {% comment %} Determine relevance class and label {% endcomment %}
+                            {% if file.search_score >= 80 %}
+                                {% comment %} High relevance files {% endcomment %}
+                                <div class="file-item high-relevance">
+                                    <div class="file-icon">
+                                        <i class="{{ file.get_file_icon }} text-{{ file.get_file_color }}"></i>
+                                    </div>
+                                    
+                                    <div class="file-details">
+                                        <div class="file-title">
+                                            {{ file.name }}
+                                            <span class="relevance-score high">
+                                                <i class="fas fa-star"></i>
+                                                {{ file.search_score }}% match
                                             </span>
+                                        </div>
+                                        
+                                        {% if file.match_reasons %}
+                                            <div class="match-reasons">
+                                                <strong><i class="fas fa-search me-1"></i>Why this matches:</strong>
+                                                <div class="mt-1">
+                                                    {% for reason in file.match_reasons %}
+                                                        <span class="match-reason">{{ reason }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <!-- AI Insights -->
+                                        {% if file.ai_analysis %}
+                                            <div class="ai-insights">
+                                                {% if file.ai_analysis.category %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-folder"></i>{{ file.ai_analysis.category }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if file.ai_analysis.content_type %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-file-alt"></i>{{ file.ai_analysis.content_type }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if file.ai_analysis.language %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-language"></i>{{ file.ai_analysis.language|upper }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if file.ai_analysis.quality_score %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-star"></i>Quality: {{ file.ai_analysis.quality_score }}/5
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <div class="file-meta">
+                                            <span>
+                                                <i class="fas fa-hdd me-1"></i>{{ file.get_file_size_display }}
+                                            </span>
+                                            <span>
+                                                <i class="fas fa-user me-1"></i>{{ file.uploaded_by.user.get_full_name|default:file.uploaded_by.user.username }}
+                                            </span>
+                                            <span>
+                                                <i class="fas fa-calendar me-1"></i>{{ file.created_at|date:"M d, Y" }}
+                                            </span>
+                                            {% if file.folder %}
+                                                <span>
+                                                    <i class="fas fa-folder me-1"></i>{{ file.folder.get_path }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if file.description %}
+                                            <div class="file-meta mt-2">
+                                                <i class="fas fa-info-circle me-1"></i>{{ file.description|truncatechars:150 }}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if file.tags %}
+                                            <div class="file-tags">
+                                                {% for tag in file.tags|split:"," %}
+                                                    <span class="badge bg-secondary">{{ tag|strip }}</span>
+                                                {% endfor %}
+                                            </div>
                                         {% endif %}
                                     </div>
                                     
-                                    {% if file.description %}
-                                        <div class="file-meta mt-2">
-                                            <i class="fas fa-info-circle me-1"></i>{{ file.description|truncatechars:100 }}
-                                        </div>
-                                    {% endif %}
-                                    
-                                    {% if file.tags %}
-                                        <div class="file-tags">
-                                            {% for tag in file.tags|split:"," %}
-                                                <span class="badge bg-secondary">{{ tag|strip }}</span>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
+                                    <div class="file-actions">
+                                        <a href="{% url 'view_file' file.id %}" class="btn-view">
+                                            <i class="fas fa-eye me-1"></i>View
+                                        </a>
+                                        <a href="{% url 'download_file' file.id %}" class="btn-download">
+                                            <i class="fas fa-download me-1"></i>Download
+                                        </a>
+                                        {% if file.ai_analysis %}
+                                            <a href="{% url 'file_analysis_detail' file.ai_analysis.id %}" class="btn btn-outline-info btn-sm">
+                                                <i class="fas fa-robot me-1"></i>AI Analysis
+                                            </a>
+                                        {% else %}
+                                            <button class="btn btn-outline-primary btn-sm trigger-analysis" 
+                                                    data-file-id="{{ file.id }}">
+                                                <i class="fas fa-magic me-1"></i>Analyze with AI
+                                            </button>
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                
-                                <div class="file-actions">
-                                    <a href="{% url 'view_file' file.id %}" class="btn-view">
-                                        <i class="fas fa-eye me-1"></i>View
-                                    </a>
-                                    <a href="{% url 'download_file' file.id %}" class="btn-download">
-                                        <i class="fas fa-download me-1"></i>Download
-                                    </a>
+                            {% elif file.search_score >= 40 %}
+                                {% comment %} Medium relevance files {% endcomment %}
+                                <div class="file-item medium-relevance">
+                                    <div class="file-icon">
+                                        <i class="{{ file.get_file_icon }} text-{{ file.get_file_color }}"></i>
+                                    </div>
+                                    
+                                    <div class="file-details">
+                                        <div class="file-title">
+                                            {{ file.name }}
+                                            <span class="relevance-score medium">
+                                                <i class="fas fa-star"></i>
+                                                {{ file.search_score }}% match
+                                            </span>
+                                        </div>
+                                        
+                                        {% if file.match_reasons %}
+                                            <div class="match-reasons">
+                                                <strong><i class="fas fa-search me-1"></i>Why this matches:</strong>
+                                                <div class="mt-1">
+                                                    {% for reason in file.match_reasons %}
+                                                        <span class="match-reason">{{ reason }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <!-- AI Insights -->
+                                        {% if file.ai_analysis %}
+                                            <div class="ai-insights">
+                                                {% if file.ai_analysis.category %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-folder"></i>{{ file.ai_analysis.category }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if file.ai_analysis.content_type %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-file-alt"></i>{{ file.ai_analysis.content_type }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if file.ai_analysis.language %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-language"></i>{{ file.ai_analysis.language|upper }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if file.ai_analysis.quality_score %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-star"></i>Quality: {{ file.ai_analysis.quality_score }}/5
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <div class="file-meta">
+                                            <span>
+                                                <i class="fas fa-hdd me-1"></i>{{ file.get_file_size_display }}
+                                            </span>
+                                            <span>
+                                                <i class="fas fa-user me-1"></i>{{ file.uploaded_by.user.get_full_name|default:file.uploaded_by.user.username }}
+                                            </span>
+                                            <span>
+                                                <i class="fas fa-calendar me-1"></i>{{ file.created_at|date:"M d, Y" }}
+                                            </span>
+                                            {% if file.folder %}
+                                                <span>
+                                                    <i class="fas fa-folder me-1"></i>{{ file.folder.get_path }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if file.description %}
+                                            <div class="file-meta mt-2">
+                                                <i class="fas fa-info-circle me-1"></i>{{ file.description|truncatechars:150 }}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if file.tags %}
+                                            <div class="file-tags">
+                                                {% for tag in file.tags|split:"," %}
+                                                    <span class="badge bg-secondary">{{ tag|strip }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="file-actions">
+                                        <a href="{% url 'view_file' file.id %}" class="btn-view">
+                                            <i class="fas fa-eye me-1"></i>View
+                                        </a>
+                                        <a href="{% url 'download_file' file.id %}" class="btn-download">
+                                            <i class="fas fa-download me-1"></i>Download
+                                        </a>
+                                        {% if file.ai_analysis %}
+                                            <a href="{% url 'file_analysis_detail' file.ai_analysis.id %}" class="btn btn-outline-info btn-sm">
+                                                <i class="fas fa-robot me-1"></i>AI Analysis
+                                            </a>
+                                        {% else %}
+                                            <button class="btn btn-outline-primary btn-sm trigger-analysis" 
+                                                    data-file-id="{{ file.id }}">
+                                                <i class="fas fa-magic me-1"></i>Analyze with AI
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% else %}
+                                {% comment %} Low relevance files {% endcomment %}
+                                <div class="file-item low-relevance">
+                                    <div class="file-icon">
+                                        <i class="{{ file.get_file_icon }} text-{{ file.get_file_color }}"></i>
+                                    </div>
+                                    
+                                    <div class="file-details">
+                                        <div class="file-title">
+                                            {{ file.name }}
+                                            <span class="relevance-score low">
+                                                <i class="fas fa-star"></i>
+                                                {{ file.search_score }}% match
+                                            </span>
+                                        </div>
+                                        
+                                        {% if file.match_reasons %}
+                                            <div class="match-reasons">
+                                                <strong><i class="fas fa-search me-1"></i>Why this matches:</strong>
+                                                <div class="mt-1">
+                                                    {% for reason in file.match_reasons %}
+                                                        <span class="match-reason">{{ reason }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <!-- AI Insights -->
+                                        {% if file.ai_analysis %}
+                                            <div class="ai-insights">
+                                                {% if file.ai_analysis.category %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-folder"></i>{{ file.ai_analysis.category }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if file.ai_analysis.content_type %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-file-alt"></i>{{ file.ai_analysis.content_type }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if file.ai_analysis.language %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-language"></i>{{ file.ai_analysis.language|upper }}
+                                                    </span>
+                                                {% endif %}
+                                                {% if file.ai_analysis.quality_score %}
+                                                    <span class="ai-insight">
+                                                        <i class="fas fa-star"></i>Quality: {{ file.ai_analysis.quality_score }}/5
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <div class="file-meta">
+                                            <span>
+                                                <i class="fas fa-hdd me-1"></i>{{ file.get_file_size_display }}
+                                            </span>
+                                            <span>
+                                                <i class="fas fa-user me-1"></i>{{ file.uploaded_by.user.get_full_name|default:file.uploaded_by.user.username }}
+                                            </span>
+                                            <span>
+                                                <i class="fas fa-calendar me-1"></i>{{ file.created_at|date:"M d, Y" }}
+                                            </span>
+                                            {% if file.folder %}
+                                                <span>
+                                                    <i class="fas fa-folder me-1"></i>{{ file.folder.get_path }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if file.description %}
+                                            <div class="file-meta mt-2">
+                                                <i class="fas fa-info-circle me-1"></i>{{ file.description|truncatechars:150 }}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if file.tags %}
+                                            <div class="file-tags">
+                                                {% for tag in file.tags|split:"," %}
+                                                    <span class="badge bg-secondary">{{ tag|strip }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="file-actions">
+                                        <a href="{% url 'view_file' file.id %}" class="btn-view">
+                                            <i class="fas fa-eye me-1"></i>View
+                                        </a>
+                                        <a href="{% url 'download_file' file.id %}" class="btn-download">
+                                            <i class="fas fa-download me-1"></i>Download
+                                        </a>
+                                        {% if file.ai_analysis %}
+                                            <a href="{% url 'file_analysis_detail' file.ai_analysis.id %}" class="btn btn-outline-info btn-sm">
+                                                <i class="fas fa-robot me-1"></i>AI Analysis
+                                            </a>
+                                        {% else %}
+                                            <button class="btn btn-outline-primary btn-sm trigger-analysis" 
+                                                    data-file-id="{{ file.id }}">
+                                                <i class="fas fa-magic me-1"></i>Analyze with AI
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if files.has_other_pages %}
+                        <nav aria-label="Search results pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if files.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?query={{ search_query }}&page=1">First</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?query={{ search_query }}&page={{ files.previous_page_number }}">Previous</a>
+                                    </li>
+                                {% endif %}
+
+                                <li class="page-item active">
+                                    <span class="page-link">
+                                        Page {{ files.number }} of {{ files.paginator.num_pages }}
+                                    </span>
+                                </li>
+
+                                {% if files.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?query={{ search_query }}&page={{ files.next_page_number }}">Next</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?query={{ search_query }}&page={{ files.paginator.num_pages }}">Last</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <!-- No files found message -->
+                    <div class="no-results">
+                        <i class="fas fa-search fa-3x mb-3"></i>
+                        <h4>No files found</h4>
+                        <p>No files match your search for "<strong>{{ search_query }}</strong>"</p>
+                        
+                        {% if search_suggestions %}
+                            <div class="ai-suggestions mt-4">
+                                <h6><i class="fas fa-robot me-2"></i>AI Suggestions:</h6>
+                                <div class="suggestions-list">
+                                    {% for suggestion in search_suggestions %}
+                                        <button class="suggestion-item" type="button">
+                                            {{ suggestion }}
+                                        </button>
+                                    {% endfor %}
                                 </div>
                             </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="no-results">
-                            <i class="fas fa-search fa-3x mb-3 text-muted"></i>
-                            <h4>No files found</h4>
-                            <p>No files match your search criteria "{{ request.GET.query }}"</p>
-                            <p class="text-muted">Try searching with different keywords or check your spelling.</p>
+                        {% endif %}
+                        
+                        <div class="search-tips">
+                            <h6><i class="fas fa-lightbulb me-2"></i>Search Tips:</h6>
+                            <div class="search-tip">• Try different keywords or phrases</div>
+                            <div class="search-tip">• Search by file content topics or categories</div>
+                            <div class="search-tip">• Use broader terms (e.g., "report" instead of "quarterly report")</div>
+                            <div class="search-tip">• Check spelling and try synonyms</div>
+                            <div class="search-tip">• AI analyzes file content automatically - search by what the file is about</div>
                         </div>
-                    {% endif %}
-                </div>
+                    </div>
+                {% endif %}
             {% else %}
                 <div class="no-results">
-                    <i class="fas fa-search fa-3x mb-3 text-muted"></i>
-                    <h4>Search Your Files</h4>
-                    <p>Enter keywords to search through your files by name, description, or tags.</p>
+                    <i class="fas fa-robot fa-3x mb-3"></i>
+                    <h4>AI-Powered File Search</h4>
+                    <p>Search your files intelligently using AI-enhanced matching</p>
+                    <div class="search-tips">
+                        <h6><i class="fas fa-magic me-2"></i>AI Search Features:</h6>
+                        <div class="search-tip">• <strong>Content Analysis:</strong> Find files by their actual content and topics</div>
+                        <div class="search-tip">• <strong>Smart Matching:</strong> Matches related terms and concepts</div>
+                        <div class="search-tip">• <strong>Category Detection:</strong> Search by AI-detected file categories</div>
+                        <div class="search-tip">• <strong>Entity Recognition:</strong> Find files containing specific names, places, or concepts</div>
+                        <div class="search-tip">• <strong>Relevance Scoring:</strong> Results ranked by how well they match your query</div>
+                    </div>
                 </div>
             {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+// Auto-suggest functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.querySelector('.search-input');
+    const suggestions = document.querySelectorAll('.suggestion-item');
+    
+    // Click suggestion to populate search
+    suggestions.forEach(function(suggestion) {
+        suggestion.addEventListener('click', function(e) {
+            e.preventDefault();
+            searchInput.value = this.textContent.trim();
+            this.closest('form').submit();
+        });
+    });
+    
+    // AI Analysis trigger
+    document.querySelectorAll('.trigger-analysis').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const fileId = this.dataset.fileId;
+            const button = this;
+            
+            // Show loading state
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Analyzing...';
+            button.disabled = true;
+            
+            // Trigger AI analysis
+            fetch(`/api/files/${fileId}/trigger-analysis/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success and reload page
+                    button.innerHTML = '<i class="fas fa-check me-1"></i>Analyzed!';
+                    button.classList.remove('btn-outline-primary');
+                    button.classList.add('btn-success');
+                    
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    // Show error
+                    button.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Error';
+                    button.classList.remove('btn-outline-primary');
+                    button.classList.add('btn-danger');
+                    
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.classList.remove('btn-danger');
+                        button.classList.add('btn-outline-primary');
+                        button.disabled = false;
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        });
+    });
+    
+    // Highlight search terms in results
+    const searchQuery = '{{ search_query|escapejs }}';
+    if (searchQuery) {
+        highlightSearchTerms(searchQuery);
+    }
+});
+
+function highlightSearchTerms(query) {
+    const terms = query.toLowerCase().split(' ');
+    const fileItems = document.querySelectorAll('.file-title, .file-meta');
+    
+    fileItems.forEach(function(item) {
+        let html = item.innerHTML;
+        terms.forEach(function(term) {
+            if (term.length > 2) {
+                const regex = new RegExp(`(${term})`, 'gi');
+                html = html.replace(regex, '<mark>$1</mark>');
+            }
+        });
+        item.innerHTML = html;
+    });
+}
+</script>
 {% endblock %}

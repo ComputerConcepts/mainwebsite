@@ -21,6 +21,21 @@ except ImportError:
     docx = None
 
 try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
+
+try:
+    from pptx import Presentation
+except ImportError:
+    Presentation = None
+
+try:
+    import csv
+except ImportError:
+    csv = None
+
+try:
     from PIL import Image
     import pytesseract
 except ImportError:
@@ -32,21 +47,69 @@ try:
     from nltk.corpus import stopwords
     from nltk.tokenize import word_tokenize, sent_tokenize
     from nltk.stem import PorterStemmer
+    from nltk.sentiment import SentimentIntensityAnalyzer
 except ImportError:
     nltk = None
 
 try:
     from collections import Counter
+    import hashlib
+    import pickle
+    from functools import lru_cache
 except ImportError:
     Counter = None
 
 
 class FreeFileAnalyzer:
-    """Free AI file analyzer using only open-source tools"""
+    """Enhanced AI file analyzer using only open-source tools with caching and advanced features"""
     
-    def __init__(self):
+    def __init__(self, cache_dir=None):
         self.setup_nltk()
         self.stemmer = PorterStemmer() if nltk else None
+        self.sentiment_analyzer = None
+        if nltk:
+            try:
+                self.sentiment_analyzer = SentimentIntensityAnalyzer()
+            except:
+                pass
+        
+        # Setup caching
+        self.cache_dir = cache_dir or os.path.join(os.getcwd(), '.ai_cache')
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+        
+        # Entity patterns for simple NER
+        self.entity_patterns = {
+            'email': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+            'phone': r'(\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}',
+            'date': r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b',
+            'currency': r'\$[0-9,]+\.?[0-9]*|\b[0-9,]+\.?[0-9]*\s*(dollars?|USD|usd)\b',
+            'percentage': r'\b\d+\.?\d*\s?%\b',
+            'url': r'https?://[^\s<>"{}|\\^`\[\]]+',
+        }
+        
+        # Enhanced PII detection patterns
+        self.pii_patterns = {
+            'ssn': r'\b\d{3}-?\d{2}-?\d{4}\b',
+            'credit_card': r'\b(?:\d{4}[-\s]?){3}\d{4}\b',
+            'email': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+            'phone': r'(\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}',
+            'ip_address': r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b',
+            'drivers_license': r'\b[A-Z]{1,2}[0-9]{6,8}\b',
+            'passport': r'\b[A-Z]{1,2}[0-9]{6,9}\b',
+            'address': r'\b\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln|Boulevard|Blvd|Drive|Dr|Court|Ct|Place|Pl)\b',
+            'bank_account': r'\b[0-9]{8,17}\b',
+            'routing_number': r'\b[0-9]{9}\b'
+        }
+        
+        # Keywords that often indicate sensitive information
+        self.sensitive_keywords = [
+            'confidential', 'secret', 'private', 'classified', 'restricted',
+            'personal', 'salary', 'wage', 'income', 'tax', 'medical', 'health',
+            'diagnosis', 'patient', 'social security', 'ssn', 'password', 'login',
+            'account number', 'card number', 'pin', 'birth date', 'birthday',
+            'mother maiden name', 'security question', 'credit score'
+        ]
     
     def setup_nltk(self):
         """Download required NLTK data"""
@@ -56,6 +119,7 @@ class FreeFileAnalyzer:
                 nltk.download('punkt', quiet=True)
                 nltk.download('stopwords', quiet=True)
                 nltk.download('averaged_perceptron_tagger', quiet=True)
+                nltk.download('vader_lexicon', quiet=True)  # For sentiment analysis
                 
                 # Initialize stopwords
                 try:
@@ -87,8 +151,37 @@ class FreeFileAnalyzer:
                 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would'
             }
     
+    def _get_cache_key(self, file_path: str) -> str:
+        """Generate cache key based on file path and modification time"""
+        try:
+            stat = os.stat(file_path)
+            content = f"{file_path}_{stat.st_mtime}_{stat.st_size}"
+            return hashlib.md5(content.encode()).hexdigest()
+        except:
+            return hashlib.md5(file_path.encode()).hexdigest()
+    
+    def _get_cached_analysis(self, cache_key: str) -> Optional[Dict]:
+        """Retrieve cached analysis if available"""
+        try:
+            cache_file = os.path.join(self.cache_dir, f"{cache_key}.pkl")
+            if os.path.exists(cache_file):
+                with open(cache_file, 'rb') as f:
+                    return pickle.load(f)
+        except:
+            pass
+        return None
+    
+    def _cache_analysis(self, cache_key: str, analysis: Dict):
+        """Cache analysis results"""
+        try:
+            cache_file = os.path.join(self.cache_dir, f"{cache_key}.pkl")
+            with open(cache_file, 'wb') as f:
+                pickle.dump(analysis, f)
+        except:
+            pass
+    
     def extract_text_from_file(self, file_path: str) -> str:
-        """Extract text from various file types"""
+        """Extract text from various file types with enhanced format support"""
         file_ext = os.path.splitext(file_path)[1].lower()
         text = ""
         
@@ -97,12 +190,20 @@ class FreeFileAnalyzer:
                 text = self._extract_from_pdf(file_path)
             elif file_ext == '.docx' and docx:
                 text = self._extract_from_docx(file_path)
+            elif file_ext in ['.xlsx', '.xls'] and openpyxl:
+                text = self._extract_from_excel(file_path)
+            elif file_ext in ['.pptx', '.ppt'] and Presentation:
+                text = self._extract_from_powerpoint(file_path)
+            elif file_ext == '.csv':
+                text = self._extract_from_csv(file_path)
             elif file_ext == '.txt':
                 text = self._extract_from_txt(file_path)
+            elif file_ext in ['.rtf']:
+                text = self._extract_from_rtf(file_path)
             elif file_ext in ['.jpg', '.jpeg', '.png', '.bmp'] and pytesseract:
                 text = self._extract_from_image(file_path)
             else:
-                text = "File type not supported for text extraction"
+                text = f"File type {file_ext} not supported for text extraction"
         except Exception as e:
             text = f"Error extracting text: {str(e)}"
         
@@ -140,6 +241,103 @@ class FreeFileAnalyzer:
             text = f"Error reading PDF: {str(e)}"
         
         return self._clean_text(text)
+    
+    def _extract_from_excel(self, file_path: str) -> str:
+        """Extract text from Excel files"""
+        try:
+            workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+            text_content = []
+            
+            for sheet_name in workbook.sheetnames:
+                sheet = workbook[sheet_name]
+                text_content.append(f"Sheet: {sheet_name}")
+                
+                for row in sheet.iter_rows(values_only=True):
+                    row_text = []
+                    for cell in row:
+                        if cell is not None:
+                            row_text.append(str(cell))
+                    if row_text:
+                        text_content.append(" ".join(row_text))
+            
+            workbook.close()
+            return self._clean_text("\n".join(text_content))
+        except Exception as e:
+            return f"Error reading Excel file: {str(e)}"
+    
+    def _extract_from_powerpoint(self, file_path: str) -> str:
+        """Extract text from PowerPoint files"""
+        try:
+            prs = Presentation(file_path)
+            text_content = []
+            
+            for slide_num, slide in enumerate(prs.slides, 1):
+                text_content.append(f"Slide {slide_num}:")
+                
+                # Extract text from shapes
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text:
+                        text_content.append(shape.text)
+                
+                text_content.append("")  # Add blank line between slides
+            
+            return self._clean_text("\n".join(text_content))
+        except Exception as e:
+            return f"Error reading PowerPoint file: {str(e)}"
+    
+    def _extract_from_csv(self, file_path: str) -> str:
+        """Extract text from CSV files"""
+        try:
+            text_content = []
+            
+            # Try different encodings
+            encodings = ['utf-8', 'latin1', 'cp1252']
+            for encoding in encodings:
+                try:
+                    with open(file_path, 'r', encoding=encoding, newline='') as csvfile:
+                        # Detect delimiter
+                        sample = csvfile.read(1024)
+                        csvfile.seek(0)
+                        sniffer = csv.Sniffer()
+                        delimiter = sniffer.sniff(sample).delimiter
+                        
+                        reader = csv.reader(csvfile, delimiter=delimiter)
+                        for row_num, row in enumerate(reader):
+                            if row_num == 0:
+                                text_content.append("Headers: " + " | ".join(row))
+                            else:
+                                text_content.append(" | ".join(str(cell) for cell in row if cell))
+                                
+                                # Limit rows to prevent huge files
+                                if row_num > 1000:
+                                    text_content.append("... (file truncated for analysis)")
+                                    break
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            return self._clean_text("\n".join(text_content))
+        except Exception as e:
+            return f"Error reading CSV file: {str(e)}"
+    
+    def _extract_from_rtf(self, file_path: str) -> str:
+        """Extract text from RTF files (basic implementation)"""
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            
+            # Basic RTF text extraction (remove RTF commands)
+            import re
+            # Remove RTF control words
+            content = re.sub(r'\\[a-z]+\d*\s?', '', content)
+            # Remove braces and other RTF syntax
+            content = re.sub(r'[{}]', '', content)
+            # Clean up extra whitespace
+            content = re.sub(r'\s+', ' ', content)
+            
+            return self._clean_text(content)
+        except Exception as e:
+            return f"Error reading RTF file: {str(e)}"
     
     def _extract_from_docx(self, file_path: str) -> str:
         """Extract text from DOCX"""
@@ -435,6 +633,150 @@ class FreeFileAnalyzer:
         text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\t')
         
         return text
+    
+    def analyze_sentiment(self, text: str) -> Dict[str, any]:
+        """Analyze sentiment of text"""
+        if not text or not self.sentiment_analyzer:
+            return {
+                'sentiment': 'neutral',
+                'confidence': 0.0,
+                'scores': {'positive': 0.0, 'negative': 0.0, 'neutral': 1.0}
+            }
+        
+        try:
+            scores = self.sentiment_analyzer.polarity_scores(text)
+            
+            # Determine overall sentiment
+            if scores['compound'] >= 0.05:
+                sentiment = 'positive'
+            elif scores['compound'] <= -0.05:
+                sentiment = 'negative'
+            else:
+                sentiment = 'neutral'
+            
+            return {
+                'sentiment': sentiment,
+                'confidence': abs(scores['compound']),
+                'scores': {
+                    'positive': scores['pos'],
+                    'negative': scores['neg'],
+                    'neutral': scores['neu']
+                }
+            }
+        except Exception as e:
+            return {
+                'sentiment': 'neutral',
+                'confidence': 0.0,
+                'scores': {'positive': 0.0, 'negative': 0.0, 'neutral': 1.0},
+                'error': str(e)
+            }
+    
+    def extract_entities(self, text: str) -> Dict[str, List[str]]:
+        """Extract entities using regex patterns"""
+        entities = {}
+        
+        for entity_type, pattern in self.entity_patterns.items():
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                # Clean up and deduplicate
+                if entity_type == 'phone':
+                    # Flatten phone number tuples
+                    matches = [match[0] + match[1] if isinstance(match, tuple) else match for match in matches]
+                
+                entities[entity_type] = list(set(matches))
+        
+        return entities
+    
+    def detect_sensitive_information(self, text: str) -> Dict:
+        """Detect sensitive information and PII in text"""
+        if not text:
+            return {
+                'has_sensitive_info': False,
+                'sensitive_types': [],
+                'risk_level': 'low',
+                'details': {}
+            }
+        
+        text_lower = text.lower()
+        found_types = []
+        detection_details = {}
+        risk_score = 0
+        
+        # Check PII patterns
+        for pii_type, pattern in self.pii_patterns.items():
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                found_types.append(pii_type.replace('_', ' ').title())
+                detection_details[pii_type] = len(matches)
+                
+                # Assign risk scores
+                if pii_type in ['ssn', 'credit_card', 'bank_account', 'routing_number']:
+                    risk_score += 50
+                elif pii_type in ['passport', 'drivers_license']:
+                    risk_score += 40
+                elif pii_type in ['email', 'phone', 'address']:
+                    risk_score += 20
+                else:
+                    risk_score += 10
+        
+        # Check sensitive keywords
+        sensitive_keyword_count = 0
+        for keyword in self.sensitive_keywords:
+            if keyword in text_lower:
+                sensitive_keyword_count += 1
+                risk_score += 5
+        
+        if sensitive_keyword_count > 0:
+            found_types.append('Sensitive Keywords')
+            detection_details['sensitive_keywords'] = sensitive_keyword_count
+        
+        # Determine risk level
+        if risk_score >= 100:
+            risk_level = 'critical'
+        elif risk_score >= 50:
+            risk_level = 'high'
+        elif risk_score >= 20:
+            risk_level = 'medium'
+        else:
+            risk_level = 'low'
+        
+        return {
+            'has_sensitive_info': len(found_types) > 0,
+            'sensitive_types': found_types,
+            'risk_level': risk_level,
+            'risk_score': risk_score,
+            'details': detection_details
+        }
+    
+    def detect_language(self, text: str) -> str:
+        """Simple language detection based on common words"""
+        if not text:
+            return 'unknown'
+        
+        text_lower = text.lower()
+        
+        # Common words in different languages
+        language_indicators = {
+            'spanish': ['el', 'la', 'de', 'que', 'y', 'es', 'en', 'un', 'se', 'no', 'te', 'lo', 'le', 'da', 'su', 'por', 'son', 'con', 'para', 'una'],
+            'french': ['le', 'de', 'et', 'à', 'un', 'il', 'être', 'et', 'en', 'avoir', 'que', 'pour', 'dans', 'ce', 'son', 'une', 'sur', 'avec', 'ne', 'se'],
+            'german': ['der', 'die', 'und', 'in', 'den', 'von', 'zu', 'das', 'mit', 'sich', 'des', 'auf', 'für', 'ist', 'im', 'dem', 'nicht', 'ein', 'eine', 'als'],
+            'italian': ['il', 'di', 'che', 'e', 'la', 'per', 'un', 'in', 'con', 'del', 'da', 'a', 'su', 'le', 'al', 'si', 'dei', 'gli', 'una', 'sono'],
+        }
+        
+        word_count = {}
+        words = text_lower.split()[:200]  # Check first 200 words
+        
+        for lang, indicators in language_indicators.items():
+            count = sum(1 for word in words if word in indicators)
+            if count > 0:
+                word_count[lang] = count / len(words)
+        
+        if word_count:
+            detected_lang = max(word_count, key=word_count.get)
+            if word_count[detected_lang] > 0.02:  # At least 2% match
+                return detected_lang
+        
+        return 'english'  # Default to English
     
     def _get_word_frequencies(self, text: str) -> Dict[str, int]:
         """Get word frequency distribution"""
@@ -772,7 +1114,14 @@ class FreeFileAnalyzer:
         return 'general'
     
     def analyze_file(self, file_path: str, filename: str) -> Dict:
-        """Complete intelligent file analysis with enhanced insights"""
+        """Complete intelligent file analysis with enhanced insights and caching"""
+        # Check cache first
+        cache_key = self._get_cache_key(file_path)
+        cached_result = self._get_cached_analysis(cache_key)
+        if cached_result:
+            cached_result['from_cache'] = True
+            return cached_result
+        
         try:
             # Extract text from file
             text = self.extract_text_from_file(file_path)
@@ -792,11 +1141,21 @@ class FreeFileAnalyzer:
             language_complexity = self._assess_language_complexity(text)
             document_structure = self._analyze_document_structure(text)
             
-            # Sentiment and tone (basic)
+            # Enhanced AI features
             tone_analysis = self._analyze_tone(text)
+            sentiment = self.analyze_sentiment(text)
+            entities = self.extract_entities(text)
+            language = self.detect_language(text)
+            
+            # Security analysis
+            security_check = self.detect_sensitive_information(text)
             
             # File type specific insights
             file_insights = self._get_file_type_insights(text, filename)
+            
+            # Advanced scoring
+            complexity_score = self._calculate_complexity_score(text)
+            readability_score = self._calculate_readability_score(text)
             
             analysis = {
                 'filename': filename,
@@ -812,21 +1171,97 @@ class FreeFileAnalyzer:
                 'language_complexity': language_complexity,
                 'document_structure': document_structure,
                 'tone_analysis': tone_analysis,
+                'sentiment': sentiment,
+                'entities': entities,
+                'language': language,
+                'complexity_score': complexity_score,
+                'readability_score': readability_score,
                 'file_insights': file_insights,
+                'security_check': security_check,  # Add security analysis
                 'analysis_date': datetime.now().isoformat(),
                 'has_text': len(text.strip()) > 10,  # More strict threshold
-                'analysis_version': '2.0'  # Track analysis version
+                'analysis_version': '3.1',  # Updated version for security features
+                'from_cache': False
             }
+            
+            # Cache the result
+            self._cache_analysis(cache_key, analysis)
             
             return analysis
             
         except Exception as e:
-            return {
+            error_analysis = {
                 'filename': filename,
+                'file_path': file_path,
                 'error': str(e),
+                'has_text': False,
                 'analysis_date': datetime.now().isoformat(),
-                'analysis_version': '2.0'
+                'analysis_version': '3.0',
+                'from_cache': False
             }
+            return error_analysis
+    
+    def _calculate_complexity_score(self, text: str) -> float:
+        """Calculate text complexity score based on various metrics"""
+        if not text:
+            return 0.0
+        
+        words = text.split()
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+        
+        if not words or not sentences:
+            return 0.0
+        
+        # Average word length
+        avg_word_length = sum(len(word) for word in words) / len(words)
+        
+        # Average sentence length
+        avg_sentence_length = len(words) / len(sentences)
+        
+        # Vocabulary diversity (unique words / total words)
+        unique_words = len(set(word.lower() for word in words))
+        vocab_diversity = unique_words / len(words)
+        
+        # Syllable complexity approximation
+        syllable_count = sum(max(1, len([c for c in word if c.lower() in 'aeiou'])) for word in words)
+        avg_syllables = syllable_count / len(words)
+        
+        # Complexity score (0-100)
+        complexity = (
+            (avg_word_length * 10) +
+            (avg_sentence_length * 2) +
+            (vocab_diversity * 30) +
+            (avg_syllables * 15)
+        )
+        
+        return min(100.0, max(0.0, complexity))
+    
+    def _calculate_readability_score(self, text: str) -> float:
+        """Calculate readability score (simplified Flesch-Kincaid style)"""
+        if not text:
+            return 0.0
+        
+        words = text.split()
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+        
+        if not words or not sentences:
+            return 0.0
+        
+        # Basic metrics
+        avg_sentence_length = len(words) / len(sentences)
+        
+        # Syllable count approximation
+        syllable_count = 0
+        for word in words:
+            vowels = len([c for c in word.lower() if c in 'aeiou'])
+            syllable_count += max(1, vowels)
+        
+        avg_syllables_per_word = syllable_count / len(words)
+        
+        # Simplified readability score (higher = easier to read)
+        readability = 206.835 - (1.015 * avg_sentence_length) - (84.6 * avg_syllables_per_word)
+        
+        return max(0.0, min(100.0, readability))
     
     def _assess_content_quality(self, text: str) -> Dict[str, any]:
         """Assess the quality and characteristics of content"""

@@ -100,6 +100,12 @@
         .alert {
             border-radius: 10px;
         }
+        .text-purple {
+            color: #6f42c1 !important;
+        }
+        .bg-purple {
+            background-color: #6f42c1 !important;
+        }
     </style>
 </head>
 <body>
@@ -110,6 +116,10 @@
                 Computer Concepts
             </a>
             <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{% url 'ai_dashboard' %}">
+                    <i class="fas fa-brain me-1"></i>
+                    AI Dashboard
+                </a>
                 <a class="nav-link" href="{% url 'employee_events' %}">
                     <i class="fas fa-calendar me-1"></i>
                     Events
@@ -158,7 +168,7 @@
 
         <!-- Stats Row -->
         <div class="row">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="stat-card">
                     <div class="stat-icon text-primary">
                         <i class="fas fa-calendar-alt"></i>
@@ -167,7 +177,7 @@
                     <div class="stat-label">Active Events</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="stat-card">
                     <div class="stat-icon text-success">
                         <i class="fas fa-columns"></i>
@@ -176,7 +186,7 @@
                     <div class="stat-label">Project Boards</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="stat-card">
                     <div class="stat-icon text-warning">
                         <i class="fas fa-tasks"></i>
@@ -185,13 +195,169 @@
                     <div class="stat-label">Assigned Tasks</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="stat-card">
                     <div class="stat-icon text-info">
                         <i class="fas fa-cloud"></i>
                     </div>
                     <div class="stat-number text-info">{{ uploaded_files_count }}</div>
                     <div class="stat-label">My Files</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-card">
+                    <div class="stat-icon text-purple">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <div class="stat-number text-purple">{{ ai_stats.analyzed_files|default:0 }}</div>
+                    <div class="stat-label">AI Analyzed</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="stat-card">
+                    <div class="stat-icon text-danger">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div class="stat-number text-danger">{{ ai_stats.unread_notifications|default:0 }}</div>
+                    <div class="stat-label">AI Alerts</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Dashboard Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <div class="card-body text-white">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h4 class="mb-2">
+                                    <i class="fas fa-brain me-2"></i>
+                                    AI-Powered Insights
+                                </h4>
+                                <p class="mb-3 opacity-75">Leverage artificial intelligence to enhance your productivity and workflow</p>
+                                <div class="row text-center">
+                                    <div class="col-3">
+                                        <div class="border-end border-white border-opacity-25">
+                                            <h3 class="mb-1">{{ ai_stats.unread_notifications|default:0 }}</h3>
+                                            <small class="opacity-75">AI Notifications</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-3">
+                                        <div class="border-end border-white border-opacity-25">
+                                            <h3 class="mb-1">{{ ai_stats.analyzed_files|default:0 }}</h3>
+                                            <small class="opacity-75">Analyzed Files</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-3">
+                                        <div class="border-end border-white border-opacity-25">
+                                            <h3 class="mb-1">{{ ai_stats.workflow_executions|default:0 }}</h3>
+                                            <small class="opacity-75">AI Workflows</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-3">
+                                        <h3 class="mb-1">7</h3>
+                                        <small class="opacity-75">AI Modules</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <i class="fas fa-robot" style="font-size: 4rem; opacity: 0.3;"></i>
+                                <div class="mt-3">
+                                    <a href="{% url 'ai_dashboard' %}" class="btn btn-light btn-sm me-2">
+                                        <i class="fas fa-chart-line me-1"></i>AI Dashboard
+                                    </a>
+                                    <a href="{% url 'ai_notifications' %}" class="btn btn-outline-light btn-sm">
+                                        <i class="fas fa-bell me-1"></i>Notifications
+                                        {% if ai_stats.unread_notifications > 0 %}
+                                            <span class="badge bg-danger ms-1">{{ ai_stats.unread_notifications }}</span>
+                                        {% endif %}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recent AI Notifications -->
+                        {% if ai_stats.recent_notifications %}
+                            <div class="mt-4 pt-3 border-top border-white border-opacity-25">
+                                <h6 class="mb-3">
+                                    <i class="fas fa-bell me-1"></i>Recent AI Insights
+                                </h6>
+                                <div class="row">
+                                    {% for notification in ai_stats.recent_notifications %}
+                                        <div class="col-md-4">
+                                            <div class="bg-white bg-opacity-10 rounded p-3 mb-2">
+                                                <div class="d-flex align-items-start">
+                                                    <div class="me-2">
+                                                        {% if notification.notification_type == 'duplicate_detected' %}
+                                                            <i class="fas fa-copy text-warning"></i>
+                                                        {% elif notification.notification_type == 'file_analyzed' %}
+                                                            <i class="fas fa-file-alt text-info"></i>
+                                                        {% elif notification.notification_type == 'recommendation' %}
+                                                            <i class="fas fa-lightbulb text-success"></i>
+                                                        {% else %}
+                                                            <i class="fas fa-info-circle text-primary"></i>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="flex-grow-1">
+                                                        <div class="small fw-semibold">{{ notification.title }}</div>
+                                                        <div class="small opacity-75">{{ notification.message|truncatechars:50 }}</div>
+                                                        <small class="opacity-50">{{ notification.created_at|timesince }} ago</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick AI Actions Row -->
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card h-100 border-0 bg-light">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-upload text-primary" style="font-size: 2rem;"></i>
+                        </div>
+                        <h6 class="card-title">Smart File Upload</h6>
+                        <p class="card-text small text-muted">Upload files and get instant AI analysis with duplicate detection and smart categorization.</p>
+                        <a href="{% url 'file_manager' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-upload me-1"></i>Upload & Analyze
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 bg-light">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-search text-success" style="font-size: 2rem;"></i>
+                        </div>
+                        <h6 class="card-title">AI-Powered Search</h6>
+                        <p class="card-text small text-muted">Find files and content using natural language search powered by semantic understanding.</p>
+                        <a href="{% url 'ai_dashboard' %}" class="btn btn-success btn-sm">
+                            <i class="fas fa-search me-1"></i>Smart Search
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 bg-light">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-magic text-warning" style="font-size: 2rem;"></i>
+                        </div>
+                        <h6 class="card-title">AI Workflows</h6>
+                        <p class="card-text small text-muted">Automate repetitive tasks with AI-powered workflows and smart notifications.</p>
+                        <a href="{% url 'ai_settings' %}" class="btn btn-warning btn-sm">
+                            <i class="fas fa-cog me-1"></i>Configure AI
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

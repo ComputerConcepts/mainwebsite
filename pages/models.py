@@ -714,3 +714,214 @@ class StorageManager:
             'total_allocated_display': Employee._format_bytes(total_allocated),
             'manual_allocation_gb': total_allocation_gb,
         }
+
+
+# AI Workflow Models
+class AIWorkflowRule(models.Model):
+    """Model for storing AI workflow automation rules"""
+    TRIGGER_CHOICES = [
+        ('file_upload', 'File Upload'),
+        ('file_modified', 'File Modified'),
+        ('file_shared', 'File Shared'),
+        ('schedule_based', 'Schedule Based'),
+        ('threshold_reached', 'Threshold Reached'),
+        ('user_action', 'User Action'),
+        ('time_based', 'Time Based'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    trigger = models.CharField(max_length=20, choices=TRIGGER_CHOICES)
+    conditions = models.JSONField(default=dict, help_text="Workflow conditions as JSON")
+    actions = models.JSONField(default=list, help_text="Workflow actions as JSON")
+    enabled = models.BooleanField(default=True)
+    created_by = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='created_workflows')
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_executed = models.DateTimeField(null=True, blank=True)
+    execution_count = models.IntegerField(default=0)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.name} ({self.trigger})"
+
+
+class AIWorkflowExecution(models.Model):
+    """Model for storing workflow execution history"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('running', 'Running'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workflow_rule = models.ForeignKey(AIWorkflowRule, on_delete=models.CASCADE, related_name='executions')
+    triggered_by = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='triggered_workflows', null=True, blank=True)
+    document = models.ForeignKey(FileDocument, on_delete=models.CASCADE, related_name='workflow_executions', null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    context_data = models.JSONField(default=dict, help_text="Execution context data")
+    result_data = models.JSONField(default=dict, help_text="Execution results")
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    execution_time_ms = models.IntegerField(null=True, blank=True, help_text="Execution time in milliseconds")
+    
+    class Meta:
+        ordering = ['-started_at']
+    
+    def __str__(self):
+        return f"{self.workflow_rule.name} - {self.status}"
+
+
+class AINotification(models.Model):
+    """Model for storing AI-generated notifications"""
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    ]
+    
+    CATEGORY_CHOICES = [
+        ('security', 'Security'),
+        ('storage_management', 'Storage Management'),
+        ('collaboration', 'Collaboration'),
+        ('duplicate_detection', 'Duplicate Detection'),
+        ('content_quality', 'Content Quality'),
+        ('file_management', 'File Management'),
+        ('workflow', 'Workflow'),
+        ('general', 'General'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='general')
+    user = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='ai_notifications')
+    document = models.ForeignKey(FileDocument, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    workflow_execution = models.ForeignKey(AIWorkflowExecution, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    data = models.JSONField(default=dict, help_text="Additional notification data")
+    is_read = models.BooleanField(default=False)
+    action_taken = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['priority', 'created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} - {self.user.user.username}"
+    
+    def mark_as_read(self):
+        """Mark notification as read"""
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = models.timezone.now()
+            self.save(update_fields=['is_read', 'read_at'])
+
+
+class AINotificationPreference(models.Model):
+    """Model for storing user notification preferences"""
+    user = models.OneToOneField(Employee, on_delete=models.CASCADE, related_name='notification_preferences')
+    email_notifications = models.BooleanField(default=True)
+    push_notifications = models.BooleanField(default=True)
+    quiet_hours_start = models.TimeField(default='22:00')
+    quiet_hours_end = models.TimeField(default='08:00')
+    priority_threshold = models.CharField(
+        max_length=10, 
+        choices=AINotification.PRIORITY_CHOICES, 
+        default='medium',
+        help_text="Minimum priority level for notifications"
+    )
+    
+    # Category preferences
+    security_notifications = models.BooleanField(default=True)
+    storage_notifications = models.BooleanField(default=True)
+    collaboration_notifications = models.BooleanField(default=True)
+    duplicate_notifications = models.BooleanField(default=False)
+    quality_notifications = models.BooleanField(default=False)
+    file_management_notifications = models.BooleanField(default=True)
+    workflow_notifications = models.BooleanField(default=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Notification preferences for {self.user.user.username}"
+    
+    def get_category_preferences(self):
+        """Return category preferences as a dictionary"""
+        return {
+            'security': self.security_notifications,
+            'storage_management': self.storage_notifications,
+            'collaboration': self.collaboration_notifications,
+            'duplicate_detection': self.duplicate_notifications,
+            'content_quality': self.quality_notifications,
+            'file_management': self.file_management_notifications,
+            'workflow': self.workflow_notifications,
+        }
+
+
+class AIFileAnalysis(models.Model):
+    """Model for storing AI analysis results of files"""
+    document = models.OneToOneField(FileDocument, on_delete=models.CASCADE, related_name='ai_analysis')
+    analysis_completed = models.BooleanField(default=False)
+    analysis_started_at = models.DateTimeField(auto_now_add=True)
+    analysis_completed_at = models.DateTimeField(null=True, blank=True)
+    
+    # Content Analysis
+    content_type = models.CharField(max_length=50, blank=True)
+    language = models.CharField(max_length=10, blank=True)
+    word_count = models.IntegerField(null=True, blank=True)
+    page_count = models.IntegerField(null=True, blank=True)
+    
+    # AI Insights
+    category = models.CharField(max_length=100, blank=True, help_text="AI-determined category")
+    key_topics = models.JSONField(default=list, help_text="Extracted key topics")
+    entities = models.JSONField(default=list, help_text="Named entities found")
+    sentiment_score = models.FloatField(null=True, blank=True, help_text="Sentiment analysis score (-1 to 1)")
+    sentiment_label = models.CharField(max_length=20, blank=True, help_text="Sentiment label")
+    readability_score = models.FloatField(null=True, blank=True, help_text="Readability score")
+    complexity_score = models.FloatField(null=True, blank=True, help_text="Content complexity score")
+    quality_score = models.FloatField(null=True, blank=True, help_text="Overall quality score")
+    
+    # Security Analysis
+    contains_sensitive_info = models.BooleanField(default=False)
+    sensitive_info_types = models.JSONField(default=list, help_text="Types of sensitive information found")
+    security_risk_level = models.CharField(max_length=20, default='low', help_text="Security risk assessment")
+    
+    # Content Structure
+    has_images = models.BooleanField(default=False)
+    has_tables = models.BooleanField(default=False)
+    has_links = models.BooleanField(default=False)
+    
+    # Recommendations
+    ai_recommendations = models.JSONField(default=list, help_text="AI-generated recommendations")
+    suggested_tags = models.JSONField(default=list, help_text="AI-suggested tags")
+    suggested_category = models.CharField(max_length=100, blank=True)
+    
+    # Processing metadata
+    processing_time_ms = models.IntegerField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+    
+    class Meta:
+        ordering = ['-analysis_started_at']
+    
+    def __str__(self):
+        return f"AI Analysis for {self.document.name}"
+    
+    def mark_completed(self, processing_time_ms=None):
+        """Mark analysis as completed"""
+        self.analysis_completed = True
+        self.analysis_completed_at = models.timezone.now()
+        if processing_time_ms:
+            self.processing_time_ms = processing_time_ms
+        self.save(update_fields=['analysis_completed', 'analysis_completed_at', 'processing_time_ms'])

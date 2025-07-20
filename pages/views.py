@@ -642,6 +642,23 @@ def employee_dashboard(request):
             'available': employee._format_bytes(employee.get_available_storage())
         }
         
+        # AI Dashboard statistics
+        from .models import AINotification, AIFileAnalysis, AIWorkflowExecution
+        ai_stats = {
+            'unread_notifications': AINotification.objects.filter(
+                user=employee, is_read=False
+            ).count(),
+            'analyzed_files': AIFileAnalysis.objects.filter(
+                document__uploaded_by=employee, analysis_completed=True
+            ).count(),
+            'workflow_executions': AIWorkflowExecution.objects.filter(
+                triggered_by=employee
+            ).count(),
+            'recent_notifications': AINotification.objects.filter(
+                user=employee
+            ).order_by('-created_at')[:3],
+        }
+        
         # HR statistics (if user is HR)
         context = {
             'employee': employee,
@@ -656,6 +673,7 @@ def employee_dashboard(request):
             'shared_files_count': shared_files_count,
             'recent_file_activities': recent_file_activities,
             'storage_stats': storage_stats,
+            'ai_stats': ai_stats,
         }
         
         # Add HR-specific statistics if user is HR

@@ -1,0 +1,363 @@
+{% extends 'employee/base.html' %}
+
+{% block title %}AI Workflows - Computer Concepts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-cogs text-primary me-2"></i>
+                        AI Workflows
+                    </h2>
+                    <p class="text-muted mb-0">Manage and monitor automated AI workflows</p>
+                </div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'ai_dashboard' %}">AI Dashboard</a></li>
+                        <li class="breadcrumb-item active">Workflows</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Execution Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ execution_stats.total }}</h4>
+                            <p class="mb-0">Total Executions</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-play-circle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ execution_stats.successful }}</h4>
+                            <p class="mb-0">Successful</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check-circle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ execution_stats.failed }}</h4>
+                            <p class="mb-0">Failed</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-times-circle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ execution_stats.last_24h }}</h4>
+                            <p class="mb-0">Last 24 Hours</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Workflow Rules -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Workflow Rules</h5>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createWorkflowModal">
+                        <i class="fas fa-plus me-1"></i>Create Rule
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if workflows %}
+                        {% for workflow in workflows %}
+                            <div class="workflow-item border rounded p-3 mb-3 {% if not workflow.is_active %}bg-light{% endif %}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <h6 class="mb-0 me-3">{{ workflow.name }}</h6>
+                                            <span class="badge bg-{{ workflow.is_active|yesno:'success,secondary' }}">
+                                                {{ workflow.is_active|yesno:'Active,Disabled' }}
+                                            </span>
+                                            {% if workflow.created_by.user.username == 'admin' %}
+                                                <span class="badge bg-info ms-2">System Default</span>
+                                            {% endif %}
+                                        </div>
+                                        <p class="text-muted mb-2">{{ workflow.description }}</p>
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-secondary me-2">{{ workflow.get_trigger_type_display }}</span>
+                                            <span class="badge bg-primary me-2">{{ workflow.category }}</span>
+                                            <small class="text-muted">
+                                                <i class="fas fa-user me-1"></i>{{ workflow.created_by.user.get_full_name|default:workflow.created_by.user.username }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                                                type="button" data-bs-toggle="dropdown">
+                                            Actions
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            {% if workflow.created_by == employee %}
+                                                <li>
+                                                    <a class="dropdown-item toggle-workflow" 
+                                                       href="{% url 'toggle_workflow_rule' workflow.id %}"
+                                                       data-workflow-id="{{ workflow.id }}">
+                                                        <i class="fas fa-{{ workflow.is_active|yesno:'pause,play' }} me-2"></i>
+                                                        {{ workflow.is_active|yesno:'Disable,Enable' }}
+                                                    </a>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                            {% endif %}
+                                            <li>
+                                                <a class="dropdown-item" href="#" data-bs-toggle="modal" 
+                                                   data-bs-target="#workflowDetailModal" 
+                                                   data-workflow="{{ workflow.id }}">
+                                                    <i class="fas fa-eye me-2"></i>View Details
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <!-- Workflow Configuration Preview -->
+                                <div class="mt-3">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <small class="text-muted">Trigger:</small>
+                                            <div>{{ workflow.get_trigger_type_display }}</div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <small class="text-muted">Conditions:</small>
+                                            <div>
+                                                {% if workflow.conditions %}
+                                                    {{ workflow.conditions|truncatechars:50 }}
+                                                {% else %}
+                                                    No conditions
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <small class="text-muted">Actions:</small>
+                                            <div>
+                                                {% if workflow.actions %}
+                                                    {{ workflow.actions|truncatechars:50 }}
+                                                {% else %}
+                                                    No actions
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No workflow rules configured</h5>
+                            <p class="text-muted">Create your first workflow rule to automate AI processes</p>
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createWorkflowModal">
+                                <i class="fas fa-plus me-1"></i>Create First Rule
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Executions -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Recent Executions</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_executions %}
+                        {% for execution in recent_executions %}
+                            <div class="execution-item border-bottom pb-2 mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ execution.workflow_rule.name }}</h6>
+                                        <small class="text-muted">
+                                            {{ execution.started_at|timesince }} ago
+                                        </small>
+                                    </div>
+                                    <div>
+                                        {% if execution.status == 'completed' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>Success
+                                            </span>
+                                        {% elif execution.status == 'failed' %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times me-1"></i>Failed
+                                            </span>
+                                        {% elif execution.status == 'running' %}
+                                            <span class="badge bg-primary">
+                                                <i class="fas fa-spinner fa-spin me-1"></i>Running
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ execution.status|capfirst }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% if execution.error_message %}
+                                    <div class="text-danger small mt-1">
+                                        {{ execution.error_message|truncatechars:100 }}
+                                    </div>
+                                {% endif %}
+                                <div class="mt-2">
+                                    <a href="{% url 'ai_workflow_execution_detail' execution.id %}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        View Details
+                                    </a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="fas fa-history fa-2x text-muted mb-2"></i>
+                            <p class="text-muted mb-0">No executions yet</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'ai_analytics' %}" class="btn btn-outline-info">
+                            <i class="fas fa-chart-bar me-2"></i>View Analytics
+                        </a>
+                        <a href="{% url 'ai_notifications' %}" class="btn btn-outline-warning">
+                            <i class="fas fa-bell me-2"></i>Check Notifications
+                        </a>
+                        <a href="{% url 'ai_settings' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-cog me-2"></i>Settings
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Workflow Modal -->
+<div class="modal fade" id="createWorkflowModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Workflow Rule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Workflow creation is coming soon. For now, the system will automatically create optimal workflows based on your usage patterns.
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Available Triggers:</h6>
+                        <ul class="list-unstyled">
+                            {% for value, label in trigger_choices %}
+                                <li><i class="fas fa-chevron-right me-2 text-primary"></i>{{ label }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Workflow Categories:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-chevron-right me-2 text-success"></i>File Management</li>
+                            <li><i class="fas fa-chevron-right me-2 text-warning"></i>Security & Compliance</li>
+                            <li><i class="fas fa-chevron-right me-2 text-info"></i>Storage Optimization</li>
+                            <li><i class="fas fa-chevron-right me-2 text-danger"></i>Quality Assurance</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" disabled>
+                    <i class="fas fa-plus me-1"></i>Create Rule (Coming Soon)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .workflow-item {
+        transition: all 0.2s ease;
+    }
+    
+    .workflow-item:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .execution-item:last-child {
+        border-bottom: none !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+    }
+</style>
+
+<script>
+    // Toggle workflow rule
+    document.querySelectorAll('.toggle-workflow').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const url = this.href;
+            const workflowId = this.dataset.workflowId;
+            
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

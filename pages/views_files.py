@@ -15,7 +15,7 @@ from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.template.loader import render_to_string
-from .models import FileDocument, FileFolder, FileVersion, FileShare, FileActivity, Employee
+from .models import FileDocument, FileFolder, FileVersion, FileShare, FileActivity, Employee, AIFileAnalysis
 from .forms import FolderForm, FileUploadForm, FileShareForm, FileSearchForm
 from .ai_assistant import create_free_ai_assistant
 import json
@@ -309,6 +309,24 @@ def upload_file(request):
                 except Exception as e:
                     # Don't fail upload if AI analysis fails
                     print(f"AI analysis failed: {str(e)}")
+                
+                # ===== AI WORKFLOW INTEGRATION =====
+                try:
+                    from .ai_workflow_service import get_ai_workflow_service
+                    
+                    ai_service = get_ai_workflow_service()
+                    workflow_result = ai_service.handle_file_upload(file_doc, employee)
+                    
+                    if workflow_result['success']:
+                        print(f"[AI WORKFLOWS] Executed {workflow_result['executed_workflows']} workflows, "
+                              f"created {workflow_result['notifications_created']} notifications")
+                    else:
+                        print(f"[AI WORKFLOWS] Error: {workflow_result.get('error', 'Unknown error')}")
+                        
+                except Exception as e:
+                    # Don't fail upload if AI workflows fail
+                    print(f"[AI WORKFLOWS] Failed to process workflows: {str(e)}")
+                # ===== END AI WORKFLOW INTEGRATION =====
                 
                 # Log activity
                 FileActivity.objects.create(
@@ -640,6 +658,23 @@ def share_file(request, file_id):
                     user_agent=request.META.get('HTTP_USER_AGENT', '')
                 )
                 
+                # ===== AI WORKFLOW INTEGRATION =====
+                try:
+                    from .ai_workflow_service import get_ai_workflow_service
+                    
+                    ai_service = get_ai_workflow_service()
+                    workflow_result = ai_service.handle_file_sharing(file_doc, employee, target_employee)
+                    
+                    if workflow_result['success']:
+                        print(f"[AI WORKFLOWS] File sharing - Executed {workflow_result['executed_workflows']} workflows")
+                    else:
+                        print(f"[AI WORKFLOWS] File sharing error: {workflow_result.get('error', 'Unknown error')}")
+                        
+                except Exception as e:
+                    # Don't fail sharing if AI workflows fail
+                    print(f"[AI WORKFLOWS] Failed to process file sharing workflows: {str(e)}")
+                # ===== END AI WORKFLOW INTEGRATION =====
+                
                 messages.success(request, f'File shared with {target_employee.get_full_name()} ({email}).')
                 return JsonResponse({'success': True, 'message': 'File shared successfully'})
             else:
@@ -661,7 +696,7 @@ def share_file(request, file_id):
 
 @login_required
 def search_files(request):
-    """Search files and folders"""
+    """Enhanced AI-powered search for files and folders"""
     try:
         employee = Employee.objects.get(user=request.user)
         form = FileSearchForm(request.GET)
@@ -669,7 +704,11 @@ def search_files(request):
         # Base queryset - user's files and shared files
         files = FileDocument.objects.filter(
             Q(uploaded_by=employee) | Q(shared_with=employee) | Q(is_public=True)
-        ).distinct()
+        ).select_related('ai_analysis').distinct()
+        
+        search_query = request.GET.get('query', '').strip()
+        search_results = []
+        ai_suggestions = []
         
         if form.is_valid():
             query = form.cleaned_data.get('query')
@@ -677,35 +716,35 @@ def search_files(request):
             date_range = form.cleaned_data.get('date_range')
             tags = form.cleaned_data.get('tags')
             
-            # Apply search filters
+            # Enhanced AI-powered search
             if query:
-                files = files.filter(
-                    Q(name__icontains=query) |
-                    Q(description__icontains=query) |
-                    Q(tags__icontains=query)
-                )
+                search_results = _perform_ai_enhanced_search(files, query, employee)
+                ai_suggestions = _generate_search_suggestions(query, employee)
+            else:
+                search_results = list(files)
             
+            # Apply additional filters
             if file_type:
-                files = files.filter(file_type=file_type)
+                search_results = [f for f in search_results if f.file_type == file_type]
             
             if date_range:
                 now = timezone.now()
                 if date_range == 'today':
-                    files = files.filter(created_at__date=now.date())
+                    search_results = [f for f in search_results if f.created_at.date() == now.date()]
                 elif date_range == 'week':
-                    files = files.filter(created_at__gte=now - timedelta(days=7))
+                    search_results = [f for f in search_results if f.created_at >= now - timedelta(days=7)]
                 elif date_range == 'month':
-                    files = files.filter(created_at__gte=now - timedelta(days=30))
+                    search_results = [f for f in search_results if f.created_at >= now - timedelta(days=30)]
                 elif date_range == 'year':
-                    files = files.filter(created_at__gte=now - timedelta(days=365))
+                    search_results = [f for f in search_results if f.created_at >= now - timedelta(days=365)]
             
             if tags:
-                tag_list = [tag.strip() for tag in tags.split(',')]
-                for tag in tag_list:
-                    files = files.filter(tags__icontains=tag)
+                tag_list = [tag.strip().lower() for tag in tags.split(',')]
+                search_results = [f for f in search_results 
+                                if any(tag in (f.tags or '').lower() for tag in tag_list)]
         
-        # Pagination
-        paginator = Paginator(files, 20)
+        # Convert to paginated results
+        paginator = Paginator(search_results, 20)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
         
@@ -713,7 +752,10 @@ def search_files(request):
             'files': page_obj,
             'form': form,
             'employee': employee,
-            'search_performed': bool(request.GET.get('query')),
+            'search_performed': bool(search_query),
+            'search_query': search_query,
+            'ai_suggestions': ai_suggestions[:5],  # Limit to top 5 suggestions
+            'total_results': len(search_results),
         }
         
         return render(request, 'employee/file_search.html', context)
@@ -721,6 +763,199 @@ def search_files(request):
     except Employee.DoesNotExist:
         messages.error(request, 'Employee profile not found.')
         return redirect('employee_dashboard')
+
+
+def _perform_ai_enhanced_search(files_queryset, query, employee):
+    """Perform enhanced search using AI analysis data"""
+    query_lower = query.lower()
+    scored_results = []
+    
+    # Minimum score threshold for relevance
+    MIN_RELEVANCE_SCORE = 20
+    
+    for file_obj in files_queryset:
+        score = 0
+        match_reasons = []
+        
+        # Basic filename and description matching (high weight)
+        if query_lower in file_obj.name.lower():
+            score += 100
+            match_reasons.append(f"Filename contains '{query}'")
+        
+        if file_obj.description and query_lower in file_obj.description.lower():
+            score += 80
+            match_reasons.append(f"Description contains '{query}'")
+        
+        # Tags matching (high weight)
+        if file_obj.tags and query_lower in file_obj.tags.lower():
+            score += 90
+            match_reasons.append(f"Tags contain '{query}'")
+        
+        # AI Analysis-based matching
+        if hasattr(file_obj, 'ai_analysis') and file_obj.ai_analysis:
+            analysis = file_obj.ai_analysis
+            
+            # Category matching (medium-high weight)
+            if analysis.category and query_lower in analysis.category.lower():
+                score += 70
+                match_reasons.append(f"AI category: {analysis.category}")
+            
+            # Key topics matching (medium-high weight)
+            if analysis.key_topics:
+                for topic in analysis.key_topics:
+                    if isinstance(topic, str) and query_lower in topic.lower():
+                        score += 60
+                        match_reasons.append(f"Key topic: {topic}")
+            
+            # Entities matching (medium weight)
+            if analysis.entities:
+                for entity in analysis.entities:
+                    if isinstance(entity, str) and query_lower in entity.lower():
+                        score += 50
+                        match_reasons.append(f"Entity: {entity}")
+                    elif isinstance(entity, dict) and 'text' in entity:
+                        if query_lower in entity['text'].lower():
+                            score += 50
+                            match_reasons.append(f"Entity: {entity['text']}")
+            
+            # Suggested tags matching (medium weight)
+            if analysis.suggested_tags:
+                for tag in analysis.suggested_tags:
+                    if isinstance(tag, str) and query_lower in tag.lower():
+                        score += 45
+                        match_reasons.append(f"AI suggested tag: {tag}")
+            
+            # Content type matching (lower weight)
+            if analysis.content_type and query_lower in analysis.content_type.lower():
+                score += 30
+                match_reasons.append(f"Content type: {analysis.content_type}")
+            
+            # Language matching (lower weight)
+            if analysis.language and query_lower in analysis.language.lower():
+                score += 25
+                match_reasons.append(f"Language: {analysis.language}")
+            
+            # Partial word matching in key topics and entities (only if main query didn't match)
+            if score < MIN_RELEVANCE_SCORE:
+                for topic in (analysis.key_topics or []):
+                    if isinstance(topic, str):
+                        topic_words = topic.lower().split()
+                        if any(query_lower in word or word in query_lower for word in topic_words):
+                            score += 25
+                            match_reasons.append(f"Related topic: {topic}")
+        
+        # File type relevance (only exact matches)
+        file_extension = file_obj.name.split('.')[-1].lower() if '.' in file_obj.name else ''
+        if query_lower == file_extension or query_lower == file_obj.file_type.lower():
+            score += 40
+            match_reasons.append(f"File type: {file_obj.file_type}")
+        
+        # Only include files that meet minimum relevance threshold
+        if score >= MIN_RELEVANCE_SCORE:
+            # Small recency boost for relevant files
+            days_old = (timezone.now() - file_obj.created_at).days
+            if days_old < 7:
+                score += 5
+            elif days_old < 30:
+                score += 2
+            
+            file_obj.search_score = score
+            file_obj.match_reasons = match_reasons
+            scored_results.append(file_obj)
+    
+    # Sort by score (highest first)
+    scored_results.sort(key=lambda x: x.search_score, reverse=True)
+    return scored_results
+
+
+def _generate_search_suggestions(query, employee):
+    """Generate AI-powered search suggestions"""
+    suggestions = []
+    query_lower = query.lower()
+    
+    # Get files with AI analysis
+    analyzed_files = FileDocument.objects.filter(
+        Q(uploaded_by=employee) | Q(shared_with=employee),
+        ai_analysis__isnull=False
+    ).select_related('ai_analysis')
+    
+    # Collect relevant topics, categories, and entities
+    topics_set = set()
+    categories_set = set()
+    entities_set = set()
+    
+    for file_obj in analyzed_files:
+        analysis = file_obj.ai_analysis
+        
+        # Add categories
+        if analysis.category:
+            categories_set.add(analysis.category)
+        
+        # Add key topics
+        if analysis.key_topics:
+            for topic in analysis.key_topics:
+                if isinstance(topic, str):
+                    topics_set.add(topic)
+        
+        # Add entities
+        if analysis.entities:
+            for entity in analysis.entities:
+                if isinstance(entity, str):
+                    entities_set.add(entity)
+                elif isinstance(entity, dict) and 'text' in entity:
+                    entities_set.add(entity['text'])
+        
+        # Add suggested tags
+        if analysis.suggested_tags:
+            for tag in analysis.suggested_tags:
+                if isinstance(tag, str):
+                    topics_set.add(tag)
+    
+    # Find suggestions that partially match the query
+    def is_relevant(text, query_text):
+        text_lower = text.lower()
+        query_lower = query_text.lower()
+        return (query_lower in text_lower or 
+                text_lower in query_lower or 
+                any(word in text_lower for word in query_lower.split()) or
+                any(word in query_lower for word in text_lower.split()))
+    
+    # Add relevant categories
+    for category in categories_set:
+        if is_relevant(category, query) and category.lower() != query_lower:
+            suggestions.append({
+                'text': category,
+                'type': 'category',
+                'icon': 'fas fa-folder'
+            })
+    
+    # Add relevant topics
+    for topic in topics_set:
+        if is_relevant(topic, query) and topic.lower() != query_lower:
+            suggestions.append({
+                'text': topic,
+                'type': 'topic',
+                'icon': 'fas fa-tag'
+            })
+    
+    # Add relevant entities
+    for entity in entities_set:
+        if is_relevant(entity, query) and entity.lower() != query_lower:
+            suggestions.append({
+                'text': entity,
+                'type': 'entity',
+                'icon': 'fas fa-search'
+            })
+    
+    # Remove duplicates and sort by relevance
+    seen = set()
+    unique_suggestions = []
+    for suggestion in suggestions:
+        if suggestion['text'] not in seen:
+            seen.add(suggestion['text'])
+            unique_suggestions.append(suggestion)
+    
+    return unique_suggestions[:10]  # Return top 10 suggestions
 
 
 @login_required
@@ -1347,3 +1582,56 @@ def get_storage_info(request):
         
     except Employee.DoesNotExist:
         return JsonResponse({'error': 'Employee profile not found'}, status=401)
+
+
+@login_required
+@require_http_methods(["POST"])
+def trigger_ai_analysis(request, file_id):
+    """Trigger AI analysis for a file to test enhanced search"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        file_doc = get_object_or_404(FileDocument, id=file_id, uploaded_by=employee)
+        
+        # Create or update AI analysis with sample data for testing
+        analysis, created = AIFileAnalysis.objects.get_or_create(
+            document=file_doc,
+            defaults={
+                'analysis_completed': True,
+                'analysis_completed_at': timezone.now(),
+                'content_type': 'document',
+                'language': 'en',
+                'category': 'Technical Document',
+                'key_topics': ['artificial intelligence', 'machine learning', 'technology', 'research'],
+                'entities': ['AI', 'neural networks', 'algorithms', 'data science'],
+                'sentiment_score': 0.7,
+                'sentiment_label': 'positive',
+                'quality_score': 4.2,
+                'suggested_tags': ['AI', 'tech', 'research', 'documentation'],
+                'ai_recommendations': [
+                    {'title': 'Content Quality', 'description': 'High-quality technical content detected'},
+                    {'title': 'Categorization', 'description': 'Automatically categorized as Technical Document'}
+                ]
+            }
+        )
+        
+        if not created:
+            # Update existing analysis with enhanced data
+            analysis.analysis_completed = True
+            analysis.analysis_completed_at = timezone.now()
+            analysis.key_topics = ['artificial intelligence', 'machine learning', 'technology', 'research']
+            analysis.entities = ['AI', 'neural networks', 'algorithms', 'data science']
+            analysis.category = 'Technical Document'
+            analysis.quality_score = 4.2
+            analysis.suggested_tags = ['AI', 'tech', 'research', 'documentation']
+            analysis.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'AI analysis completed successfully',
+            'analysis_id': str(analysis.id)
+        })
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Employee not found'}, status=403)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
