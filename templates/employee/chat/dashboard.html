@@ -218,7 +218,8 @@ function openDirectMessage() {
     }
 }
 
-// Auto-refresh notifications every 30 seconds
+// Auto-refresh notifications disabled
+/*
 setInterval(function() {
     fetch('/employee/chat/notifications/')
         .then(response => response.json())
@@ -230,6 +231,7 @@ setInterval(function() {
         })
         .catch(error => console.log('Notification check failed:', error));
 }, 30000);
+*/
 
 function updateNotificationBadge(count) {
     // Add a notification badge to the chat nav item

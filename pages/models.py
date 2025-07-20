@@ -987,6 +987,7 @@ class ChatChannel(models.Model):
         ('general', 'General'),
         ('department', 'Department'),
         ('project', 'Project'),
+        ('board', 'Board Discussion'),
         ('private', 'Private Group'),
     ]
     
@@ -996,6 +997,10 @@ class ChatChannel(models.Model):
     channel_type = models.CharField(max_length=20, choices=CHANNEL_TYPES, default='general')
     created_by = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='created_channels')
     members = models.ManyToManyField('Employee', through='ChatChannelMembership', related_name='chat_channels')
+    
+    # Optional association with a specific board
+    associated_board = models.ForeignKey('Board', on_delete=models.SET_NULL, null=True, blank=True, related_name='associated_channels')
+    
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     
@@ -1010,6 +1015,32 @@ class ChatChannel(models.Model):
     
     def get_member_count(self):
         return self.members.count()
+    
+    def get_shared_boards(self):
+        """Get all boards shared in this channel"""
+        return Board.objects.filter(chat_shares__channel=self, chat_shares__is_active=True).distinct()
+    
+    def get_shared_files(self):
+        """Get all files shared in this channel"""
+        return FileDocument.objects.filter(chat_shares__channel=self, chat_shares__is_active=True).distinct()
+    
+    def add_board_access_to_members(self, board):
+        """Add all channel members to the board"""
+        for member in self.members.all():
+            if not board.members.filter(id=member.id).exists():
+                board.members.add(member)
+    
+    def get_activity_summary(self):
+        """Get recent activity summary for this channel"""
+        from django.db.models import Count
+        recent_messages = self.messages.filter(created_at__gte=timezone.now() - timezone.timedelta(days=7))
+        
+        return {
+            'recent_message_count': recent_messages.count(),
+            'active_members': recent_messages.values('sender').distinct().count(),
+            'shared_boards_count': self.shared_boards.filter(is_active=True).count(),
+            'shared_files_count': self.shared_files.filter(is_active=True).count(),
+        }
 
 
 class ChatChannelMembership(models.Model):
@@ -1034,6 +1065,7 @@ class ChatMessage(models.Model):
     MESSAGE_TYPES = [
         ('text', 'Text'),
         ('file', 'File'),
+        ('board', 'Board Share'),
         ('system', 'System'),
     ]
     
@@ -1044,6 +1076,11 @@ class ChatMessage(models.Model):
     message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES, default='text')
     content = models.TextField()
     file_attachment = models.FileField(upload_to='chat_files/', null=True, blank=True)
+    
+    # New fields for board and file integration
+    shared_board = models.ForeignKey('Board', on_delete=models.CASCADE, null=True, blank=True, related_name='chat_messages')
+    shared_file = models.ForeignKey('FileDocument', on_delete=models.CASCADE, null=True, blank=True, related_name='chat_messages')
+    
     created_at = models.DateTimeField(auto_now_add=True)
     edited_at = models.DateTimeField(null=True, blank=True)
     is_edited = models.BooleanField(default=False)
@@ -1064,6 +1101,45 @@ class ChatMessage(models.Model):
         self.is_edited = True
         self.edited_at = timezone.now()
         self.save()
+    
+    def has_board_attachment(self):
+        return self.shared_board is not None
+    
+    def has_file_attachment(self):
+        return self.shared_file is not None or self.file_attachment
+    
+    def get_attachment_info(self):
+        """Get information about any attachments in this message"""
+        attachments = []
+        
+        if self.shared_board:
+            attachments.append({
+                'type': 'board',
+                'id': self.shared_board.id,
+                'name': self.shared_board.title,
+                'description': self.shared_board.description,
+                'url': f"/employee/boards/{self.shared_board.id}/"
+            })
+        
+        if self.shared_file:
+            attachments.append({
+                'type': 'file',
+                'id': self.shared_file.id,
+                'name': self.shared_file.name,
+                'size': self.shared_file.get_file_size_display(),
+                'file_type': self.shared_file.file_type,
+                'url': f"/employee/files/download/{self.shared_file.id}/"
+            })
+        
+        if self.file_attachment:
+            import os
+            attachments.append({
+                'type': 'upload',
+                'name': os.path.basename(self.file_attachment.name),
+                'url': self.file_attachment.url
+            })
+        
+        return attachments
 
 
 class ChatMessageRead(models.Model):
@@ -1085,6 +1161,8 @@ class ChatNotification(models.Model):
         ('message', 'New Message'),
         ('mention', 'Mentioned'),
         ('channel_invite', 'Channel Invite'),
+        ('board_shared', 'Board Shared'),
+        ('file_shared', 'File Shared'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -1102,3 +1180,61 @@ class ChatNotification(models.Model):
         
     def __str__(self):
         return f"Chat notification for {self.recipient.user.username}: {self.content[:50]}..."
+
+
+class ChatBoardShare(models.Model):
+    """Boards shared in chat channels"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    channel = models.ForeignKey(ChatChannel, on_delete=models.CASCADE, related_name='shared_boards')
+    board = models.ForeignKey('Board', on_delete=models.CASCADE, related_name='chat_shares')
+    shared_by = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='shared_boards_in_chat')
+    shared_at = models.DateTimeField(auto_now_add=True)
+    message = models.TextField(blank=True, help_text="Optional message when sharing the board")
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        unique_together = ['channel', 'board']
+        ordering = ['-shared_at']
+    
+    def __str__(self):
+        return f"Board '{self.board.title}' shared in #{self.channel.name}"
+    
+    def get_access_count(self):
+        """Count how many channel members have accessed this board"""
+        return self.board.members.filter(chat_channels=self.channel).count()
+
+
+class ChatFileShare(models.Model):
+    """Files shared in chat messages or channels"""
+    SHARE_TYPES = [
+        ('message', 'Shared in Message'),
+        ('channel', 'Shared to Channel'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    channel = models.ForeignKey(ChatChannel, on_delete=models.CASCADE, related_name='shared_files', null=True, blank=True)
+    message = models.ForeignKey(ChatMessage, on_delete=models.CASCADE, related_name='attached_files', null=True, blank=True)
+    file_document = models.ForeignKey('FileDocument', on_delete=models.CASCADE, related_name='chat_shares')
+    shared_by = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='shared_files_in_chat')
+    share_type = models.CharField(max_length=20, choices=SHARE_TYPES, default='message')
+    shared_at = models.DateTimeField(auto_now_add=True)
+    share_message = models.TextField(blank=True, help_text="Optional message when sharing the file")
+    download_count = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['-shared_at']
+    
+    def __str__(self):
+        if self.message:
+            return f"File '{self.file_document.name}' shared in message"
+        else:
+            return f"File '{self.file_document.name}' shared in #{self.channel.name}"
+    
+    def get_download_stats(self):
+        """Get download statistics for this shared file"""
+        return {
+            'total_downloads': self.download_count,
+            'shared_at': self.shared_at,
+            'shared_by': self.shared_by.user.get_full_name() or self.shared_by.user.username
+        }

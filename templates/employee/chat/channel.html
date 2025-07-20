@@ -15,6 +15,31 @@
         padding: 15px 20px;
         border-bottom: 1px solid #e0e0e0;
         background-color: #f8f9fa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .chat-tabs {
+        display: flex;
+        gap: 10px;
+        margin-left: auto;
+    }
+    
+    .tab-link {
+        padding: 8px 16px;
+        border-radius: 20px;
+        text-decoration: none;
+        color: #666;
+        background-color: #e9ecef;
+        transition: all 0.3s;
+        font-size: 0.9rem;
+    }
+    
+    .tab-link:hover, .tab-link.active {
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
     }
     
     .chat-messages {
@@ -28,6 +53,28 @@
         padding: 15px 20px;
         border-top: 1px solid #e0e0e0;
         background-color: #f8f9fa;
+    }
+    
+    .input-toolbar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+        align-items: center;
+    }
+    
+    .toolbar-btn {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        background-color: white;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-size: 0.9rem;
+    }
+    
+    .toolbar-btn:hover {
+        background-color: #f8f9fa;
+        border-color: #007bff;
     }
     
     .message {
@@ -145,6 +192,17 @@
                 </div>
             </div>
             <div class="d-flex align-items-center">
+                <div class="chat-tabs me-3">
+                    <a href="{% url 'chat_channel' channel.id %}" class="tab-link active">
+                        <i class="fas fa-comments me-1"></i>Messages
+                    </a>
+                    <a href="{% url 'channel_boards' channel.id %}" class="tab-link">
+                        <i class="fas fa-clipboard me-1"></i>Boards
+                    </a>
+                    <a href="{% url 'channel_files' channel.id %}" class="tab-link">
+                        <i class="fas fa-folder me-1"></i>Files
+                    </a>
+                </div>
                 <span class="text-muted me-3">{{ channel.get_member_count }} members</span>
                 <div class="dropdown">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -188,6 +246,66 @@
                 </div>
                 {% endif %}
                 <div class="message-text">{{ message.content|linebreaks }}</div>
+                
+                <!-- Display Board/File Attachments -->
+                {% if message.shared_board %}
+                <div class="message-attachment mt-2">
+                    <div class="card border-primary">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-clipboard text-primary fa-2x me-3"></i>
+                                <div>
+                                    <h6 class="card-title mb-1">{{ message.shared_board.title }}</h6>
+                                    <p class="card-text text-muted small mb-1">{{ message.shared_board.description|truncatechars:100 }}</p>
+                                    <a href="{% url 'board_detail' message.shared_board.id %}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-external-link-alt me-1"></i>Open Board
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if message.shared_file %}
+                <div class="message-attachment mt-2">
+                    <div class="card border-success">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-file text-success fa-2x me-3"></i>
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">{{ message.shared_file.name }}</h6>
+                                    <p class="card-text text-muted small mb-1">
+                                        {{ message.shared_file.file_type|title }} • {{ message.shared_file.get_file_size_display }}
+                                    </p>
+                                    <a href="{% url 'download_shared_file' message.id %}" class="btn btn-sm btn-success">
+                                        <i class="fas fa-download me-1"></i>Download
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if message.file_attachment %}
+                <div class="message-attachment mt-2">
+                    <div class="card border-info">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-paperclip text-info fa-2x me-3"></i>
+                                <div>
+                                    <h6 class="card-title mb-1">{{ message.file_attachment.name }}</h6>
+                                    <a href="{{ message.file_attachment.url }}" class="btn btn-sm btn-info" target="_blank">
+                                        <i class="fas fa-external-link-alt me-1"></i>View
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
                 {% if message.is_edited %}
                 <small class="text-muted">(edited)</small>
                 {% endif %}
@@ -209,6 +327,17 @@
     
     <!-- Chat Input -->
     <div class="chat-input">
+        <div class="input-toolbar">
+            <button type="button" class="toolbar-btn" onclick="showBoardShareModal()">
+                <i class="fas fa-clipboard me-1"></i>Share Board
+            </button>
+            <button type="button" class="toolbar-btn" onclick="showFileShareModal()">
+                <i class="fas fa-folder me-1"></i>Share File
+            </button>
+            <button type="button" class="toolbar-btn" onclick="document.getElementById('fileUpload').click()">
+                <i class="fas fa-paperclip me-1"></i>Upload File
+            </button>
+        </div>
         <form id="messageForm" onsubmit="sendMessage(event)">
             <div class="input-group">
                 <input type="text" class="form-control" id="messageInput" placeholder="Type a message..." maxlength="2000" required>
@@ -216,6 +345,7 @@
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
+            <input type="file" id="fileUpload" style="display: none;" onchange="handleFileUpload(this)">
         </form>
     </div>
 </div>
@@ -245,12 +375,112 @@
         </div>
     </div>
 </div>
+
+<!-- Board Share Modal -->
+<div class="modal fade" id="boardShareModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Share Board to Channel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="boardSelect" class="form-label">Select Board:</label>
+                    <select class="form-select" id="boardSelect">
+                        <option value="">Loading boards...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="boardShareMessage" class="form-label">Message (optional):</label>
+                    <textarea class="form-control" id="boardShareMessage" rows="3" placeholder="Add a message about this board..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="shareSelectedBoard()">Share Board</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Share Modal -->
+<div class="modal fade" id="fileShareModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Share File to Channel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="fileSelect" class="form-label">Select File:</label>
+                    <select class="form-select" id="fileSelect">
+                        <option value="">Loading files...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="fileShareMessage" class="form-label">Message (optional):</label>
+                    <textarea class="form-control" id="fileShareMessage" rows="3" placeholder="Add a message about this file..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="shareSelectedFile()">Share File</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 const channelId = '{{ channel.id }}';
+const currentUserId = '{{ employee.user.id }}';
+const currentUserName = '{{ employee.user.get_full_name }}';
+const currentUserInitial = '{{ employee.user.first_name|first|upper }}';
 let isTyping = false;
+let typingTimer;
+let lastMessageTime = null;
+let pollInterval;
+
+// Initialize polling for new messages (PythonAnywhere compatible)
+function startPolling() {
+    pollInterval = setInterval(pollForNewMessages, 3000); // Poll every 3 seconds
+}
+
+function stopPolling() {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+    }
+}
+
+function pollForNewMessages() {
+    let url = `/employee/chat/poll/${channelId}/`;
+    if (lastMessageTime) {
+        url += `?last_message_time=${encodeURIComponent(lastMessageTime)}`;
+    }
+    
+    fetch(url)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.messages && data.messages.length > 0) {
+            data.messages.forEach(message => {
+                addMessageToChat(message);
+            });
+            scrollToBottom();
+            
+            // Update last message time
+            if (data.latest_timestamp) {
+                lastMessageTime = data.latest_timestamp;
+            }
+        }
+    })
+    .catch(error => {
+        // Silently handle errors to avoid console spam
+        // Error could be due to network issues or server being down
+    });
+}
 
 function sendMessage(event) {
     event.preventDefault();
@@ -263,7 +493,7 @@ function sendMessage(event) {
     // Disable input while sending
     messageInput.disabled = true;
     
-    fetch('/employee/chat/send/', {
+    fetch('/employee/chat/send-ajax/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -280,12 +510,14 @@ function sendMessage(event) {
             messageInput.value = '';
             addMessageToChat(data.message);
             scrollToBottom();
+            
+            // Update last message time
+            lastMessageTime = data.message.created_at_iso;
         } else {
             alert('Failed to send message: ' + (data.error || 'Unknown error'));
         }
     })
     .catch(error => {
-        console.error('Error:', error);
         alert('Failed to send message');
     })
     .finally(() => {
@@ -294,32 +526,255 @@ function sendMessage(event) {
     });
 }
 
+// Board sharing functions
+function showBoardShareModal() {
+    const modal = new bootstrap.Modal(document.getElementById('boardShareModal'));
+    loadUserBoards();
+    modal.show();
+}
+
+function loadUserBoards() {
+    fetch('{% url "get_user_boards" %}')
+    .then(response => response.json())
+    .then(data => {
+        const select = document.getElementById('boardSelect');
+        select.innerHTML = '<option value="">Select a board...</option>';
+        
+        if (data.success && data.boards.length > 0) {
+            data.boards.forEach(board => {
+                const option = document.createElement('option');
+                option.value = board.id;
+                option.textContent = board.title;
+                select.appendChild(option);
+            });
+        } else {
+            select.innerHTML = '<option value="">No boards available</option>';
+        }
+    })
+    .catch(error => {
+        // console.error('Error loading boards:', error); // Removed to prevent browser notifications
+        document.getElementById('boardSelect').innerHTML = '<option value="">Error loading boards</option>';
+    });
+}
+
+function shareSelectedBoard() {
+    const boardId = document.getElementById('boardSelect').value;
+    const message = document.getElementById('boardShareMessage').value;
+    
+    if (!boardId) {
+        alert('Please select a board to share');
+        return;
+    }
+    
+    const data = {
+        content: message || `Shared board`,
+        channel_id: channelId,
+        shared_board_id: boardId
+    };
+    
+    fetch('/employee/chat/send/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('boardShareModal')).hide();
+            // Instead of reloading, let the WebSocket handle the new message
+            // The message will appear automatically via WebSocket
+        } else {
+            alert('Error sharing board: ' + data.error);
+        }
+    })
+    .catch(error => {
+        // console.error('Error:', error); // Removed to prevent browser notifications
+        alert('Failed to share board');
+    });
+}
+
+// File sharing functions
+function showFileShareModal() {
+    const modal = new bootstrap.Modal(document.getElementById('fileShareModal'));
+    loadUserFiles();
+    modal.show();
+}
+
+function loadUserFiles() {
+    fetch('{% url "get_user_files" %}')
+    .then(response => response.json())
+    .then(data => {
+        const select = document.getElementById('fileSelect');
+        select.innerHTML = '<option value="">Select a file...</option>';
+        
+        if (data.success && data.files.length > 0) {
+            data.files.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.id;
+                option.textContent = `${file.name} (${file.file_type})`;
+                select.appendChild(option);
+            });
+        } else {
+            select.innerHTML = '<option value="">No files available</option>';
+        }
+    })
+    .catch(error => {
+        // console.error('Error loading files:', error); // Removed to prevent browser notifications
+        document.getElementById('fileSelect').innerHTML = '<option value="">Error loading files</option>';
+    });
+}
+
+function shareSelectedFile() {
+    const fileId = document.getElementById('fileSelect').value;
+    const message = document.getElementById('fileShareMessage').value;
+    
+    if (!fileId) {
+        alert('Please select a file to share');
+        return;
+    }
+    
+    const data = {
+        content: message || `Shared file`,
+        channel_id: channelId,
+        shared_file_id: fileId
+    };
+    
+    fetch('/employee/chat/send/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('fileShareModal')).hide();
+            // Instead of reloading, let the WebSocket handle the new message
+            // The message will appear automatically via WebSocket
+        } else {
+            alert('Error sharing file: ' + data.error);
+        }
+    })
+    .catch(error => {
+        // console.error('Error:', error); // Removed to prevent browser notifications
+        alert('Failed to share file');
+    });
+}
+
+// File upload handling
+function handleFileUpload(input) {
+    const file = input.files[0];
+    if (file) {
+        // This is for direct file upload to chat
+        // In a full implementation, you'd upload the file first, then send a message
+        alert('File upload functionality would be implemented here');
+    }
+}
+
 function addMessageToChat(messageData) {
     const messagesContainer = document.getElementById('chatMessages');
     const messageElement = document.createElement('div');
-    messageElement.className = 'message own';
     
-    const now = new Date();
-    const timeString = now.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    // Check if this is our own message
+    const isOwnMessage = messageData.is_own || messageData.sender_name === currentUserName;
+    messageElement.className = isOwnMessage ? 'message own' : 'message';
+    
+    let attachmentHtml = '';
+    
+    // Add board attachment if present
+    if (messageData.shared_board) {
+        attachmentHtml += `
+            <div class="message-attachment mt-2">
+                <div class="card border-primary">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-clipboard text-primary fa-2x me-3"></i>
+                            <div>
+                                <h6 class="card-title mb-1">${messageData.shared_board.title}</h6>
+                                <p class="card-text text-muted small mb-1">${messageData.shared_board.description}</p>
+                                <a href="/employee/boards/${messageData.shared_board.id}/" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-external-link-alt me-1"></i>Open Board
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Add file attachment if present
+    if (messageData.shared_file) {
+        attachmentHtml += `
+            <div class="message-attachment mt-2">
+                <div class="card border-success">
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-file text-success fa-2x me-3"></i>
+                            <div class="flex-grow-1">
+                                <h6 class="card-title mb-1">${messageData.shared_file.name}</h6>
+                                <p class="card-text text-muted small mb-1">
+                                    ${messageData.shared_file.file_type} • ${messageData.shared_file.file_size}
+                                </p>
+                                <a href="${messageData.shared_file.download_url}" class="btn btn-sm btn-success">
+                                    <i class="fas fa-download me-1"></i>Download
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
     
     messageElement.innerHTML = `
-        <div class="message-avatar">{{ employee.user.first_name|first|upper }}</div>
+        <div class="message-avatar">${isOwnMessage ? currentUserInitial : messageData.sender_initial}</div>
         <div class="message-content">
             <div class="message-header">
-                <span class="message-sender">{{ employee.user.get_full_name }}</span>
-                <span class="message-time">${timeString}</span>
+                <span class="message-sender">${messageData.sender_name}</span>
+                <span class="message-time">${messageData.created_at}</span>
             </div>
             <div class="message-text">${messageData.content.replace(/\n/g, '<br>')}</div>
+            ${attachmentHtml}
         </div>
     `;
     
     messagesContainer.appendChild(messageElement);
 }
+
+// Page visibility handling to pause/resume polling
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        stopPolling();
+    } else {
+        startPolling();
+    }
+});
+
+// Start polling when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    scrollToBottom();
+    document.getElementById('messageInput').focus();
+    
+    // Get the timestamp of the last message on page
+    const messages = document.querySelectorAll('.message');
+    if (messages.length > 0) {
+        // Set initial timestamp to avoid duplicate messages
+        lastMessageTime = new Date().toISOString();
+    }
+    
+    startPolling();
+});
+
+// Stop polling when page unloads
+window.addEventListener('beforeunload', function() {
+    stopPolling();
+});
 
 function scrollToBottom() {
     const messagesContainer = document.getElementById('chatMessages');
@@ -340,18 +795,5 @@ function getCookie(name) {
     }
     return cookieValue;
 }
-
-// Auto-scroll to bottom on page load
-document.addEventListener('DOMContentLoaded', function() {
-    scrollToBottom();
-    document.getElementById('messageInput').focus();
-});
-
-// Poll for new messages every 5 seconds (simple polling - could be enhanced with WebSockets)
-setInterval(function() {
-    // This is a simple implementation - in production you'd want WebSockets
-    // or at least check for messages newer than the last known message
-    location.reload();
-}, 30000);
 </script>
 {% endblock %}

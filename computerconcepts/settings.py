@@ -34,6 +34,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 INSTALLED_APPS = [
     'pages',
+    # 'channels',  # Removed channels for PythonAnywhere compatibility
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -72,6 +73,10 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'computerconcepts.wsgi.application'
+
+# Real-time chat configuration for PythonAnywhere
+# Using polling-based approach instead of WebSockets
+CHAT_POLL_INTERVAL = 3000  # Poll every 3 seconds for new messages
 
 DATABASES = {
     'default': {

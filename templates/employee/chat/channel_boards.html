@@ -1,0 +1,186 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Boards - #{{ channel.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid #e0e0e0;
+        background-color: #f8f9fa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .tab-link {
+        padding: 8px 16px;
+        border-radius: 20px;
+        text-decoration: none;
+        color: #666;
+        background-color: #e9ecef;
+        transition: all 0.3s;
+        font-size: 0.9rem;
+        margin-right: 10px;
+    }
+    
+    .tab-link:hover, .tab-link.active {
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+    }
+    
+    .board-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .board-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .shared-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: linear-gradient(45deg, #007bff, #0056b3);
+        color: white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="chat-header mb-4">
+        <div class="d-flex align-items-center">
+            <a href="{% url 'chat_channel' channel.id %}" class="btn btn-sm btn-outline-secondary me-3">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div>
+                <h5 class="mb-0"># {{ channel.name }} - Shared Boards</h5>
+                <small class="text-muted">{{ shared_boards|length }} boards shared in this channel</small>
+            </div>
+        </div>
+        <div class="d-flex align-items-center">
+            <a href="{% url 'chat_channel' channel.id %}" class="tab-link">
+                <i class="fas fa-comments me-1"></i>Messages
+            </a>
+            <a href="{% url 'channel_boards' channel.id %}" class="tab-link active">
+                <i class="fas fa-clipboard me-1"></i>Boards
+            </a>
+            <a href="{% url 'channel_files' channel.id %}" class="tab-link">
+                <i class="fas fa-folder me-1"></i>Files
+            </a>
+        </div>
+    </div>
+
+    <!-- Shared Boards -->
+    <div class="row">
+        {% for board_share in shared_boards %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card board-card h-100 position-relative">
+                <div class="shared-badge">
+                    <i class="fas fa-share"></i>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-title">{{ board_share.board.title }}</h6>
+                    <p class="card-text text-muted small">{{ board_share.board.description|truncatechars:100 }}</p>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="avatar-sm me-2">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                {{ board_share.shared_by.user.first_name|first|upper }}
+                            </div>
+                        </div>
+                        <div>
+                            <small class="text-muted">Shared by</small><br>
+                            <small class="fw-bold">{{ board_share.shared_by.user.get_full_name }}</small>
+                        </div>
+                    </div>
+                    
+                    {% if board_share.message %}
+                    <div class="bg-light p-2 rounded mb-3">
+                        <small class="text-muted">"{{ board_share.message }}"</small>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">{{ board_share.shared_at|date:"M d, Y" }}</small>
+                        <a href="{% url 'board_detail' board_share.board.id %}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>Open Board
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">No Boards Shared Yet</h4>
+                <p class="text-muted">Boards shared in this channel will appear here.</p>
+                <a href="{% url 'chat_channel' channel.id %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Share a Board
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Channel Activity Summary -->
+    {% if shared_boards %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Board Activity Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 class="text-primary">{{ shared_boards|length }}</h3>
+                                <p class="text-muted mb-0">Shared Boards</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 class="text-success">{{ channel.get_member_count }}</h3>
+                                <p class="text-muted mb-0">Team Members</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 class="text-info">{{ shared_boards|length }}</h3>
+                                <p class="text-muted mb-0">Active Projects</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 class="text-warning">{{ channel.get_activity_summary.recent_message_count }}</h3>
+                                <p class="text-muted mb-0">Recent Messages</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add any specific JavaScript for board management here
+</script>
+{% endblock %}

@@ -669,9 +669,8 @@ def employee_dashboard(request):
             Q(recipient=employee, channel__isnull=True)
         ).exclude(sender=employee).order_by('-created_at')[:5]
         
-        unread_chat_notifications = ChatNotification.objects.filter(
-            recipient=employee, is_read=False
-        ).count()
+        # Chat notifications disabled
+        unread_chat_notifications = 0
         
         # Get online employees (simplified - last 15 minutes activity)
         online_employees = Employee.objects.filter(

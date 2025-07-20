@@ -1,0 +1,287 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Files - #{{ channel.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid #e0e0e0;
+        background-color: #f8f9fa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .tab-link {
+        padding: 8px 16px;
+        border-radius: 20px;
+        text-decoration: none;
+        color: #666;
+        background-color: #e9ecef;
+        transition: all 0.3s;
+        font-size: 0.9rem;
+        margin-right: 10px;
+    }
+    
+    .tab-link:hover, .tab-link.active {
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+    }
+    
+    .file-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .file-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .file-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        color: white;
+    }
+    
+    .file-icon.document { background-color: #007bff; }
+    .file-icon.image { background-color: #28a745; }
+    .file-icon.video { background-color: #dc3545; }
+    .file-icon.audio { background-color: #ffc107; }
+    .file-icon.pdf { background-color: #fd7e14; }
+    .file-icon.spreadsheet { background-color: #20c997; }
+    .file-icon.presentation { background-color: #e83e8c; }
+    .file-icon.archive { background-color: #6f42c1; }
+    .file-icon.other { background-color: #6c757d; }
+    
+    .shared-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: linear-gradient(45deg, #28a745, #20c997);
+        color: white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+    }
+    
+    .file-stats {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="chat-header mb-4">
+        <div class="d-flex align-items-center">
+            <a href="{% url 'chat_channel' channel.id %}" class="btn btn-sm btn-outline-secondary me-3">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div>
+                <h5 class="mb-0"># {{ channel.name }} - Shared Files</h5>
+                <small class="text-muted">{{ shared_files|length }} files shared in this channel</small>
+            </div>
+        </div>
+        <div class="d-flex align-items-center">
+            <a href="{% url 'chat_channel' channel.id %}" class="tab-link">
+                <i class="fas fa-comments me-1"></i>Messages
+            </a>
+            <a href="{% url 'channel_boards' channel.id %}" class="tab-link">
+                <i class="fas fa-clipboard me-1"></i>Boards
+            </a>
+            <a href="{% url 'channel_files' channel.id %}" class="tab-link active">
+                <i class="fas fa-folder me-1"></i>Files
+            </a>
+        </div>
+    </div>
+
+    <!-- File Type Filter -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body py-2">
+                    <div class="d-flex align-items-center">
+                        <span class="me-3 text-muted">Filter by type:</span>
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="fileTypeFilter" id="all" autocomplete="off" checked>
+                            <label class="btn btn-outline-secondary btn-sm" for="all">All</label>
+                            
+                            <input type="radio" class="btn-check" name="fileTypeFilter" id="document" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm" for="document">Documents</label>
+                            
+                            <input type="radio" class="btn-check" name="fileTypeFilter" id="image" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm" for="image">Images</label>
+                            
+                            <input type="radio" class="btn-check" name="fileTypeFilter" id="pdf" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm" for="pdf">PDFs</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shared Files -->
+    <div class="row" id="filesContainer">
+        {% for file_share in shared_files %}
+        <div class="col-md-6 col-lg-4 mb-4 file-item" data-file-type="{{ file_share.file_document.file_type }}">
+            <div class="card file-card h-100 position-relative">
+                <div class="shared-badge">
+                    <i class="fas fa-share"></i>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-start mb-3">
+                        <div class="file-icon {{ file_share.file_document.file_type }} me-3">
+                            {% if file_share.file_document.file_type == 'document' %}
+                                <i class="fas fa-file-alt"></i>
+                            {% elif file_share.file_document.file_type == 'image' %}
+                                <i class="fas fa-image"></i>
+                            {% elif file_share.file_document.file_type == 'video' %}
+                                <i class="fas fa-video"></i>
+                            {% elif file_share.file_document.file_type == 'audio' %}
+                                <i class="fas fa-music"></i>
+                            {% elif file_share.file_document.file_type == 'pdf' %}
+                                <i class="fas fa-file-pdf"></i>
+                            {% elif file_share.file_document.file_type == 'spreadsheet' %}
+                                <i class="fas fa-file-excel"></i>
+                            {% elif file_share.file_document.file_type == 'presentation' %}
+                                <i class="fas fa-file-powerpoint"></i>
+                            {% elif file_share.file_document.file_type == 'archive' %}
+                                <i class="fas fa-file-archive"></i>
+                            {% else %}
+                                <i class="fas fa-file"></i>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-1">{{ file_share.file_document.name }}</h6>
+                            <div class="file-stats">
+                                {{ file_share.file_document.file_type|title }} • {{ file_share.file_document.get_file_size_display }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="avatar-sm me-2">
+                            <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                {{ file_share.shared_by.user.first_name|first|upper }}
+                            </div>
+                        </div>
+                        <div>
+                            <small class="text-muted">Shared by</small><br>
+                            <small class="fw-bold">{{ file_share.shared_by.user.get_full_name }}</small>
+                        </div>
+                    </div>
+                    
+                    {% if file_share.share_message %}
+                    <div class="bg-light p-2 rounded mb-3">
+                        <small class="text-muted">"{{ file_share.share_message }}"</small>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted">{{ file_share.shared_at|date:"M d, Y" }}</small>
+                        <small class="text-muted">{{ file_share.download_count }} downloads</small>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <a href="{% url 'download_shared_file' file_share.id %}" class="btn btn-sm btn-success">
+                            <i class="fas fa-download me-1"></i>Download File
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">No Files Shared Yet</h4>
+                <p class="text-muted">Files shared in this channel will appear here.</p>
+                <a href="{% url 'chat_channel' channel.id %}" class="btn btn-success">
+                    <i class="fas fa-plus me-1"></i>Share a File
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- File Activity Summary -->
+    {% if shared_files %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">File Activity Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 class="text-success">{{ shared_files|length }}</h3>
+                                <p class="text-muted mb-0">Shared Files</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 class="text-primary">{{ channel.get_member_count }}</h3>
+                                <p class="text-muted mb-0">Team Members</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 class="text-info">{{ shared_files|length }}</h3>
+                                <p class="text-muted mb-0">Total Downloads</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 class="text-warning">{{ channel.get_activity_summary.recent_message_count }}</h3>
+                                <p class="text-muted mb-0">Recent Activity</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// File type filtering
+document.addEventListener('DOMContentLoaded', function() {
+    const filterInputs = document.querySelectorAll('input[name="fileTypeFilter"]');
+    const fileItems = document.querySelectorAll('.file-item');
+    
+    filterInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const filterType = this.id;
+            
+            fileItems.forEach(item => {
+                if (filterType === 'all' || item.dataset.fileType === filterType) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

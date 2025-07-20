@@ -157,6 +157,17 @@ urlpatterns = [
     path('employee/chat/dm/<uuid:recipient_id>/', views_chat.chat_direct_message, name='chat_direct_message'),
     path('employee/chat/create/', views_chat.create_channel, name='create_channel'),
     path('employee/chat/send/', views_chat.send_message, name='send_message'),
+    path('employee/chat/send-ajax/', views_chat.send_message_ajax, name='send_message_ajax'),
+    path('employee/chat/poll/<uuid:channel_id>/', views_chat.poll_messages, name='poll_messages'),
     path('employee/chat/notifications/', views_chat.chat_notifications, name='chat_notifications'),
     path('employee/chat/notifications/<uuid:notification_id>/read/', views_chat.mark_notification_read, name='mark_notification_read'),
+    
+    # Chat Integration URLs
+    path('employee/chat/api/boards/', views_chat.get_user_boards, name='get_user_boards'),
+    path('employee/chat/api/files/', views_chat.get_user_files, name='get_user_files'),
+    path('employee/chat/channel/<uuid:channel_id>/share-board/<uuid:board_id>/', views_chat.share_board_to_channel, name='share_board_to_channel'),
+    path('employee/chat/channel/<uuid:channel_id>/share-file/<uuid:file_id>/', views_chat.share_file_to_channel, name='share_file_to_channel'),
+    path('employee/chat/channel/<uuid:channel_id>/boards/', views_chat.channel_boards, name='channel_boards'),
+    path('employee/chat/channel/<uuid:channel_id>/files/', views_chat.channel_files, name='channel_files'),
+    path('employee/chat/download/<uuid:file_share_id>/', views_chat.download_shared_file, name='download_shared_file'),
 ]
