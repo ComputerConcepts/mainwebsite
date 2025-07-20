@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 import uuid
 
 class StorageAllocation(models.Model):
@@ -872,10 +873,31 @@ class AINotificationPreference(models.Model):
 
 class AIFileAnalysis(models.Model):
     """Model for storing AI analysis results of files"""
+    # Status choices for queue management
+    STATUS_CHOICES = [
+        ('queued', 'Queued'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('retrying', 'Retrying'),
+    ]
+    
     document = models.OneToOneField(FileDocument, on_delete=models.CASCADE, related_name='ai_analysis')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='queued')
+    priority = models.IntegerField(default=5, help_text="Processing priority (1=highest, 10=lowest)")
+    
+    # Analysis lifecycle timestamps
+    queued_at = models.DateTimeField(auto_now_add=True)
+    processing_started_at = models.DateTimeField(null=True, blank=True)
+    analysis_completed_at = models.DateTimeField(null=True, blank=True)
+    
+    # Retry management
+    retry_count = models.IntegerField(default=0)
+    max_retries = models.IntegerField(default=3)
+    
+    # Legacy field for backward compatibility
     analysis_completed = models.BooleanField(default=False)
     analysis_started_at = models.DateTimeField(auto_now_add=True)
-    analysis_completed_at = models.DateTimeField(null=True, blank=True)
     
     # Content Analysis
     content_type = models.CharField(max_length=50, blank=True)
@@ -920,8 +942,40 @@ class AIFileAnalysis(models.Model):
     
     def mark_completed(self, processing_time_ms=None):
         """Mark analysis as completed"""
+        self.status = 'completed'
         self.analysis_completed = True
-        self.analysis_completed_at = models.timezone.now()
+        self.analysis_completed_at = timezone.now()
         if processing_time_ms:
             self.processing_time_ms = processing_time_ms
-        self.save(update_fields=['analysis_completed', 'analysis_completed_at', 'processing_time_ms'])
+        self.save(update_fields=['status', 'analysis_completed', 'analysis_completed_at', 'processing_time_ms'])
+    
+    def mark_processing(self):
+        """Mark analysis as currently being processed"""
+        self.status = 'processing'
+        self.processing_started_at = timezone.now()
+        self.save(update_fields=['status', 'processing_started_at'])
+    
+    def mark_failed(self, error_message=None):
+        """Mark analysis as failed"""
+        if self.retry_count < self.max_retries:
+            self.status = 'retrying'
+            self.retry_count += 1
+        else:
+            self.status = 'failed'
+        
+        if error_message:
+            self.error_message = error_message
+        self.save(update_fields=['status', 'retry_count', 'error_message'])
+    
+    @classmethod
+    def get_next_in_queue(cls):
+        """Get the next queued analysis to process"""
+        return cls.objects.filter(
+            status__in=['queued', 'retrying']
+        ).order_by('priority', 'queued_at').first()
+    
+    @classmethod 
+    def get_queue_stats(cls):
+        """Get queue statistics"""
+        from django.db.models import Count
+        return cls.objects.values('status').annotate(count=Count('status'))

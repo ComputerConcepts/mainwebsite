@@ -40,11 +40,17 @@ def ai_dashboard(request):
     # Get workflow analytics
     analytics = ai_service.get_workflow_analytics(employee)
     
-    # Get recent file analyses
+    # Get recent file analyses (completed)
     recent_analyses = AIFileAnalysis.objects.filter(
         document__uploaded_by=employee,
-        analysis_completed=True
+        status='completed'
     ).order_by('-analysis_completed_at')[:5]
+    
+    # Get pending analyses (queued or processing)
+    pending_analyses = AIFileAnalysis.objects.filter(
+        document__uploaded_by=employee,
+        status__in=['queued', 'processing']
+    ).order_by('-queued_at')[:5]
     
     # Get workflow suggestions
     suggestions = ai_service.suggest_workflow_optimizations(employee)
@@ -59,6 +65,7 @@ def ai_dashboard(request):
         'unread_notifications_count': unread_count,
         'analytics': analytics,
         'recent_analyses': recent_analyses,
+        'pending_analyses': pending_analyses,
         'workflow_suggestions': suggestions[:3],  # Top 3 suggestions
         'storage_percentage': storage_percentage,
         'storage_warning': storage_warning,
@@ -67,7 +74,7 @@ def ai_dashboard(request):
             'total_executions': analytics.get('user_workflow_executions', 0),
             'files_analyzed': AIFileAnalysis.objects.filter(
                 document__uploaded_by=employee,
-                analysis_completed=True
+                status='completed'
             ).count(),
             'notifications_sent': analytics.get('user_notifications', 0)
         }
@@ -463,26 +470,37 @@ def file_analysis_detail(request, analysis_id):
 @login_required
 @require_http_methods(["POST"])
 def trigger_manual_analysis(request, file_id):
-    """Manually trigger AI analysis for a file"""
+    """Queue AI analysis for a file"""
     try:
         employee = Employee.objects.get(user=request.user)
         file_doc = get_object_or_404(FileDocument, id=file_id, uploaded_by=employee)
         
-        ai_service = get_ai_workflow_service()
+        # Get or create analysis record
+        analysis, created = AIFileAnalysis.objects.get_or_create(
+            document=file_doc,
+            defaults={'status': 'queued'}
+        )
         
-        # Trigger file analysis
-        result = ai_service.handle_file_upload(file_doc, employee)
-        
-        if result['success']:
+        if analysis.status == 'completed':
             return JsonResponse({
                 'success': True,
-                'message': 'AI analysis triggered successfully',
-                'analysis_completed': result.get('analysis_completed', False)
+                'message': 'Analysis already completed',
+                'status': 'completed'
+            })
+        elif analysis.status in ['queued', 'processing']:
+            return JsonResponse({
+                'success': True,
+                'message': f'Analysis is {analysis.status}',
+                'status': analysis.status
             })
         else:
+            # Queue for processing
+            analysis.status = 'queued'
+            analysis.save()
             return JsonResponse({
-                'success': False,
-                'error': result.get('error', 'Analysis failed')
+                'success': True,
+                'message': 'Analysis queued for processing',
+                'status': 'queued'
             })
             
     except Employee.DoesNotExist:
@@ -490,6 +508,41 @@ def trigger_manual_analysis(request, file_id):
             'success': False,
             'error': 'Employee profile not found'
         }, status=403)
+
+
+@login_required
+def check_analysis_status(request, analysis_id):
+    """Check the status of an AI analysis"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        analysis = get_object_or_404(
+            AIFileAnalysis, 
+            id=analysis_id, 
+            document__uploaded_by=employee
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'analysis_id': analysis.id,
+            'status': analysis.status,
+            'queued_at': analysis.queued_at.isoformat() if analysis.queued_at else None,
+            'processing_started_at': analysis.processing_started_at.isoformat() if analysis.processing_started_at else None,
+            'completed_at': analysis.analysis_completed_at.isoformat() if analysis.analysis_completed_at else None,
+            'retry_count': analysis.retry_count,
+            'error_message': analysis.error_message if analysis.status == 'failed' else None,
+            'file_name': analysis.document.name
+        })
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Employee profile not found'
+        }, status=403)
+    except AIFileAnalysis.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Analysis not found'
+        }, status=404)
 
 
 @login_required
@@ -516,3 +569,100 @@ def ai_workflow_execution_detail(request, execution_id):
     }
     
     return render(request, 'employee/ai_workflow_execution.html', context)
+
+
+@login_required 
+def ai_queue_dashboard(request):
+    """Dashboard view for AI processing queue"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        
+        # Only allow admins and AI staff to see queue dashboard
+        if not (employee.is_admin() or employee.department.lower() in ['it', 'ai', 'tech']):
+            messages.error(request, 'Access denied. Only administrators can view the AI queue dashboard.')
+            return redirect('ai_dashboard')
+        
+        # Get queue statistics
+        queue_stats = {}
+        for stat in AIFileAnalysis.get_queue_stats():
+            queue_stats[stat['status']] = stat['count']
+        
+        # Get recent analyses
+        recent_analyses = AIFileAnalysis.objects.select_related('document', 'document__uploaded_by').order_by('-queued_at')[:20]
+        
+        # Get currently processing
+        processing_analyses = AIFileAnalysis.objects.filter(status='processing').select_related('document')
+        
+        # Get failed analyses that can be retried
+        from django.db import models
+        failed_analyses = AIFileAnalysis.objects.filter(status='failed', retry_count__lt=models.F('max_retries')).select_related('document')[:10]
+        
+        context = {
+            'employee': employee,
+            'queue_stats': queue_stats,
+            'recent_analyses': recent_analyses,
+            'processing_analyses': processing_analyses,
+            'failed_analyses': failed_analyses,
+            'total_queued': queue_stats.get('queued', 0),
+            'total_processing': queue_stats.get('processing', 0),
+            'total_completed': queue_stats.get('completed', 0),
+            'total_failed': queue_stats.get('failed', 0),
+        }
+        
+        return render(request, 'employee/ai_queue_dashboard.html', context)
+        
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
+        return redirect('employee_login')
+
+
+@login_required
+@require_http_methods(["POST"])
+def retry_failed_analysis(request, analysis_id):
+    """Retry a failed AI analysis"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        analysis = get_object_or_404(AIFileAnalysis, id=analysis_id)
+        
+        # Check permissions - admin or file owner
+        if not (employee.is_admin() or 
+                employee.department.lower() in ['it', 'ai', 'tech'] or
+                analysis.document.uploaded_by == employee):
+            return JsonResponse({
+                'success': False,
+                'error': 'Access denied'
+            }, status=403)
+        
+        # Check if analysis can be retried
+        if analysis.status != 'failed':
+            return JsonResponse({
+                'success': False,
+                'error': 'Analysis is not in failed state'
+            })
+        
+        if analysis.retry_count >= analysis.max_retries:
+            return JsonResponse({
+                'success': False,
+                'error': 'Maximum retry attempts exceeded'
+            })
+        
+        # Reset analysis for retry
+        analysis.status = 'queued'
+        analysis.error_message = ''
+        analysis.queued_at = timezone.now()
+        analysis.processing_started_at = None
+        analysis.analysis_completed_at = None
+        analysis.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Analysis has been queued for retry',
+            'analysis_id': analysis.id,
+            'status': 'queued'
+        })
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Employee profile not found'
+        }, status=403)

@@ -138,7 +138,10 @@ urlpatterns = [
     path('employee/ai/settings/', views_ai.ai_settings, name='ai_settings'),
     path('employee/ai/analysis/<int:analysis_id>/', views_ai.file_analysis_detail, name='file_analysis_detail'),
     path('employee/ai/execution/<uuid:execution_id>/', views_ai.ai_workflow_execution_detail, name='ai_workflow_execution_detail'),
+    path('employee/ai/queue/', views_ai.ai_queue_dashboard, name='ai_queue_dashboard'),
     path('api/ai/analyze-file/<uuid:file_id>/', views_ai.trigger_manual_analysis, name='trigger_manual_analysis'),
+    path('api/ai/analysis-status/<int:analysis_id>/', views_ai.check_analysis_status, name='check_analysis_status'),
+    path('api/ai/retry-analysis/<int:analysis_id>/', views_ai.retry_failed_analysis, name='retry_failed_analysis'),
     
     # Storage Management Admin URLs
     path('admin/storage/update-quota/<int:user_id>/', views_admin.update_user_quota, name='admin_update_user_quota'),

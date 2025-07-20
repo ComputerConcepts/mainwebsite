@@ -290,7 +290,36 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        {% if recent_analyses %}
+                        {% if recent_analyses or pending_analyses %}
+                            <!-- Pending Analyses -->
+                            {% if pending_analyses %}
+                                {% for analysis in pending_analyses %}
+                                    <div class="d-flex align-items-center mb-3 p-3 border rounded bg-light">
+                                        <div class="me-3">
+                                            <i class="fas fa-clock text-warning" style="font-size: 1.5rem;"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ analysis.document.name }}</h6>
+                                            <small class="text-muted">
+                                                {% if analysis.status == 'queued' %}
+                                                    <span class="badge bg-warning">Queued for Analysis</span>
+                                                {% elif analysis.status == 'processing' %}
+                                                    <span class="badge bg-info">Processing...</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">{{ analysis.status|title }}</span>
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                        <div class="text-end">
+                                            <small class="text-muted">
+                                                Queued {{ analysis.queued_at|timesince }} ago
+                                            </small>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                            
+                            <!-- Completed Analyses -->
                             {% for analysis in recent_analyses %}
                                 <div class="d-flex align-items-center mb-3 p-3 border rounded">
                                     <div class="me-3">
@@ -299,7 +328,8 @@
                                     <div class="flex-grow-1">
                                         <h6 class="mb-1">{{ analysis.document.name }}</h6>
                                         <small class="text-muted">
-                                            Analyzed {{ analysis.analysis_completed_at|timesince }} ago
+                                            <span class="badge bg-success">Completed</span>
+                                            {{ analysis.analysis_completed_at|timesince }} ago
                                         </small>
                                         {% if analysis.suggested_category %}
                                             <br><span class="badge bg-secondary">{{ analysis.suggested_category }}</span>
@@ -314,7 +344,11 @@
                                     </div>
                                 </div>
                             {% endfor %}
+                            
                             <div class="text-center mt-3">
+                                <button class="btn btn-outline-primary me-2" onclick="location.reload()">
+                                    <i class="fas fa-sync me-1"></i>Refresh Status
+                                </button>
                                 <a href="{% url 'file_manager' %}" class="btn btn-outline-primary">
                                     <i class="fas fa-folder-open me-1"></i>View File Manager
                                 </a>

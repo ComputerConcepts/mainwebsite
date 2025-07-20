@@ -35,7 +35,7 @@ class AIFileAnalyzer:
         try:
             # Get or create analysis record
             analysis, created = AIFileAnalysis.objects.get_or_create(
-                file=file_document,
+                document=file_document,
                 defaults={'status': 'processing'}
             )
             
@@ -238,7 +238,7 @@ class AIFileAnalyzer:
             # Get other analyzed files
             other_analyses = AIFileAnalysis.objects.filter(
                 status='completed'
-            ).exclude(file=current_file)[:50]  # Limit for performance
+            ).exclude(document=current_file)[:50]  # Limit for performance
             
             for other_analysis in other_analyses:
                 try:
@@ -253,12 +253,12 @@ class AIFileAnalyzer:
                         
                         if similarity > 0.1:  # Only keep significant similarities
                             similarity_scores.append({
-                                'file_id': other_analysis.file.id,
-                                'filename': other_analysis.file.file.name,
+                                'file_id': other_analysis.document.id,
+                                'filename': other_analysis.document.file.name,
                                 'similarity': similarity
                             })
                 except Exception as e:
-                    logger.error(f"Error calculating similarity with file {other_analysis.file.id}: {str(e)}")
+                    logger.error(f"Error calculating similarity with file {other_analysis.document.id}: {str(e)}")
                     continue
             
             # Sort by similarity
