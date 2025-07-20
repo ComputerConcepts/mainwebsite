@@ -1,0 +1,154 @@
+{% extends "employee/base.html" %}
+{% load static %}
+
+{% block title %}User Files - {{ employee.get_full_name }} - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-folder-open me-2"></i>Files for {{ employee.get_full_name }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- User Statistics -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h5 class="text-primary">{{ total_files }}</h5>
+                                <small class="text-muted">Total Files</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h5 class="text-success">{{ total_size|filesizeformat }}</h5>
+                                <small class="text-muted">Total Size</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h5 class="text-warning">{{ employee.storage_quota|filesizeformat }}</h5>
+                                <small class="text-muted">Quota</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                {% with usage_percent=total_size|mul:100|div:employee.storage_quota %}
+                                    <h5 class="{% if usage_percent > 90 %}text-danger{% elif usage_percent > 75 %}text-warning{% else %}text-success{% endif %}">
+                                        {{ usage_percent|floatformat:1 }}%
+                                    </h5>
+                                    <small class="text-muted">Usage</small>
+                                {% endwith %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <a href="/admin/pages/employee/{{ employee.id }}/change/" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Employee
+                            </a>
+                            <a href="{% url 'admin_recalculate_storage' employee.id %}" class="btn btn-primary">
+                                <i class="fas fa-sync me-1"></i>Recalculate Storage
+                            </a>
+                        </div>
+                        <div>
+                            <small class="text-muted">
+                                Showing {{ files.start_index }}-{{ files.end_index }} of {{ total_files }} files
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Files Table -->
+                    {% if files %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>File Name</th>
+                                        <th>Size</th>
+                                        <th>Type</th>
+                                        <th>Uploaded</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for file in files %}
+                                        <tr>
+                                            <td>
+                                                <i class="fas fa-file me-2"></i>
+                                                {{ file.original_filename|truncatechars:50 }}
+                                            </td>
+                                            <td>{{ file.file_size|filesizeformat }}</td>
+                                            <td>
+                                                <span class="badge bg-secondary">
+                                                    {{ file.file_type|upper|default:"Unknown" }}
+                                                </span>
+                                            </td>
+                                            <td>{{ file.uploaded_at|date:"M d, Y H:i" }}</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'view_file' file.id %}" 
+                                                       class="btn btn-outline-primary btn-sm" 
+                                                       target="_blank">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="{% url 'download_file' file.id %}" 
+                                                       class="btn btn-outline-success btn-sm">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if files.has_other_pages %}
+                            <nav aria-label="Files pagination">
+                                <ul class="pagination justify-content-center">
+                                    {% if files.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ files.previous_page_number }}">Previous</a>
+                                        </li>
+                                    {% endif %}
+
+                                    {% for num in files.paginator.page_range %}
+                                        {% if files.number == num %}
+                                            <li class="page-item active">
+                                                <span class="page-link">{{ num }}</span>
+                                            </li>
+                                        {% elif num > files.number|add:'-3' and num < files.number|add:'3' %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {% if files.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ files.next_page_number }}">Next</a>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No files found</h5>
+                            <p class="text-muted">This user hasn't uploaded any files yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

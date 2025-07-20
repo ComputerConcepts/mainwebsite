@@ -629,10 +629,18 @@ def employee_dashboard(request):
         assigned_cards = Card.objects.filter(assigned_to=employee, is_completed=False)[:5]
         
         # File Manager statistics
-        from .models import FileDocument, FileActivity
+        from .models import FileDocument, FileActivity, StorageManager
         uploaded_files_count = FileDocument.objects.filter(uploaded_by=employee).count()
         shared_files_count = FileDocument.objects.filter(shared_with=employee).count()
         recent_file_activities = FileActivity.objects.filter(user=employee).order_by('-created_at')[:5]
+        
+        # Storage statistics for current user
+        storage_stats = {
+            'used': employee.get_storage_used_display(),
+            'quota': employee.get_storage_quota_display(),
+            'percentage': employee.get_storage_percentage(),
+            'available': employee._format_bytes(employee.get_available_storage())
+        }
         
         # HR statistics (if user is HR)
         context = {
@@ -647,6 +655,7 @@ def employee_dashboard(request):
             'uploaded_files_count': uploaded_files_count,
             'shared_files_count': shared_files_count,
             'recent_file_activities': recent_file_activities,
+            'storage_stats': storage_stats,
         }
         
         # Add HR-specific statistics if user is HR
@@ -677,12 +686,20 @@ def employee_dashboard(request):
                 employee__isnull=False
             ).order_by('-date_joined')[:5]
             
+            # Storage management statistics for admins
+            from .models import StorageManager, StorageAllocation
+            system_storage_stats = StorageManager.get_storage_stats()
+            current_allocation = StorageAllocation.get_current_allocation()
+            
             context.update({
                 'total_users': total_users,
                 'active_users': active_users,
                 'pending_users': pending_users,
                 'total_departments': departments,
                 'recent_users': recent_users,
+                'system_storage_stats': system_storage_stats,
+                'current_allocation_gb': current_allocation,
+                'is_admin': True,
             })
         
         return render(request, 'employee/dashboard.html', context)
@@ -1256,22 +1273,194 @@ def admin_application_update_status(request, application_id):
     return redirect('admin_job_detail', job_id=application.job_posting.id)
 
 
+@login_required
+def admin_application_detail(request, application_id):
+    """Employee portal - view detailed application"""
+    if not is_hr_or_admin(request.user):
+        messages.error(request, 'Access denied. Only HR and admin users can view application details.')
+        return redirect('employee_dashboard')
+    
+    application = get_object_or_404(Career, id=application_id)
+    
+    context = {
+        'application': application,
+    }
+    
+    return render(request, 'employee/application_detail.html', context)
+
+
+# Storage Management Views for Employee Portal
+@login_required
+def admin_storage_overview(request):
+    """Storage overview for admin users"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if not (employee.is_admin() or employee.is_super_admin()):
+            messages.error(request, 'Access denied. Only admin users can view storage management.')
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
+        return redirect('employee_dashboard')
+    
+    # Get all users with their storage information
+    employees = Employee.objects.filter(is_active=True).order_by('user__first_name', 'user__last_name')
+    
+    # Get system storage statistics
+    from .models import StorageManager
+    system_stats = StorageManager.get_storage_stats()
+    
+    context = {
+        'employees': employees,
+        'system_stats': system_stats,
+        'employee': employee,
+    }
+    
+    return render(request, 'employee/admin_storage_overview.html', context)
+
 
 @login_required
-
-def admin_application_detail(request, application_id):
-
-    """Employee portal - view detailed application"""
-
-    if not is_hr_or_admin(request.user):
-
-        messages.error(request, 'Access denied. Only HR and admin users can view application details.')
-
+def admin_update_storage_quotas(request):
+    """Update storage quotas for all users"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if not (employee.is_admin() or employee.is_super_admin()):
+            messages.error(request, 'Access denied. Only admin users can update storage quotas.')
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
         return redirect('employee_dashboard')
-
     
+    if request.method == 'POST':
+        try:
+            from .models import StorageManager
+            result = StorageManager.update_all_user_quotas()
+            messages.success(
+                request, 
+                f'Successfully updated storage quotas for {result["updated_users"]} users. '
+                f'New quota per user: {result["quota_display"]}'
+            )
+        except Exception as e:
+            messages.error(request, f'Error updating storage quotas: {str(e)}')
+        
+        return redirect('employee_dashboard')
+    
+    return redirect('employee_dashboard')
 
-    application = get_object_or_404(Career, id=application_id)
+
+@login_required
+def admin_set_user_quota(request, user_id):
+    """Set individual user storage quota"""
+    try:
+        admin_employee = Employee.objects.get(user=request.user)
+        if not (admin_employee.is_admin() or admin_employee.is_super_admin()):
+            messages.error(request, 'Access denied. Only admin users can set user quotas.')
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
+        return redirect('employee_dashboard')
+    
+    target_employee = get_object_or_404(Employee, id=user_id)
+    
+    if request.method == 'POST':
+        quota_gb = request.POST.get('quota_gb')
+        try:
+            quota_gb = float(quota_gb)
+            if quota_gb < 0:
+                messages.error(request, 'Quota cannot be negative.')
+            else:
+                quota_bytes = int(quota_gb * 1024 * 1024 * 1024)  # Convert GB to bytes
+                target_employee.storage_quota = quota_bytes
+                target_employee.save()
+                
+                messages.success(
+                    request, 
+                    f'Successfully set storage quota for {target_employee.get_full_name()} to {quota_gb} GB'
+                )
+        except (ValueError, TypeError):
+            messages.error(request, 'Invalid quota value. Please enter a valid number.')
+        except Exception as e:
+            messages.error(request, f'Error setting quota: {str(e)}')
+    
+    return redirect('admin_storage_overview')
+
+
+@login_required
+def user_storage_details(request):
+    """View current user's storage details"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
+        return redirect('employee_dashboard')
+    
+    # Get user's files
+    from .models import FileDocument
+    user_files = FileDocument.objects.filter(uploaded_by=employee).order_by('-created_at')
+    
+    # Calculate storage breakdown
+    total_files = user_files.count()
+    if total_files > 0:
+        avg_file_size = employee.storage_used / total_files
+        largest_file = user_files.order_by('-file_size').first()
+    else:
+        avg_file_size = 0
+        largest_file = None
+    
+    context = {
+        'employee': employee,
+        'user_files': user_files,
+        'total_files': total_files,
+        'avg_file_size': employee._format_bytes(avg_file_size),
+        'largest_file': largest_file,
+        'storage_stats': {
+            'used': employee.get_storage_used_display(),
+            'quota': employee.get_storage_quota_display(),
+            'percentage': employee.get_storage_percentage(),
+            'available': employee.get_available_storage_display()
+        }
+    }
+    
+    return render(request, 'employee/user_storage_details.html', context)
+
+
+@login_required
+def admin_set_storage_allocation(request):
+    """Set total storage allocation for all users"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if not employee.is_super_admin():
+            messages.error(request, 'Access denied. Only super admin users can set storage allocation.')
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found.')
+        return redirect('employee_dashboard')
+    
+    if request.method == 'POST':
+        allocation_gb = request.POST.get('allocation_gb')
+        try:
+            allocation_gb = float(allocation_gb)
+            if allocation_gb <= 0:
+                messages.error(request, 'Storage allocation must be greater than 0.')
+            else:
+                from .models import StorageAllocation
+                StorageAllocation.set_allocation(allocation_gb, request.user)
+                
+                # Update all user quotas based on new allocation
+                from .models import StorageManager
+                result = StorageManager.update_all_user_quotas()
+                
+                messages.success(
+                    request, 
+                    f'Successfully set total storage allocation to {allocation_gb} GB. '
+                    f'Updated quotas for {result["updated_users"]} users. '
+                    f'New quota per user: {result["quota_display"]}'
+                )
+        except (ValueError, TypeError):
+            messages.error(request, 'Invalid allocation value. Please enter a valid number.')
+        except Exception as e:
+            messages.error(request, f'Error setting storage allocation: {str(e)}')
+    
+    return redirect('employee_dashboard')
 
     
 

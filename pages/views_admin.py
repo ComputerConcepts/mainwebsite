@@ -501,3 +501,199 @@ def send_verification_email(request, user_id):
             
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+# Storage Management Views
+
+@login_required
+def update_user_quota(request, user_id):
+    """Update individual user's storage quota"""
+    if not is_employee_authenticated(request):
+        return redirect('employee_login')
+    
+    try:
+        current_employee = Employee.objects.get(user=request.user)
+        if not current_employee.can_manage_users():
+            messages.error(request, 'You do not have permission to manage storage quotas.')
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee record not found.')
+        return redirect('employee_login')
+    
+    employee = get_object_or_404(Employee, id=user_id)
+    
+    if request.method == 'POST':
+        try:
+            # Get new quota from form
+            new_quota_gb = float(request.POST.get('quota_gb', 0))
+            new_quota_bytes = int(new_quota_gb * 1024 * 1024 * 1024)  # Convert to bytes
+            
+            # Update quota
+            employee.storage_quota = new_quota_bytes
+            employee.save()
+            
+            messages.success(request, f'Storage quota updated to {new_quota_gb}GB for {employee.get_full_name()}')
+            return redirect(f'/admin/pages/employee/{user_id}/change/')
+            
+        except (ValueError, TypeError):
+            messages.error(request, 'Invalid quota value provided.')
+            return redirect(f'/admin/pages/employee/{user_id}/change/')
+    
+    # Show update form
+    context = {
+        'employee': employee,
+        'current_quota_gb': employee.storage_quota / (1024**3) if employee.storage_quota else 0,
+        'current_usage_gb': employee.storage_used / (1024**3) if employee.storage_used else 0,
+    }
+    
+    return render(request, 'admin/storage/update_quota.html', context)
+
+
+@login_required 
+def recalculate_storage(request, user_id):
+    """Recalculate user's storage usage"""
+    if not is_employee_authenticated(request):
+        return redirect('employee_login')
+    
+    try:
+        current_employee = Employee.objects.get(user=request.user)
+        if not current_employee.can_manage_users():
+            messages.error(request, 'You do not have permission to manage storage.')
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee record not found.')
+        return redirect('employee_login')
+    
+    employee = get_object_or_404(Employee, id=user_id)
+    
+    try:
+        # Recalculate storage usage
+        old_usage = employee.storage_used or 0
+        employee.update_storage_used()
+        new_usage = employee.storage_used or 0
+        
+        messages.success(request, 
+            f'Storage recalculated for {employee.get_full_name()}. '
+            f'Usage: {old_usage / (1024**2):.1f}MB → {new_usage / (1024**2):.1f}MB')
+        
+    except Exception as e:
+        messages.error(request, f'Error recalculating storage: {str(e)}')
+    
+    return redirect(f'/admin/pages/employee/{user_id}/change/')
+
+
+@login_required
+def view_user_files(request, user_id):
+    """View all files for a specific user"""
+    if not is_employee_authenticated(request):
+        return redirect('employee_login')
+    
+    try:
+        current_employee = Employee.objects.get(user=request.user)
+        if not current_employee.can_manage_users():
+            messages.error(request, 'You do not have permission to view user files.')
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee record not found.')
+        return redirect('employee_login')
+    
+    employee = get_object_or_404(Employee, id=user_id)
+    
+    # Get user's files
+    from .models import FileDocument
+    files = FileDocument.objects.filter(uploaded_by=employee).order_by('-uploaded_at')
+    
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(files, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'employee': employee,
+        'files': page_obj,
+        'total_files': files.count(),
+        'total_size': sum(f.file_size for f in files),
+    }
+    
+    return render(request, 'admin/storage/user_files.html', context)
+
+
+@login_required
+def bulk_update_quotas(request):
+    """Update storage quotas for all users"""
+    if not is_employee_authenticated(request):
+        return redirect('employee_login')
+    
+    try:
+        current_employee = Employee.objects.get(user=request.user)
+        if not current_employee.can_manage_users():
+            messages.error(request, 'You do not have permission to manage storage quotas.')
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee record not found.')
+        return redirect('employee_login')
+    
+    if request.method == 'POST':
+        try:
+            from .models import StorageManager
+            
+            # Update all user quotas
+            result = StorageManager.update_all_user_quotas()
+            
+            messages.success(request, 
+                f'Successfully updated {result["updated_users"]} users with quota: {result["quota_display"]} each')
+            
+        except Exception as e:
+            messages.error(request, f'Error updating quotas: {str(e)}')
+    
+    return redirect('/admin/pages/employee/')
+
+
+@login_required
+def storage_overview(request):
+    """Storage management overview page"""
+    if not is_employee_authenticated(request):
+        return redirect('employee_login')
+    
+    try:
+        current_employee = Employee.objects.get(user=request.user)
+        if not current_employee.can_manage_users():
+            messages.error(request, 'You do not have permission to access storage management.')
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee record not found.')
+        return redirect('employee_login')
+    
+    from .models import StorageManager, FileDocument
+    
+    # Get storage statistics
+    stats = StorageManager.get_storage_stats()
+    
+    # Calculate usage percentage for old template compatibility
+    stats['usage_percentage'] = (stats.get('total_user_storage', 0) / stats.get('total_allocated', 1) * 100) if stats.get('total_allocated', 0) > 0 else 0
+    
+    # Get top storage users
+    top_users = Employee.objects.filter(
+        is_active=True, 
+        storage_used__gt=0
+    ).order_by('-storage_used')[:10]
+    
+    # Add usage percentage to each user
+    for user in top_users:
+        if user.storage_quota and user.storage_quota > 0:
+            user.usage_percentage = (user.storage_used / user.storage_quota) * 100
+        else:
+            user.usage_percentage = 0
+    
+    # Get recent file uploads
+    recent_files = FileDocument.objects.order_by('-created_at')[:10]
+    
+    context = {
+        'stats': stats,
+        'top_users': top_users,
+        'recent_files': recent_files,
+        'total_employees': Employee.objects.filter(is_active=True).count(),
+    }
+    
+    return render(request, 'admin/storage/overview.html', context)

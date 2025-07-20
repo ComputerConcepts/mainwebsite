@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse, Http404
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.db.models import Sum, F
 from django.utils import timezone
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
@@ -1236,7 +1237,7 @@ def get_file_details(request, file_id):
 
 @login_required
 def storage_management(request):
-    """Storage management view for admins"""
+    """Storage management view for administrators using manual allocation"""
     try:
         employee = Employee.objects.get(user=request.user)
         
@@ -1245,18 +1246,20 @@ def storage_management(request):
             messages.error(request, 'Access denied. Admin privileges required.')
             return redirect('file_manager')
         
-        from .models import StorageManager
-        
         if request.method == 'POST':
             action = request.POST.get('action')
             
             if action == 'update_quotas':
+                # Update all user quotas based on current storage allocation
+                from .models import StorageAllocation, StorageManager
+                allocation_gb = StorageAllocation.get_current_allocation()
+                user_quota = StorageManager.calculate_user_quota()
+                
                 # Update all user quotas
-                result = StorageManager.update_all_user_quotas()
+                updated_count = Employee.objects.filter(is_active=True).update(storage_quota=user_quota)
                 messages.success(request, 
-                    f'Updated storage quotas for {result["updated_users"]} users. '
-                    f'New quota per user: {result["quota_display"]}')
-            
+                    f'Updated quotas for {updated_count} users to {Employee._format_bytes(user_quota)} each.')
+                
             elif action == 'recalculate_usage':
                 # Recalculate storage usage for all users
                 updated_count = 0
@@ -1265,23 +1268,51 @@ def storage_management(request):
                     updated_count += 1
                 messages.success(request, f'Recalculated storage usage for {updated_count} users.')
         
-        # Get storage statistics
-        storage_stats = StorageManager.get_storage_stats()
+        # Get storage statistics using manual allocation
+        from .models import StorageAllocation, StorageManager
+        allocation_gb = StorageAllocation.get_current_allocation()
+        
+        # Calculate statistics based on manual allocation
+        active_users = Employee.objects.filter(is_active=True).count()
+        total_user_storage = Employee.objects.filter(is_active=True).aggregate(
+            total=Sum('storage_used')
+        )['total'] or 0
+        
+        total_files = FileDocument.objects.count()
+        user_quota = StorageManager.calculate_user_quota()
+        
+        storage_stats = {
+            'allocation': {
+                'total_allocated': allocation_gb * (1024 ** 3),  # Convert to bytes
+                'total_allocated_display': f"{allocation_gb} GB",
+                'quota_per_user': user_quota,
+                'quota_per_user_display': Employee._format_bytes(user_quota),
+            },
+            'active_users': active_users,
+            'total_files': total_files,
+            'total_user_storage': total_user_storage,
+            'total_user_storage_display': Employee._format_bytes(total_user_storage),
+        }
         
         # Get top storage users
-        top_users = Employee.objects.filter(is_active=True).order_by('-storage_used')[:10]
+        top_users = Employee.objects.filter(is_active=True).exclude(
+            storage_used__isnull=True
+        ).order_by('-storage_used')[:10]
         
         # Get users over quota
-        over_quota_users = []
-        for emp in Employee.objects.filter(is_active=True):
-            if emp.storage_quota and emp.storage_used > emp.storage_quota:
-                over_quota_users.append(emp)
+        over_quota_users = Employee.objects.filter(
+            is_active=True,
+            storage_used__gt=F('storage_quota')
+        ).exclude(
+            storage_quota__isnull=True
+        )
         
         context = {
             'storage_stats': storage_stats,
             'top_users': top_users,
             'over_quota_users': over_quota_users,
             'employee': employee,
+            'allocation_gb': allocation_gb,
         }
         
         return render(request, 'employee/storage_management.html', context)
@@ -1311,7 +1342,7 @@ def get_storage_info(request):
             'storage_quota_display': employee.get_storage_quota_display(),
             'storage_percentage': employee.get_storage_percentage(),
             'available_storage': employee.get_available_storage(),
-            'available_storage_display': employee._format_bytes(employee.get_available_storage())
+            'available_storage_display': Employee._format_bytes(employee.get_available_storage())
         })
         
     except Employee.DoesNotExist:

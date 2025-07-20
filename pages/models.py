@@ -2,6 +2,35 @@ from django.db import models
 from django.contrib.auth.models import User
 import uuid
 
+class StorageAllocation(models.Model):
+    """Model to store storage allocation settings"""
+    total_allocation_gb = models.FloatField(
+        default=6.0, 
+        help_text="Total storage allocation for all users in GB"
+    )
+    updated_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-updated_at']
+    
+    def __str__(self):
+        return f"{self.total_allocation_gb} GB allocation (updated by {self.updated_by.username})"
+    
+    @classmethod
+    def get_current_allocation(cls):
+        """Get the current storage allocation setting"""
+        latest = cls.objects.first()
+        return latest.total_allocation_gb if latest else 6.0  # Default to 6GB
+    
+    @classmethod
+    def set_allocation(cls, allocation_gb, user):
+        """Set a new storage allocation"""
+        return cls.objects.create(
+            total_allocation_gb=allocation_gb,
+            updated_by=user
+        )
+
 class ContactForm(models.Model):
     name = models.CharField(max_length=200)
     email = models.EmailField()
@@ -168,6 +197,12 @@ class Employee(models.Model):
             return self._format_bytes(self.storage_quota)
         return "No limit"
     
+    def get_storage_quota_gb(self):
+        """Return storage quota in GB"""
+        if self.storage_quota:
+            return round(self.storage_quota / (1024 * 1024 * 1024), 2)
+        return 0
+    
     def get_storage_percentage(self):
         """Return storage usage percentage"""
         if not self.storage_quota or self.storage_quota == 0:
@@ -179,6 +214,13 @@ class Employee(models.Model):
         if not self.storage_quota:
             return float('inf')
         return max(0, self.storage_quota - self.storage_used)
+    
+    def get_available_storage_display(self):
+        """Return human-readable available storage"""
+        available = self.get_available_storage()
+        if available == float('inf'):
+            return "Unlimited"
+        return self._format_bytes(available)
     
     def can_upload_file(self, file_size):
         """Check if user can upload a file of given size"""
@@ -598,22 +640,19 @@ class StorageManager:
     
     @staticmethod
     def calculate_user_quota():
-        """Calculate storage quota per user based on available space"""
-        storage_info = StorageManager.get_system_storage_info()
+        """Calculate storage quota per user based on manual allocation"""
+        # Get current manual allocation
+        total_allocation_gb = StorageAllocation.get_current_allocation()
+        total_allocation_bytes = total_allocation_gb * 1024 * 1024 * 1024
+        
         active_users = Employee.objects.filter(is_active=True).count()
-        
-        # Reserve 1GB for website purposes
-        reserved_space = 1 * 1024 * 1024 * 1024  # 1GB in bytes
-        
-        # Calculate available space for users
-        available_for_users = max(0, storage_info['free'] - reserved_space)
         
         # If no active users, return 0
         if active_users == 0:
             return 0
         
-        # Calculate quota per user
-        quota_per_user = available_for_users // active_users
+        # Calculate quota per user (evenly divided)
+        quota_per_user = total_allocation_bytes // active_users
         
         # Minimum quota of 10MB per user
         min_quota = 10 * 1024 * 1024  # 10MB
@@ -637,7 +676,9 @@ class StorageManager:
     @staticmethod
     def get_storage_stats():
         """Get comprehensive storage statistics"""
-        storage_info = StorageManager.get_system_storage_info()
+        # Get manual allocation setting
+        total_allocation_gb = StorageAllocation.get_current_allocation()
+        total_allocation_bytes = total_allocation_gb * 1024 * 1024 * 1024
         
         # Get user storage usage
         total_user_storage = Employee.objects.filter(is_active=True).aggregate(
@@ -652,15 +693,24 @@ class StorageManager:
         active_users = Employee.objects.filter(is_active=True).count()
         total_allocated = quota_per_user * active_users
         
+        # Calculate usage percentage
+        usage_percentage = (total_user_storage / total_allocation_bytes * 100) if total_allocation_bytes > 0 else 0
+        
         return {
-            'system': storage_info,
+            'total_system_storage': total_allocation_bytes,
+            'total_system_storage_display': Employee._format_bytes(total_allocation_bytes),
+            'used_storage_display': Employee._format_bytes(total_user_storage),
+            'available_for_users': total_allocation_bytes,
+            'available_for_users_display': Employee._format_bytes(total_allocation_bytes),
+            'per_user_quota_display': Employee._format_bytes(quota_per_user),
+            'usage_percentage': min(100, usage_percentage),
             'total_user_storage': total_user_storage,
             'total_files': total_files,
             'quota_per_user': quota_per_user,
             'active_users': active_users,
             'total_allocated': total_allocated,
-            'reserved_space': 1 * 1024 * 1024 * 1024,  # 1GB
             'quota_per_user_display': Employee._format_bytes(quota_per_user),
             'total_user_storage_display': Employee._format_bytes(total_user_storage),
             'total_allocated_display': Employee._format_bytes(total_allocated),
+            'manual_allocation_gb': total_allocation_gb,
         }

@@ -1,0 +1,99 @@
+{% extends "employee/base.html" %}
+{% load static %}
+
+{% block title %}Update Storage Quota - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-hdd me-2"></i>Update Storage Quota
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- User Info -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5>Employee Information</h5>
+                            <p><strong>Name:</strong> {{ employee.get_full_name }}</p>
+                            <p><strong>Email:</strong> {{ employee.user.email }}</p>
+                            <p><strong>Department:</strong> {{ employee.department|default:"Not assigned" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Current Storage Status</h5>
+                            <p><strong>Current Quota:</strong> {{ current_quota_gb|floatformat:1 }} GB</p>
+                            <p><strong>Current Usage:</strong> {{ current_usage_gb|floatformat:2 }} GB</p>
+                            {% if current_quota_gb > 0 %}
+                                {% with usage_percent=current_usage_gb|mul:100|div:current_quota_gb %}
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar {% if usage_percent > 90 %}bg-danger{% elif usage_percent > 75 %}bg-warning{% else %}bg-success{% endif %}" 
+                                             style="width: {{ usage_percent|floatformat:1 }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ usage_percent|floatformat:1 }}% used</small>
+                                {% endwith %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Update Form -->
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="quota_gb" class="form-label">
+                                        <i class="fas fa-hdd me-1"></i>New Storage Quota (GB)
+                                    </label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="quota_gb" 
+                                           name="quota_gb" 
+                                           value="{{ current_quota_gb|floatformat:1 }}" 
+                                           step="0.1" 
+                                           min="0" 
+                                           max="100" 
+                                           required>
+                                    <div class="form-text">
+                                        Enter the new storage quota in GB. Current usage: {{ current_usage_gb|floatformat:2 }} GB
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Update Quota
+                            </button>
+                            <a href="/admin/pages/employee/{{ employee.id }}/change/" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Employee
+                            </a>
+                        </div>
+                    </form>
+
+                    <!-- Quick Quota Presets -->
+                    <div class="mt-4">
+                        <h6>Quick Quota Presets</h6>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuota(0.5)">500 MB</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuota(1)">1 GB</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuota(2)">2 GB</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuota(5)">5 GB</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQuota(10)">10 GB</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setQuota(gb) {
+    document.getElementById('quota_gb').value = gb;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends "employee/base.html" %}
+{% load static %}
+
+{% block title %}Storage Management Overview - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>Storage Management Overview
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Storage Statistics -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="text-primary">{{ stats.total_users }}</h5>
+                                    <small class="text-muted">Total Users</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="text-info">{{ stats.total_used|filesizeformat }}</h5>
+                                    <small class="text-muted">Total Used</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="text-warning">{{ stats.total_quota|filesizeformat }}</h5>
+                                    <small class="text-muted">Total Quota</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="{% if stats.usage_percentage > 90 %}text-danger{% elif stats.usage_percentage > 75 %}text-warning{% else %}text-success{% endif %}">
+                                        {{ stats.usage_percentage|floatformat:1 }}%
+                                    </h5>
+                                    <small class="text-muted">Overall Usage</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="mb-4">
+                        <h5>Management Actions</h5>
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'admin_bulk_update_quotas' %}" class="btn btn-primary">
+                                <i class="fas fa-sync me-1"></i>Update All Quotas
+                            </a>
+                            <a href="/admin/pages/employee/" class="btn btn-secondary">
+                                <i class="fas fa-users me-1"></i>Manage Users
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Top Storage Users -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-users me-1"></i>Top Storage Users
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if top_users %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>User</th>
+                                                        <th>Used</th>
+                                                        <th>Quota</th>
+                                                        <th>%</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for user in top_users %}
+                                                        <tr>
+                                                            <td>
+                                                                <a href="/admin/pages/employee/{{ user.id }}/change/" class="text-decoration-none">
+                                                                    {{ user.get_full_name|truncatechars:20 }}
+                                                                </a>
+                                                            </td>
+                                                            <td>{{ user.storage_used|filesizeformat }}</td>
+                                                            <td>{{ user.storage_quota|filesizeformat }}</td>
+                                                            <td>
+                                                                {% if user.storage_quota > 0 %}
+                                                                    <span class="badge {% if user.usage_percentage > 90 %}bg-danger{% elif user.usage_percentage > 75 %}bg-warning{% else %}bg-success{% endif %}">
+                                                                        {{ user.usage_percentage|floatformat:0 }}%
+                                                                    </span>
+                                                                {% else %}
+                                                                    <span class="badge bg-secondary">-</span>
+                                                                {% endif %}
+                                                            </td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-muted">No users with storage usage found.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent File Uploads -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-clock me-1"></i>Recent File Uploads
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if recent_files %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>File</th>
+                                                        <th>User</th>
+                                                        <th>Size</th>
+                                                        <th>Date</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for file in recent_files %}
+                                                        <tr>
+                                                            <td>{{ file.original_filename|truncatechars:20 }}</td>
+                                                            <td>
+                                                                <a href="/admin/pages/employee/{{ file.uploaded_by.id }}/change/" class="text-decoration-none">
+                                                                    {{ file.uploaded_by.get_full_name|truncatechars:15 }}
+                                                                </a>
+                                                            </td>
+                                                            <td>{{ file.file_size|filesizeformat }}</td>
+                                                            <td>{{ file.uploaded_at|date:"M d" }}</td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-muted">No recent file uploads found.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

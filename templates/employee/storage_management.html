@@ -97,26 +97,26 @@
                 <div class="row">
                     <div class="col-md-3">
                         <div class="stat-item">
-                            <div class="stat-value">{{ storage_stats.system.total|filesizeformat }}</div>
-                            <div class="stat-label">Total System Storage</div>
+                            <div class="stat-value">{{ storage_stats.allocation.total_allocated_display }}</div>
+                            <div class="stat-label">Total Allocated Storage</div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="stat-item">
-                            <div class="stat-value">{{ storage_stats.system.free|filesizeformat }}</div>
-                            <div class="stat-label">Available Space</div>
+                            <div class="stat-value">{{ storage_stats.total_user_storage_display }}</div>
+                            <div class="stat-label">Used by Users</div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="stat-item">
-                            <div class="stat-value">{{ storage_stats.total_allocated_display }}</div>
-                            <div class="stat-label">Total Allocated</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-item">
-                            <div class="stat-value">{{ storage_stats.quota_per_user_display }}</div>
+                            <div class="stat-value">{{ storage_stats.allocation.quota_per_user_display }}</div>
                             <div class="stat-label">Quota Per User</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-item">
+                            <div class="stat-value">{{ storage_stats.active_users }}</div>
+                            <div class="stat-label">Active Users</div>
                         </div>
                     </div>
                 </div>
@@ -141,8 +141,12 @@
                                 <td>{{ storage_stats.total_user_storage_display }}</td>
                             </tr>
                             <tr>
-                                <td><strong>Reserved for System:</strong></td>
-                                <td>1.0 GB</td>
+                                <td><strong>Total Allocated:</strong></td>
+                                <td>{{ allocation_gb }} GB</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Quota Per User:</strong></td>
+                                <td>{{ storage_stats.allocation.quota_per_user_display }}</td>
                             </tr>
                         </table>
                         
@@ -150,10 +154,10 @@
                             {% csrf_token %}
                             <div class="d-grid gap-2">
                                 <button type="submit" name="action" value="update_quotas" class="btn btn-primary">
-                                    <i class="fas fa-sync me-2"></i>Update User Quotas
+                                    <i class="fas fa-sync me-2"></i>Update All User Quotas
                                 </button>
                                 <button type="submit" name="action" value="recalculate_usage" class="btn btn-outline-secondary">
-                                    <i class="fas fa-calculator me-2"></i>Recalculate Usage
+                                    <i class="fas fa-calculator me-2"></i>Recalculate All Usage
                                 </button>
                             </div>
                         </form>
@@ -185,12 +189,12 @@
                     <div class="storage-card">
                         <h5 class="mb-3"><i class="fas fa-info-circle me-2"></i>Storage Information</h5>
                         <div class="alert alert-info">
-                            <h6>How Storage Allocation Works:</h6>
+                            <h6>Manual Storage Allocation:</h6>
                             <ul class="mb-0">
-                                <li>1GB is reserved for website operations</li>
-                                <li>Remaining space is divided equally among active users</li>
-                                <li>Quotas are automatically updated based on available space</li>
-                                <li>Minimum quota per user is 10MB</li>
+                                <li>Total allocated storage: {{ allocation_gb }} GB</li>
+                                <li>Storage is divided equally among {{ storage_stats.active_users }} active users</li>
+                                <li>Each user gets: {{ storage_stats.allocation.quota_per_user_display }}</li>
+                                <li>Use the dashboard to modify total allocation</li>
                             </ul>
                         </div>
                     </div>

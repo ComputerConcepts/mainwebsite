@@ -54,6 +54,13 @@ urlpatterns = [
     path('employee/applications/<uuid:application_id>/update-status/', views.admin_application_update_status, name='admin_application_update_status'),
     path('careers/<uuid:job_id>/', views.career_apply, name='career_apply'),
     
+    # Storage Management URLs for Employee Portal
+    path('employee/storage/overview/', views.admin_storage_overview, name='admin_storage_overview'),
+    path('employee/storage/update-quotas/', views.admin_update_storage_quotas, name='admin_update_storage_quotas'),
+    path('employee/storage/set-quota/<uuid:user_id>/', views.admin_set_user_quota, name='admin_set_user_quota'),
+    path('employee/storage/set-allocation/', views.admin_set_storage_allocation, name='admin_set_storage_allocation'),
+    path('employee/storage/my-storage/', views.user_storage_details, name='user_storage_details'),
+    
     # Admin Management URLs
     path('employee/admin/', views_admin.admin_dashboard, name='admin_dashboard'),
     path('employee/admin/users/', views_admin.user_management, name='user_management'),
@@ -116,4 +123,11 @@ urlpatterns = [
     path('api/ai/chat/', views_files.ai_chat, name='ai_chat'),
     path('api/ai/analyze/<uuid:file_id>/', views_files.analyze_file_ai, name='analyze_file_ai'),
     path('api/files/<uuid:file_id>/analysis/', views_files.get_file_analysis, name='get_file_analysis'),
+    
+    # Storage Management Admin URLs
+    path('admin/storage/update-quota/<int:user_id>/', views_admin.update_user_quota, name='admin_update_user_quota'),
+    path('admin/storage/recalculate/<int:user_id>/', views_admin.recalculate_storage, name='admin_recalculate_storage'),
+    path('admin/storage/view-files/<int:user_id>/', views_admin.view_user_files, name='admin_view_user_files'),
+    path('admin/storage/bulk-update/', views_admin.bulk_update_quotas, name='admin_bulk_update_quotas'),
+    path('admin/storage/overview/', views_admin.storage_overview, name='admin_storage_overview'),
 ]

@@ -1,0 +1,330 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}My Storage - Computer Concepts{% endblock %}
+
+{% block extra_css %}
+<style>
+    .storage-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+    }
+    
+    .storage-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+        border-left: 5px solid #667eea;
+    }
+    
+    .storage-progress {
+        height: 25px;
+        border-radius: 15px;
+        overflow: hidden;
+        margin: 1rem 0;
+        background-color: #f8f9fa;
+    }
+    
+    .file-item {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        transition: transform 0.2s ease;
+        border-left: 4px solid #e9ecef;
+    }
+    
+    .file-item:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.12);
+    }
+    
+    .storage-metric {
+        text-align: center;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    
+    .metric-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    
+    .file-icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        margin-right: 1rem;
+    }
+    
+    .file-type-pdf { background: #ff6b6b; color: white; }
+    .file-type-doc { background: #4dabf7; color: white; }
+    .file-type-image { background: #51cf66; color: white; }
+    .file-type-other { background: #868e96; color: white; }
+    
+    .quota-warning {
+        background: linear-gradient(135deg, #ffc107, #fd7e14);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    
+    .quota-critical {
+        background: linear-gradient(135deg, #dc3545, #c82333);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="storage-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-2"><i class="fas fa-chart-pie me-3"></i>My Storage</h1>
+                <p class="mb-0 opacity-75">Monitor your file storage usage and manage your quota</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <a href="{% url 'file_manager' %}" class="btn btn-light btn-lg">
+                    <i class="fas fa-folder me-2"></i>File Manager
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage Alerts -->
+    {% if storage_stats.percentage >= 90 %}
+    <div class="quota-critical">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+            <div>
+                <h5 class="mb-1">Storage Quota Critical</h5>
+                <p class="mb-0">You're using {{ storage_stats.percentage }}% of your storage quota. Please delete some files to free up space.</p>
+            </div>
+        </div>
+    </div>
+    {% elif storage_stats.percentage >= 75 %}
+    <div class="quota-warning">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-exclamation-circle fa-2x me-3"></i>
+            <div>
+                <h5 class="mb-1">Storage Quota Warning</h5>
+                <p class="mb-0">You're using {{ storage_stats.percentage }}% of your storage quota. Consider cleaning up old files.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Storage Overview -->
+    <div class="storage-card">
+        <h3 class="mb-4"><i class="fas fa-hdd me-2"></i>Storage Overview</h3>
+        
+        <!-- Storage Progress Bar -->
+        <div class="mb-4">
+            <div class="d-flex justify-content-between mb-2">
+                <span class="fw-bold">Storage Usage</span>
+                <span class="text-muted">{{ storage_stats.used }} / {{ storage_stats.quota }}</span>
+            </div>
+            <div class="storage-progress">
+                {% if storage_stats.percentage >= 90 %}
+                    <div class="progress-bar bg-danger" style="width: {{ storage_stats.percentage }}%"></div>
+                {% elif storage_stats.percentage >= 75 %}
+                    <div class="progress-bar bg-warning" style="width: {{ storage_stats.percentage }}%"></div>
+                {% else %}
+                    <div class="progress-bar bg-success" style="width: {{ storage_stats.percentage }}%"></div>
+                {% endif %}
+            </div>
+            <div class="text-center mt-2">
+                <span class="badge bg-primary">{{ storage_stats.percentage }}% Used</span>
+            </div>
+        </div>
+
+        <!-- Storage Metrics -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="storage-metric">
+                    <div class="metric-value text-info">{{ storage_stats.used }}</div>
+                    <div class="metric-label">Used Storage</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="storage-metric">
+                    <div class="metric-value text-success">{{ storage_stats.available }}</div>
+                    <div class="metric-label">Available Storage</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="storage-metric">
+                    <div class="metric-value text-primary">{{ total_files }}</div>
+                    <div class="metric-label">Total Files</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="storage-metric">
+                    <div class="metric-value text-warning">{{ avg_file_size }}</div>
+                    <div class="metric-label">Average File Size</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Breakdown -->
+    <div class="storage-card">
+        <h3 class="mb-4"><i class="fas fa-files me-2"></i>My Files</h3>
+        
+        {% if user_files %}
+            <div class="row">
+                {% for file in user_files %}
+                <div class="col-12">
+                    <div class="file-item">
+                        <div class="d-flex align-items-center">
+                            <div class="file-icon file-type-{% if file.file_type == 'pdf' %}pdf{% elif file.file_type in 'doc,docx' %}doc{% elif file.file_type in 'jpg,jpeg,png,gif' %}image{% else %}other{% endif %}">
+                                {% if file.file_type == 'pdf' %}
+                                    <i class="fas fa-file-pdf"></i>
+                                {% elif file.file_type in 'doc,docx' %}
+                                    <i class="fas fa-file-word"></i>
+                                {% elif file.file_type in 'jpg,jpeg,png,gif' %}
+                                    <i class="fas fa-file-image"></i>
+                                {% else %}
+                                    <i class="fas fa-file"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ file.name }}</h6>
+                                <div class="small text-muted">
+                                    <span>{{ file.get_file_size_display }}</span>
+                                    <span class="mx-2">•</span>
+                                    <span>{{ file.created_at|date:"M d, Y" }}</span>
+                                    {% if file.folder %}
+                                        <span class="mx-2">•</span>
+                                        <span><i class="fas fa-folder me-1"></i>{{ file.folder.name }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <a href="{% url 'view_file' file.id %}" class="btn btn-sm btn-outline-primary me-2">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'download_file' file.id %}" class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Show pagination if needed -->
+            {% if user_files|length >= 20 %}
+            <div class="text-center mt-3">
+                <a href="{% url 'file_manager' %}" class="btn btn-outline-primary">
+                    View All Files <i class="fas fa-arrow-right ms-2"></i>
+                </a>
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No Files Yet</h5>
+                <p class="text-muted">Upload your first file to get started!</p>
+                <a href="{% url 'file_manager' %}" class="btn btn-primary">
+                    <i class="fas fa-upload me-2"></i>Upload Files
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Largest Files Section -->
+    {% if largest_file %}
+    <div class="storage-card">
+        <h4 class="mb-3"><i class="fas fa-weight-hanging me-2"></i>Largest File</h4>
+        <div class="file-item">
+            <div class="d-flex align-items-center">
+                <div class="file-icon file-type-{% if largest_file.file_type == 'pdf' %}pdf{% elif largest_file.file_type in 'doc,docx' %}doc{% elif largest_file.file_type in 'jpg,jpeg,png,gif' %}image{% else %}other{% endif %}">
+                    {% if largest_file.file_type == 'pdf' %}
+                        <i class="fas fa-file-pdf"></i>
+                    {% elif largest_file.file_type in 'doc,docx' %}
+                        <i class="fas fa-file-word"></i>
+                    {% elif largest_file.file_type in 'jpg,jpeg,png,gif' %}
+                        <i class="fas fa-file-image"></i>
+                    {% else %}
+                        <i class="fas fa-file"></i>
+                    {% endif %}
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="mb-1">{{ largest_file.name }}</h6>
+                    <div class="small text-muted">
+                        <span class="badge bg-warning">{{ largest_file.get_file_size_display }}</span>
+                        <span class="mx-2">•</span>
+                        <span>{{ largest_file.created_at|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+                <div>
+                    <a href="{% url 'view_file' largest_file.id %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-eye me-1"></i>View
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Storage Tips -->
+    <div class="storage-card">
+        <h4 class="mb-3"><i class="fas fa-lightbulb me-2"></i>Storage Tips</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <ul class="list-unstyled">
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Regularly review and delete old files</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Use folders to organize your files</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Share files instead of duplicating them</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <ul class="list-unstyled">
+                    <li class="mb-2"><i class="fas fa-info text-info me-2"></i>Compress large files before uploading</li>
+                    <li class="mb-2"><i class="fas fa-info text-info me-2"></i>Monitor your quota regularly</li>
+                    <li class="mb-2"><i class="fas fa-info text-info me-2"></i>Contact admin if you need more space</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add smooth animations
+    const fileItems = document.querySelectorAll('.file-item');
+    fileItems.forEach((item, index) => {
+        item.style.animationDelay = `${index * 0.1}s`;
+        item.classList.add('animate__animated', 'animate__fadeInUp');
+    });
+});
+</script>
+{% endblock %}

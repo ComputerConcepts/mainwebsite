@@ -38,10 +38,10 @@ class TicketAdmin(admin.ModelAdmin):
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ['employee_id', 'get_full_name', 'get_email', 'department', 'position', 'role', 'is_active', 'get_verification_status', 'hire_date', 'last_login_date']
+    list_display = ['employee_id', 'get_full_name', 'get_email', 'department', 'position', 'role', 'is_active', 'get_verification_status', 'get_storage_info', 'hire_date', 'last_login_date']
     list_filter = ['department', 'position', 'role', 'is_active', 'is_email_verified', 'hire_date', 'created_at']
     search_fields = ['employee_id', 'user__first_name', 'user__last_name', 'user__email', 'department', 'position', 'phone']
-    readonly_fields = ['id', 'hire_date', 'created_at', 'updated_at', 'last_login_date', 'verification_actions']
+    readonly_fields = ['id', 'hire_date', 'created_at', 'updated_at', 'last_login_date', 'verification_actions', 'storage_actions']
     date_hierarchy = 'hire_date'
     list_per_page = 50
     
@@ -51,6 +51,10 @@ class EmployeeAdmin(admin.ModelAdmin):
         }),
         ('Work Information', {
             'fields': ('department', 'position', 'role', 'manager', 'salary', 'hire_date')
+        }),
+        ('Storage Management', {
+            'fields': ('storage_quota', 'storage_used', 'storage_actions'),
+            'description': 'Manage user storage quotas and usage. Storage is automatically calculated.'
         }),
         ('Account Status', {
             'fields': ('is_active', 'is_email_verified', 'email_verification_token', 'verification_actions'),
@@ -124,6 +128,64 @@ class EmployeeAdmin(admin.ModelAdmin):
         return mark_safe('<br>'.join(buttons)) if buttons else "-"
     
     verification_actions.short_description = 'Quick Actions'
+    
+    def get_storage_info(self, obj):
+        """Display storage usage information"""
+        if obj.storage_quota and obj.storage_used is not None:
+            percentage = obj.get_storage_percentage()
+            used_display = obj.get_storage_used_display()
+            quota_display = obj.get_storage_quota_display()
+            
+            # Color based on usage
+            if percentage < 70:
+                color = 'green'
+            elif percentage < 90:
+                color = 'orange'
+            else:
+                color = 'red'
+            
+            return format_html(
+                '<span style="color: {}; font-weight: bold;">{:.1f}%</span><br>'
+                '<small>{} / {}</small>',
+                color, percentage, used_display, quota_display
+            )
+        else:
+            return format_html(
+                '<span style="color: gray;">Not set</span>'
+            )
+    get_storage_info.short_description = 'Storage Usage'
+    
+    def storage_actions(self, obj):
+        """Display storage management action buttons"""
+        from django.urls import reverse
+        from django.utils.safestring import mark_safe
+        
+        if not obj.pk:  # New object, no actions available
+            return "-"
+        
+        buttons = []
+        
+        # Update quota button
+        update_quota_url = reverse('admin:update_user_quota', args=[obj.pk])
+        buttons.append(
+            f'<a href="{update_quota_url}" class="button" style="background: #007cba; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">📊 Update Quota</a>'
+        )
+        
+        # Recalculate usage button
+        recalc_usage_url = reverse('admin:recalculate_storage', args=[obj.pk])
+        buttons.append(
+            f'<a href="{recalc_usage_url}" class="button" style="background: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 5px;">🔄 Recalc Usage</a>'
+        )
+        
+        # View files button
+        view_files_url = reverse('admin:view_user_files', args=[obj.pk])
+        buttons.append(
+            f'<a href="{view_files_url}" class="button" style="background: #6c757d; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;">📁 View Files</a>'
+        )
+        
+        return mark_safe('<br>'.join(buttons)) if buttons else "-"
+    
+    storage_actions.short_description = 'Storage Actions'
     
     def get_role_display(self, obj):
         colors = {
