@@ -12,7 +12,7 @@ from django.db.models import Q, Count
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from datetime import timedelta
+from datetime import timedelta, datetime
 import json
 
 from .models import (
@@ -400,9 +400,19 @@ def ai_settings(request):
         quiet_end = request.POST.get('quiet_hours_end')
         
         if quiet_start:
-            preferences.quiet_hours_start = quiet_start
+            try:
+                # Parse the time string into a time object
+                time_obj = datetime.strptime(quiet_start, '%H:%M').time()
+                preferences.quiet_hours_start = time_obj
+            except ValueError:
+                pass  # Keep existing value if parsing fails
         if quiet_end:
-            preferences.quiet_hours_end = quiet_end
+            try:
+                # Parse the time string into a time object
+                time_obj = datetime.strptime(quiet_end, '%H:%M').time()
+                preferences.quiet_hours_end = time_obj
+            except ValueError:
+                pass  # Keep existing value if parsing fails
         
         # Category preferences
         preferences.security_notifications = request.POST.get('security_notifications') == 'on'
@@ -417,14 +427,30 @@ def ai_settings(request):
         
         # Update notification engine preferences
         ai_service = get_ai_workflow_service()
+        
+        # Safely format time fields
+        start_time = preferences.quiet_hours_start
+        end_time = preferences.quiet_hours_end
+        
+        # Handle both time objects and string values
+        if hasattr(start_time, 'strftime'):
+            start_str = start_time.strftime('%H:%M')
+        else:
+            start_str = str(start_time) if start_time else '22:00'
+            
+        if hasattr(end_time, 'strftime'):
+            end_str = end_time.strftime('%H:%M')
+        else:
+            end_str = str(end_time) if end_time else '08:00'
+        
         ai_service.notification_engine.set_user_preferences(
             employee.user.username,
             {
                 'email_notifications': preferences.email_notifications,
                 'push_notifications': preferences.push_notifications,
                 'quiet_hours': {
-                    'start': preferences.quiet_hours_start.strftime('%H:%M'),
-                    'end': preferences.quiet_hours_end.strftime('%H:%M')
+                    'start': start_str,
+                    'end': end_str
                 },
                 'priority_threshold': preferences.priority_threshold,
                 'categories': preferences.get_category_preferences()
@@ -566,6 +592,9 @@ def ai_workflow_execution_detail(request, execution_id):
         'workflow_rule': execution.workflow_rule,
         'context_data': json.dumps(execution.context_data, indent=2),
         'result_data': json.dumps(execution.result_data, indent=2),
+        'completed_executions_count': execution.workflow_rule.executions.filter(status='completed').count(),
+        'failed_executions_count': execution.workflow_rule.executions.filter(status='failed').count(),
+        'total_executions_count': execution.workflow_rule.executions.count(),
     }
     
     return render(request, 'employee/ai_workflow_execution.html', context)

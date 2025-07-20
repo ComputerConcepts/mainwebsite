@@ -246,18 +246,18 @@
                 <div class="card-body">
                     <div class="row text-center">
                         <div class="col-4">
-                            <h5 class="text-primary">{{ workflow_rule.executions.count }}</h5>
+                            <h5 class="text-primary">{{ total_executions_count }}</h5>
                             <small class="text-muted">Total Runs</small>
                         </div>
                         <div class="col-4">
                             <h5 class="text-success">
-                                {{ workflow_rule.executions.filter:status='completed'|length }}
+                                {{ completed_executions_count }}
                             </h5>
                             <small class="text-muted">Successful</small>
                         </div>
                         <div class="col-4">
                             <h5 class="text-danger">
-                                {{ workflow_rule.executions.filter:status='failed'|length }}
+                                {{ failed_executions_count }}
                             </h5>
                             <small class="text-muted">Failed</small>
                         </div>
@@ -267,12 +267,20 @@
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span>Success Rate</span>
                             <span class="fw-bold">
-                                {% widthratio workflow_rule.executions.filter:status='completed'|length workflow_rule.executions.count 100 %}%
+                                {% if total_executions_count > 0 %}
+                                    {% widthratio completed_executions_count total_executions_count 100 %}%
+                                {% else %}
+                                    0%
+                                {% endif %}
                             </span>
                         </div>
                         <div class="progress">
                             <div class="progress-bar bg-success" role="progressbar" 
-                                 style="width: {% widthratio workflow_rule.executions.filter:status='completed'|length workflow_rule.executions.count 100 %}%"></div>
+                                 {% if total_executions_count > 0 %}
+                                     style="width: {% widthratio completed_executions_count total_executions_count 100 %}%"
+                                 {% else %}
+                                     style="width: 0%"
+                                 {% endif %}></div>
                         </div>
                     </div>
                 </div>
