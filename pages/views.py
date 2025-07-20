@@ -1,4 +1,5 @@
 from django.shortcuts import render, HttpResponse, redirect, get_object_or_404
+from django.http import JsonResponse
 from .models import ContactForm, Events, Invoice, Ticket, Employee, Career, JobPosting
 from django.contrib.auth.models import User
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -1201,6 +1202,51 @@ def admin_job_delete(request, job_id):
     }
     
     return render(request, 'employee/job_confirm_delete.html', context)
+
+@login_required
+def admin_job_toggle_status(request, job_id):
+    """Employee portal - toggle job posting status (activate/deactivate)"""
+    if request.method == 'POST':
+        try:
+            employee = get_object_or_404(Employee, user=request.user)
+            job = get_object_or_404(JobPosting, id=job_id)
+            
+            if not is_hr_or_admin(request.user):
+                return JsonResponse({
+                    'success': False, 
+                    'message': 'Access denied. Only HR and admin users can toggle job status.'
+                }, status=403)
+            
+            # Toggle the job status
+            job.is_active = not job.is_active
+            job.save()
+            
+            # Create appropriate message
+            status_text = 'activated' if job.is_active else 'deactivated'
+            message = f'Job posting "{job.title}" has been {status_text} successfully.'
+            
+            return JsonResponse({
+                'success': True,
+                'message': message,
+                'is_active': job.is_active,
+                'status_text': status_text
+            })
+            
+        except Employee.DoesNotExist:
+            return JsonResponse({
+                'success': False, 
+                'message': 'Employee profile not found.'
+            }, status=404)
+        except Exception as e:
+            return JsonResponse({
+                'success': False, 
+                'message': f'An error occurred: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({
+        'success': False, 
+        'message': 'Invalid request method.'
+    }, status=405)
 
 def career_apply(request, job_id):
     """Application form for specific job posting"""

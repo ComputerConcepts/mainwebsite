@@ -1,4 +1,5 @@
 {% extends 'employee/base.html' %}
+{% load static %}
 
 {% block title %}{{ job.title }} - Job Details{% endblock %}
 
@@ -133,6 +134,7 @@
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="row">
     <div class="col-12">
         <div class="card">
@@ -371,10 +373,37 @@
 <script>
 function toggleJobStatus(jobId, activate) {
     if (confirm(`Are you sure you want to ${activate ? 'activate' : 'deactivate'} this job posting?`)) {
-        // This would typically be an AJAX call to update the job status
-        // For now, we'll just show a message
-        alert(`Job posting ${activate ? 'activated' : 'deactivated'} successfully!`);
-        location.reload();
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Make AJAX call to toggle status
+        fetch(`/employee/jobs/${jobId}/toggle-status/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                action: activate ? 'activate' : 'deactivate'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                alert(data.message);
+                // Reload the page to reflect the status change
+                location.reload();
+            } else {
+                // Show error message
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating the job status. Please try again.');
+        });
     }
 }
 </script>

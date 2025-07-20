@@ -51,6 +51,7 @@ urlpatterns = [
     path('employee/jobs/<uuid:job_id>/', views.admin_job_detail, name='admin_job_detail'),
     path('employee/jobs/<uuid:job_id>/edit/', views.admin_job_edit, name='admin_job_edit'),
     path('employee/jobs/<uuid:job_id>/delete/', views.admin_job_delete, name='admin_job_delete'),
+    path('employee/jobs/<uuid:job_id>/toggle-status/', views.admin_job_toggle_status, name='admin_job_toggle_status'),
     path('employee/applications/<uuid:application_id>/', views.admin_application_detail, name='admin_application_detail'),
     path('employee/applications/<uuid:application_id>/update-status/', views.admin_application_update_status, name='admin_application_update_status'),
     path('careers/<uuid:job_id>/', views.career_apply, name='career_apply'),
