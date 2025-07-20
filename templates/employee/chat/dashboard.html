@@ -1,0 +1,248 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Chat - Employee Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-sidebar {
+        height: calc(100vh - 120px);
+        overflow-y: auto;
+        border-right: 1px solid #e0e0e0;
+    }
+    
+    .chat-main {
+        height: calc(100vh - 120px);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .channel-item, .dm-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        text-decoration: none;
+        color: #333;
+        border-radius: 6px;
+        margin: 2px 0;
+        transition: background-color 0.2s;
+    }
+    
+    .channel-item:hover, .dm-item:hover {
+        background-color: #f8f9fa;
+        text-decoration: none;
+        color: #333;
+    }
+    
+    .channel-item.active, .dm-item.active {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .channel-icon, .dm-avatar {
+        width: 32px;
+        height: 32px;
+        margin-right: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        font-weight: bold;
+    }
+    
+    .unread-badge {
+        background-color: #dc3545;
+        color: white;
+        border-radius: 10px;
+        padding: 2px 6px;
+        font-size: 11px;
+        margin-left: auto;
+    }
+    
+    .online-indicator {
+        width: 8px;
+        height: 8px;
+        background-color: #28a745;
+        border-radius: 50%;
+        margin-left: auto;
+    }
+    
+    .chat-welcome {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        text-align: center;
+        color: #6c757d;
+    }
+    
+    .sidebar-section {
+        margin-bottom: 20px;
+    }
+    
+    .sidebar-section h6 {
+        color: #6c757d;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+        padding: 0 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Chat Sidebar -->
+        <div class="col-md-3 chat-sidebar">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Chat</h5>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{% url 'create_channel' %}">
+                            <i class="fas fa-hashtag me-2"></i>Create Channel
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="startDirectMessage()">
+                            <i class="fas fa-user me-2"></i>Start Direct Message
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Channels -->
+            <div class="sidebar-section">
+                <h6>Channels</h6>
+                {% for channel in channels %}
+                <a href="{% url 'chat_channel' channel.id %}" class="channel-item">
+                    <div class="channel-icon">#</div>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold">{{ channel.name }}</div>
+                        {% if channel.get_latest_message %}
+                        <small class="text-muted">{{ channel.get_latest_message.created_at|timesince }} ago</small>
+                        {% endif %}
+                    </div>
+                    {% comment %}
+                    {% if channel.unread_count %}
+                    <span class="unread-badge">{{ channel.unread_count }}</span>
+                    {% endif %}
+                    {% endcomment %}
+                </a>
+                {% empty %}
+                <p class="text-muted small px-3">No channels yet</p>
+                {% endfor %}
+            </div>
+            
+            <!-- Direct Messages -->
+            <div class="sidebar-section">
+                <h6>Direct Messages</h6>
+                {% for dm in recent_dms %}
+                {% comment %} This would need more complex logic to show the other participant {% endcomment %}
+                {% endfor %}
+                
+                <!-- Online Users -->
+                <h6 class="mt-3">Online Now</h6>
+                {% for online_user in online_employees %}
+                <a href="{% url 'chat_direct_message' online_user.id %}" class="dm-item">
+                    <div class="dm-avatar">{{ online_user.user.first_name|first|upper }}</div>
+                    <div class="flex-grow-1">
+                        <div>{{ online_user.user.get_full_name }}</div>
+                        <small class="text-muted">{{ online_user.department }}</small>
+                    </div>
+                    <div class="online-indicator"></div>
+                </a>
+                {% empty %}
+                <p class="text-muted small px-3">No one online</p>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Chat Main Area -->
+        <div class="col-md-9 chat-main">
+            <div class="chat-welcome">
+                <div>
+                    <i class="fas fa-comments fa-4x mb-3 text-muted"></i>
+                    <h4>Welcome to Employee Chat</h4>
+                    <p class="text-muted">Select a channel or start a direct message to begin chatting.</p>
+                    <a href="{% url 'create_channel' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Create Your First Channel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start DM Modal -->
+<div class="modal fade" id="startDMModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Start Direct Message</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="dmRecipient" class="form-label">Select Employee</label>
+                    <select class="form-select" id="dmRecipient">
+                        <option value="">Choose an employee...</option>
+                        {% for emp in online_employees %}
+                        <option value="{{ emp.id }}">{{ emp.user.get_full_name }} ({{ emp.department }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="openDirectMessage()">Start Chat</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function startDirectMessage() {
+    new bootstrap.Modal(document.getElementById('startDMModal')).show();
+}
+
+function openDirectMessage() {
+    const recipientId = document.getElementById('dmRecipient').value;
+    if (recipientId) {
+        window.location.href = `/employee/chat/dm/${recipientId}/`;
+    }
+}
+
+// Auto-refresh notifications every 30 seconds
+setInterval(function() {
+    fetch('/employee/chat/notifications/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.unread_count > 0) {
+                // Update notification indicator
+                updateNotificationBadge(data.unread_count);
+            }
+        })
+        .catch(error => console.log('Notification check failed:', error));
+}, 30000);
+
+function updateNotificationBadge(count) {
+    // Add a notification badge to the chat nav item
+    let chatNav = document.querySelector('a[href*="chat"]');
+    if (chatNav && count > 0) {
+        let badge = chatNav.querySelector('.badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'badge bg-danger ms-1';
+            chatNav.appendChild(badge);
+        }
+        badge.textContent = count;
+    }
+}
+</script>
+{% endblock %}

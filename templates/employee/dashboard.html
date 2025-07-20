@@ -1022,6 +1022,122 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Chat Overview Section -->
+        <div class="row mt-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-comments me-2"></i>
+                                Recent Messages
+                            </h5>
+                            <div>
+                                {% if chat_stats.unread_notifications > 0 %}
+                                    <span class="badge bg-danger me-2">{{ chat_stats.unread_notifications }} unread</span>
+                                {% endif %}
+                                <a href="{% url 'chat_dashboard' %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-comments me-1"></i>Open Chat
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if chat_stats.recent_messages %}
+                            {% for message in chat_stats.recent_messages %}
+                            <div class="d-flex align-items-start mb-3 p-2 border rounded">
+                                <div class="flex-shrink-0">
+                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+                                         style="width: 40px; height: 40px;">
+                                        {{ message.sender.user.first_name|first|upper }}
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <div class="d-flex justify-content-between align-items-baseline">
+                                        <h6 class="mb-1">{{ message.sender.user.get_full_name }}</h6>
+                                        <small class="text-muted">{{ message.created_at|timesince }} ago</small>
+                                    </div>
+                                    {% if message.channel %}
+                                        <small class="text-muted">in #{{ message.channel.name }}</small>
+                                    {% else %}
+                                        <small class="text-muted">direct message</small>
+                                    {% endif %}
+                                    <p class="mb-0 text-truncate">{{ message.content|truncatechars:100 }}</p>
+                                </div>
+                                <div class="flex-shrink-0">
+                                    {% if message.channel %}
+                                        <a href="{% url 'chat_channel' message.channel.id %}" class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-reply"></i>
+                                        </a>
+                                    {% else %}
+                                        <a href="{% url 'chat_direct_message' message.sender.id %}" class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-reply"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-comments text-muted" style="font-size: 3rem;"></i>
+                                <p class="text-muted mt-3">No recent messages</p>
+                                <a href="{% url 'chat_dashboard' %}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-1"></i>Start Chatting
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users me-2"></i>
+                            Online Now
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if chat_stats.online_employees %}
+                            {% for employee_online in chat_stats.online_employees %}
+                            <div class="d-flex align-items-center mb-3 p-2 border rounded">
+                                <div class="flex-shrink-0">
+                                    <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center"
+                                         style="width: 32px; height: 32px; font-size: 14px;">
+                                        {{ employee_online.user.first_name|first|upper }}
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="mb-0">{{ employee_online.user.get_full_name }}</h6>
+                                    <small class="text-muted">{{ employee_online.department }}</small>
+                                </div>
+                                <div class="flex-shrink-0">
+                                    <a href="{% url 'chat_direct_message' employee_online.id %}" class="btn btn-outline-success btn-sm">
+                                        <i class="fas fa-comment"></i>
+                                    </a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-3">
+                                <i class="fas fa-user-clock text-muted" style="font-size: 2rem;"></i>
+                                <p class="text-muted mt-2">No one online right now</p>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="mt-3 text-center">
+                            <small class="text-muted">{{ chat_stats.channels_count }} channels available</small>
+                            <br>
+                            <a href="{% url 'create_channel' %}" class="btn btn-outline-primary btn-sm mt-2">
+                                <i class="fas fa-plus me-1"></i>Create Channel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Set Storage Allocation Modal -->

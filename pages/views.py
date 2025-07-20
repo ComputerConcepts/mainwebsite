@@ -660,6 +660,31 @@ def employee_dashboard(request):
             ).order_by('-created_at')[:3],
         }
         
+        # Chat statistics
+        from .models import ChatChannel, ChatMessage, ChatNotification
+        from django.db.models import Q
+        user_channels = ChatChannel.objects.filter(members=employee, is_active=True)
+        recent_messages = ChatMessage.objects.filter(
+            Q(channel__in=user_channels) | 
+            Q(recipient=employee, channel__isnull=True)
+        ).exclude(sender=employee).order_by('-created_at')[:5]
+        
+        unread_chat_notifications = ChatNotification.objects.filter(
+            recipient=employee, is_read=False
+        ).count()
+        
+        # Get online employees (simplified - last 15 minutes activity)
+        online_employees = Employee.objects.filter(
+            user__last_login__gte=timezone.now() - timezone.timedelta(minutes=15)
+        ).exclude(id=employee.id)[:5]
+        
+        chat_stats = {
+            'channels_count': user_channels.count(),
+            'recent_messages': recent_messages,
+            'unread_notifications': unread_chat_notifications,
+            'online_employees': online_employees,
+        }
+        
         # HR statistics (if user is HR)
         context = {
             'employee': employee,
@@ -675,6 +700,7 @@ def employee_dashboard(request):
             'recent_file_activities': recent_file_activities,
             'storage_stats': storage_stats,
             'ai_stats': ai_stats,
+            'chat_stats': chat_stats,
         }
         
         # Add HR-specific statistics if user is HR

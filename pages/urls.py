@@ -5,6 +5,7 @@ from . import views_boards
 from . import views_admin
 from . import views_files
 from . import views_ai
+from . import views_chat
 
 
 urlpatterns = [
@@ -149,4 +150,13 @@ urlpatterns = [
     path('admin/storage/view-files/<int:user_id>/', views_admin.view_user_files, name='admin_view_user_files'),
     path('admin/storage/bulk-update/', views_admin.bulk_update_quotas, name='admin_bulk_update_quotas'),
     path('admin/storage/overview/', views_admin.storage_overview, name='admin_storage_overview'),
+    
+    # Chat URLs
+    path('employee/chat/', views_chat.chat_dashboard, name='chat_dashboard'),
+    path('employee/chat/channel/<uuid:channel_id>/', views_chat.chat_channel, name='chat_channel'),
+    path('employee/chat/dm/<uuid:recipient_id>/', views_chat.chat_direct_message, name='chat_direct_message'),
+    path('employee/chat/create/', views_chat.create_channel, name='create_channel'),
+    path('employee/chat/send/', views_chat.send_message, name='send_message'),
+    path('employee/chat/notifications/', views_chat.chat_notifications, name='chat_notifications'),
+    path('employee/chat/notifications/<uuid:notification_id>/read/', views_chat.mark_notification_read, name='mark_notification_read'),
 ]

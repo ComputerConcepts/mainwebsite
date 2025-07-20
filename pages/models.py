@@ -979,3 +979,126 @@ class AIFileAnalysis(models.Model):
         """Get queue statistics"""
         from django.db.models import Count
         return cls.objects.values('status').annotate(count=Count('status'))
+
+
+class ChatChannel(models.Model):
+    """Chat channels for group conversations"""
+    CHANNEL_TYPES = [
+        ('general', 'General'),
+        ('department', 'Department'),
+        ('project', 'Project'),
+        ('private', 'Private Group'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    channel_type = models.CharField(max_length=20, choices=CHANNEL_TYPES, default='general')
+    created_by = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='created_channels')
+    members = models.ManyToManyField('Employee', through='ChatChannelMembership', related_name='chat_channels')
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['name']
+        
+    def __str__(self):
+        return f"#{self.name}"
+    
+    def get_latest_message(self):
+        return self.messages.order_by('-created_at').first()
+    
+    def get_member_count(self):
+        return self.members.count()
+
+
+class ChatChannelMembership(models.Model):
+    """Through model for channel membership with additional data"""
+    channel = models.ForeignKey(ChatChannel, on_delete=models.CASCADE)
+    employee = models.ForeignKey('Employee', on_delete=models.CASCADE)
+    joined_at = models.DateTimeField(auto_now_add=True)
+    is_admin = models.BooleanField(default=False)
+    last_read_at = models.DateTimeField(default=timezone.now)
+    
+    class Meta:
+        unique_together = ['channel', 'employee']
+    
+    def get_unread_count(self):
+        return self.channel.messages.filter(
+            created_at__gt=self.last_read_at
+        ).count()
+
+
+class ChatMessage(models.Model):
+    """Individual chat messages"""
+    MESSAGE_TYPES = [
+        ('text', 'Text'),
+        ('file', 'File'),
+        ('system', 'System'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    channel = models.ForeignKey(ChatChannel, on_delete=models.CASCADE, related_name='messages', null=True, blank=True)
+    sender = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='sent_messages')
+    recipient = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='received_messages', null=True, blank=True)
+    message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES, default='text')
+    content = models.TextField()
+    file_attachment = models.FileField(upload_to='chat_files/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    is_edited = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    reply_to = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        target = f"#{self.channel.name}" if self.channel else f"@{self.recipient.user.username}"
+        return f"{self.sender.user.username} → {target}: {self.content[:50]}..."
+    
+    def is_direct_message(self):
+        return self.recipient is not None and self.channel is None
+    
+    def mark_as_edited(self):
+        self.is_edited = True
+        self.edited_at = timezone.now()
+        self.save()
+
+
+class ChatMessageRead(models.Model):
+    """Track which messages have been read by which users"""
+    message = models.ForeignKey(ChatMessage, on_delete=models.CASCADE, related_name='read_receipts')
+    reader = models.ForeignKey('Employee', on_delete=models.CASCADE)
+    read_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['message', 'reader']
+        
+    def __str__(self):
+        return f"{self.reader.user.username} read message at {self.read_at}"
+
+
+class ChatNotification(models.Model):
+    """Notifications for chat messages"""
+    NOTIFICATION_TYPES = [
+        ('message', 'New Message'),
+        ('mention', 'Mentioned'),
+        ('channel_invite', 'Channel Invite'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='chat_notifications')
+    sender = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='sent_chat_notifications')
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
+    message = models.ForeignKey(ChatMessage, on_delete=models.CASCADE, null=True, blank=True)
+    channel = models.ForeignKey(ChatChannel, on_delete=models.CASCADE, null=True, blank=True)
+    content = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"Chat notification for {self.recipient.user.username}: {self.content[:50]}..."
