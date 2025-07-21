@@ -84,7 +84,7 @@ def file_manager(request):
         folders = FileFolder.objects.none()  # No folders in recent view
         files = FileDocument.objects.filter(
             Q(uploaded_by=employee) | Q(shared_with=employee) | Q(shares__shared_with=employee)
-        ).order_by('-last_accessed')[:20].distinct()  # Show last 20 accessed files
+        ).distinct().order_by('-last_accessed')[:20]  # Show last 20 accessed files
     elif current_folder:
         # Show folders that are children of current folder AND user has access to
         folders = FileFolder.objects.filter(
@@ -129,7 +129,7 @@ def file_manager(request):
     # Get recent files
     recent_files = FileDocument.objects.filter(
         Q(uploaded_by=employee) | Q(shared_with=employee) | Q(shares__shared_with=employee)
-    ).order_by('-last_accessed')[:10].distinct()
+    ).distinct().order_by('-last_accessed')[:10]
     
     # Get file statistics
     total_files = FileDocument.objects.filter(uploaded_by=employee).count()
