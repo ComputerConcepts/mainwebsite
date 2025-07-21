@@ -285,9 +285,11 @@
                             <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); downloadFile('{{ file.id }}')" title="Download">
                                 <i class="fas fa-download"></i>
                             </button>
+                            {% if file.uploaded_by == request.user.employee %}
                             <button class="btn btn-sm btn-outline-success" onclick="event.stopPropagation(); shareFile('{{ file.id }}')" title="Share">
                                 <i class="fas fa-share-alt"></i>
                             </button>
+                            {% endif %}
                             {% if file.uploaded_by == request.user.employee %}
                             <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFile('{{ file.id }}')" title="Delete">
                                 <i class="fas fa-trash"></i>
