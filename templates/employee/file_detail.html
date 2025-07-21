@@ -504,7 +504,6 @@
 </div>
 
 <script>
-<script>
 // PDF Loading function
 function loadPDF(url) {
     const container = document.getElementById('pdf-container');
@@ -765,29 +764,85 @@ function updatePermission(shareId, newPermission) {
 }
 
 function revokeAccess(shareId, userName) {
-    if (confirm(`Remove access for ${userName}?`)) {
-        fetch(`/employee/files/unshare/{{ file.id }}/${shareId}/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/json',
+    console.log(`🔧 Revoking access for ${userName}, Share ID: ${shareId}`);
+    
+    if (!confirm(`Remove access for ${userName}?`)) {
+        console.log('🚫 User cancelled revoke action');
+        return;
+    }
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken || !csrfToken.value) {
+        console.error('❌ CSRF token not found');
+        alert('Error: Security token not found. Please refresh the page and try again.');
+        return;
+    }
+    
+    console.log(`📡 Making request to: /employee/files/unshare/{{ file.id }}/${shareId}/`);
+    
+    // Show loading state on button
+    const shareItem = document.querySelector(`[data-share-id="${shareId}"]`);
+    const revokeButton = shareItem ? shareItem.querySelector('button[onclick*="revokeAccess"]') : null;
+    
+    if (revokeButton) {
+        revokeButton.disabled = true;
+        revokeButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    }
+    
+    fetch(`/employee/files/unshare/{{ file.id }}/${shareId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken.value,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        console.log(`📡 Response: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        console.log('📡 Response data:', data);
+        
+        if (data.success) {
+            console.log(`✅ Successfully revoked access for ${userName}`);
+            alert(`Access removed for ${userName}`);
+            
+            // Remove from both sidebar and modal
+            const shareItems = document.querySelectorAll(`[data-share-id="${shareId}"]`);
+            shareItems.forEach(item => {
+                item.style.transition = 'opacity 0.3s ease';
+                item.style.opacity = '0';
+                setTimeout(() => item.remove(), 300);
+            });
+            
+            // Also remove from sidebar if it exists
+            const sidebarRevokeButton = document.querySelector(`button[onclick*="revokeAccess('${shareId}'"]`);
+            if (sidebarRevokeButton) {
+                const sidebarShareItem = sidebarRevokeButton.closest('.d-flex');
+                if (sidebarShareItem) {
+                    sidebarShareItem.style.transition = 'opacity 0.3s ease';
+                    sidebarShareItem.style.opacity = '0';
+                    setTimeout(() => sidebarShareItem.remove(), 300);
+                }
             }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(`Access removed for ${userName}`);
-                // Remove the share item from the UI
-                const shareItem = document.querySelector(`[data-share-id="${shareId}"]`);
-                if (shareItem) {
-                    shareItem.remove();
-                    // Update the count in the header
-                    const currentSharesDiv = document.getElementById('currentShares');
+            
+            // Update the modal count
+            setTimeout(() => {
+                const currentSharesDiv = document.getElementById('currentShares');
+                if (currentSharesDiv) {
                     const remainingShares = currentSharesDiv.querySelectorAll('.share-item').length;
-                    const headerText = document.querySelector('.card-header h6');
+                    const headerText = document.querySelector('.modal .card-header h6');
                     if (headerText) {
                         headerText.innerHTML = `<i class="fas fa-users me-2"></i>Currently shared with (${remainingShares})`;
                     }
+                    
                     // If no shares left, show empty state
                     if (remainingShares === 0) {
                         currentSharesDiv.innerHTML = `
@@ -799,15 +854,29 @@ function revokeAccess(shareId, userName) {
                         `;
                     }
                 }
-            } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
+            }, 350);
+            
+        } else {
+            console.error('❌ Server returned error:', data.error);
+            alert('Error: ' + (data.error || 'Unknown error occurred'));
+            
+            // Restore button
+            if (revokeButton) {
+                revokeButton.disabled = false;
+                revokeButton.innerHTML = '<i class="fas fa-times"></i>';
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error removing access');
-        });
-    }
+        }
+    })
+    .catch(error => {
+        console.error('❌ Request failed:', error);
+        alert('Error removing access: ' + error.message);
+        
+        // Restore button
+        if (revokeButton) {
+            revokeButton.disabled = false;
+            revokeButton.innerHTML = '<i class="fas fa-times"></i>';
+        }
+    });
 }
 
 function transferOwnership() {
