@@ -13,15 +13,23 @@
     .sidebar {
         background: white;
         border-right: 1px solid #dee2e6;
-        height: 100vh;
+        height: calc(100vh - 56px);
         position: fixed;
         width: 250px;
         overflow-y: auto;
+        top: 56px;
+        left: 0;
+        z-index: 1000;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
     }
     
     .main-content {
         margin-left: 250px;
+        margin-top: 56px;
         padding: 20px;
+        min-height: calc(100vh - 56px);
+        transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     .board-card {
@@ -81,6 +89,79 @@
         color: #1976d2;
         font-weight: 500;
     }
+    
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+        .sidebar {
+            transform: translateX(-100%);
+            width: 280px;
+            height: 100vh;
+            top: 0;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .sidebar.show {
+            transform: translateX(0);
+        }
+        
+        .main-content {
+            margin-left: 0;
+            margin-top: 56px;
+            padding: 15px;
+        }
+        
+        .mobile-sidebar-toggle {
+            display: block !important;
+        }
+        
+        .search-bar, .breadcrumb {
+            margin-left: 60px; /* Account for mobile toggle button */
+        }
+    }
+    
+    @media (min-width: 769px) {
+        .mobile-sidebar-toggle {
+            display: none !important;
+        }
+    }
+    
+    .mobile-sidebar-toggle {
+        position: fixed;
+        top: 70px;
+        left: 20px;
+        z-index: 1001;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transition: all 0.2s ease;
+    }
+    
+    .mobile-sidebar-toggle:hover {
+        background: #0056b3;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    }
+    
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 999;
+        display: none;
+        transition: opacity 0.3s ease;
+    }
+    
+    @media (max-width: 768px) {
+        .sidebar.show + .sidebar-overlay {
+            display: block;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -133,8 +214,16 @@
         </div>
     </div>
     
+    <!-- Sidebar Overlay for Mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
     <!-- Main Content -->
     <div class="main-content">
+        <!-- Mobile Sidebar Toggle -->
+        <button class="mobile-sidebar-toggle btn" id="sidebarToggle" style="display: none;">
+            <i class="fas fa-bars"></i>
+        </button>
+        
         <!-- Messages -->
         {% if messages %}
             {% for message in messages %}
@@ -508,6 +597,52 @@
                 card.style.transform = 'translateY(0)';
             }, index * 100);
         });
+        
+        // Initialize mobile sidebar
+        initializeMobileSidebar();
     });
+    
+    // Mobile sidebar functionality
+    function initializeMobileSidebar() {
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        
+        if (sidebarToggle && sidebar) {
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('show');
+                if (overlay) {
+                    overlay.style.display = sidebar.classList.contains('show') ? 'block' : 'none';
+                }
+            });
+            
+            // Close sidebar when clicking overlay
+            if (overlay) {
+                overlay.addEventListener('click', function() {
+                    sidebar.classList.remove('show');
+                    overlay.style.display = 'none';
+                });
+            }
+            
+            // Close sidebar when clicking outside on mobile
+            document.addEventListener('click', function(e) {
+                if (window.innerWidth <= 768 && 
+                    !sidebar.contains(e.target) && 
+                    !sidebarToggle.contains(e.target) && 
+                    sidebar.classList.contains('show')) {
+                    sidebar.classList.remove('show');
+                    if (overlay) overlay.style.display = 'none';
+                }
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('show');
+                    if (overlay) overlay.style.display = 'none';
+                }
+            });
+        }
+    }
 </script>
 {% endblock %}
