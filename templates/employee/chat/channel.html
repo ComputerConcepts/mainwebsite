@@ -224,6 +224,45 @@
     .selected-member-tag .remove-btn:hover {
         opacity: 1;
     }
+    
+    /* File Search Styles */
+    .file-search-container {
+        position: relative;
+    }
+    
+    .file-search-results {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        background: white;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1050;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .file-search-result {
+        padding: 0.75rem;
+        border-bottom: 1px solid #f8f9fa;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .file-search-result:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .file-search-result:last-child {
+        border-bottom: none;
+    }
+    
+    .selected-file {
+        margin-top: 0.5rem;
+    }
+    
+    .selected-file .card {
+        border-color: #007bff;
+        background-color: #f8f9fa;
+    }
 </style>
 {% endblock %}
 
@@ -493,10 +532,33 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="fileSelect" class="form-label">Select File:</label>
-                    <select class="form-select" id="fileSelect">
-                        <option value="">Loading files...</option>
-                    </select>
+                    <label for="fileSearch" class="form-label">Select File:</label>
+                    <div class="file-search-container position-relative">
+                        <input type="text" class="form-control" id="fileSearch" 
+                               placeholder="Search for files by name..." autocomplete="off">
+                        <input type="hidden" id="selectedFileId">
+                        <div class="file-search-results position-absolute bg-white border rounded" 
+                             id="fileSearchResults" style="display: none; top: 100%; left: 0; right: 0; max-height: 300px; overflow-y: auto; z-index: 1050;">
+                        </div>
+                    </div>
+                    <div class="selected-file mt-2" id="selectedFile" style="display: none;">
+                        <div class="card">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-file me-2" id="selectedFileIcon"></i>
+                                        <div>
+                                            <div class="fw-bold" id="selectedFileName"></div>
+                                            <small class="text-muted" id="selectedFileInfo"></small>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearFileSelection()">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="mb-3">
                     <label for="fileShareMessage" class="form-label">Message (optional):</label>
@@ -736,36 +798,144 @@ function shareSelectedBoard() {
 // File sharing functions
 function showFileShareModal() {
     const modal = new bootstrap.Modal(document.getElementById('fileShareModal'));
-    loadUserFiles();
+    clearFileSelection();
+    setupFileSearch();
     modal.show();
 }
 
-function loadUserFiles() {
+let fileSearchTimeout;
+let allFiles = [];
+
+function setupFileSearch() {
+    const fileSearchInput = document.getElementById('fileSearch');
+    const searchResults = document.getElementById('fileSearchResults');
+    
+    // Load all files first
     fetch('{% url "get_user_files" %}')
     .then(response => response.json())
     .then(data => {
-        const select = document.getElementById('fileSelect');
-        select.innerHTML = '<option value="">Select a file...</option>';
-        
-        if (data.success && data.files.length > 0) {
-            data.files.forEach(file => {
-                const option = document.createElement('option');
-                option.value = file.id;
-                option.textContent = `${file.name} (${file.file_type})`;
-                select.appendChild(option);
-            });
+        if (data.success) {
+            allFiles = data.files;
         } else {
-            select.innerHTML = '<option value="">No files available</option>';
+            allFiles = [];
         }
     })
     .catch(error => {
-        // console.error('Error loading files:', error); // Removed to prevent browser notifications
-        document.getElementById('fileSelect').innerHTML = '<option value="">Error loading files</option>';
+        console.error('Error loading files:', error);
+        allFiles = [];
+    });
+    
+    fileSearchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        clearTimeout(fileSearchTimeout);
+        
+        if (query.length < 1) {
+            searchResults.style.display = 'none';
+            return;
+        }
+        
+        fileSearchTimeout = setTimeout(() => {
+            searchFiles(query);
+        }, 300);
+    });
+    
+    // Hide results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.file-search-container')) {
+            searchResults.style.display = 'none';
+        }
     });
 }
 
+function searchFiles(query) {
+    const searchResults = document.getElementById('fileSearchResults');
+    
+    if (!query || allFiles.length === 0) {
+        searchResults.style.display = 'none';
+        return;
+    }
+    
+    const filteredFiles = allFiles.filter(file => 
+        file.name.toLowerCase().includes(query.toLowerCase()) ||
+        file.file_type.toLowerCase().includes(query.toLowerCase())
+    );
+    
+    if (filteredFiles.length === 0) {
+        searchResults.innerHTML = '<div class="p-3 text-center text-muted">No files found</div>';
+        searchResults.style.display = 'block';
+        return;
+    }
+    
+    const resultsHtml = filteredFiles.map(file => {
+        const fileIcon = getFileIcon(file.file_type);
+        const fileSize = formatFileSize(file.file_size);
+        const createdDate = new Date(file.created_at).toLocaleDateString();
+        
+        return `
+            <div class="file-search-result p-3 border-bottom" style="cursor: pointer;" 
+                 onclick="selectFile('${file.id}', '${file.name}', '${file.file_type}', '${fileSize}', '${createdDate}')">
+                <div class="d-flex align-items-center">
+                    <i class="fas ${fileIcon} me-3 text-primary"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold">${file.name}</div>
+                        <small class="text-muted">${file.file_type} • ${fileSize} • ${createdDate}</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    searchResults.innerHTML = resultsHtml;
+    searchResults.style.display = 'block';
+}
+
+function getFileIcon(fileType) {
+    const iconMap = {
+        'document': 'fa-file-alt',
+        'image': 'fa-image',
+        'video': 'fa-video',
+        'audio': 'fa-music',
+        'pdf': 'fa-file-pdf',
+        'spreadsheet': 'fa-file-excel',
+        'presentation': 'fa-file-powerpoint',
+        'archive': 'fa-file-archive'
+    };
+    return iconMap[fileType] || 'fa-file';
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return '0 B';
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+function selectFile(fileId, fileName, fileType, fileSize, createdDate) {
+    document.getElementById('selectedFileId').value = fileId;
+    document.getElementById('fileSearch').value = fileName;
+    document.getElementById('selectedFileName').textContent = fileName;
+    document.getElementById('selectedFileInfo').textContent = `${fileType} • ${fileSize} • ${createdDate}`;
+    document.getElementById('selectedFileIcon').className = `fas ${getFileIcon(fileType)} me-2`;
+    
+    document.getElementById('selectedFile').style.display = 'block';
+    document.getElementById('fileSearchResults').style.display = 'none';
+}
+
+function clearFileSelection() {
+    document.getElementById('selectedFileId').value = '';
+    document.getElementById('fileSearch').value = '';
+    document.getElementById('selectedFile').style.display = 'none';
+    document.getElementById('fileSearchResults').style.display = 'none';
+}
+
+function loadUserFiles() {
+    // This function is no longer needed but keeping it for compatibility
+    // The new implementation loads files in setupFileSearch()
+}
+
 function shareSelectedFile() {
-    const fileId = document.getElementById('fileSelect').value;
+    const fileId = document.getElementById('selectedFileId').value;
     const message = document.getElementById('fileShareMessage').value;
     
     if (!fileId) {
@@ -791,6 +961,8 @@ function shareSelectedFile() {
     .then(data => {
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('fileShareModal')).hide();
+            clearFileSelection();
+            document.getElementById('fileShareMessage').value = '';
             // Instead of reloading, let the WebSocket handle the new message
             // The message will appear automatically via WebSocket
         } else {
