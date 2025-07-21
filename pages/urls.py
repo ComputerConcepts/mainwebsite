@@ -173,4 +173,6 @@ urlpatterns = [
     
     # Chat member management
     path('api/channels/<uuid:channel_id>/invite/', views_chat.invite_channel_members, name='invite_channel_members'),
+    path('api/channels/<uuid:channel_id>/settings/', views_chat.update_channel_settings, name='update_channel_settings'),
+    path('api/channels/<uuid:channel_id>/delete/', views_chat.delete_channel, name='delete_channel'),
 ]

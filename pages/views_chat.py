@@ -882,3 +882,94 @@ def invite_channel_members(request, channel_id):
         return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def update_channel_settings(request, channel_id):
+    """Update channel settings (name, description, privacy)"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        channel = get_object_or_404(ChatChannel, id=channel_id)
+        
+        # Check if user is admin of the channel or system admin
+        membership = ChatChannelMembership.objects.filter(
+            channel=channel, 
+            employee=employee
+        ).first()
+        
+        if not (membership and membership.is_admin) and not employee.is_admin():
+            return JsonResponse({'error': 'You do not have permission to update this channel'}, status=403)
+        
+        data = json.loads(request.body)
+        name = data.get('name', '').strip().lower()
+        description = data.get('description', '').strip()
+        channel_type = data.get('channel_type', 'general')
+        
+        # Validate channel type
+        valid_types = ['general', 'department', 'project', 'board', 'private']
+        if channel_type not in valid_types:
+            return JsonResponse({'error': 'Invalid channel type'}, status=400)
+        
+        # Validate name
+        if not name or len(name) < 2:
+            return JsonResponse({'error': 'Channel name must be at least 2 characters long'}, status=400)
+        
+        # Check for valid channel name format
+        import re
+        if not re.match(r'^[a-z0-9-]+$', name):
+            return JsonResponse({'error': 'Channel name can only contain lowercase letters, numbers, and hyphens'}, status=400)
+        
+        # Check if name is already taken (excluding current channel)
+        if ChatChannel.objects.filter(name=name).exclude(id=channel_id).exists():
+            return JsonResponse({'error': 'A channel with this name already exists'}, status=400)
+        
+        # Update channel
+        channel.name = name
+        channel.description = description
+        channel.channel_type = channel_type
+        channel.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Channel settings updated successfully'
+        })
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee profile not found'}, status=403)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_channel(request, channel_id):
+    """Delete a chat channel (admin only)"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        channel = get_object_or_404(ChatChannel, id=channel_id)
+        
+        # Check if user is admin of the channel or system admin
+        membership = ChatChannelMembership.objects.filter(
+            channel=channel, 
+            employee=employee
+        ).first()
+        
+        if not (membership and membership.is_admin) and not employee.is_admin():
+            return JsonResponse({'error': 'You do not have permission to delete this channel'}, status=403)
+        
+        # Delete the channel (this will cascade delete messages, memberships, etc.)
+        channel_name = channel.name
+        channel.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Channel #{channel_name} has been deleted successfully'
+        })
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee profile not found'}, status=403)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
