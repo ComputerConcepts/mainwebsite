@@ -826,3 +826,59 @@ def send_message_ajax(request):
         return JsonResponse({'error': 'Employee profile not found'}, status=403)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def invite_channel_members(request, channel_id):
+    """Invite new members to a chat channel"""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        channel = get_object_or_404(ChatChannel, id=channel_id)
+        
+        # Check if user is a member of the channel (basic permission check)
+        if not channel.members.filter(id=employee.id).exists():
+            return JsonResponse({'error': 'You are not a member of this channel'}, status=403)
+        
+        data = json.loads(request.body)
+        member_ids = data.get('member_ids', [])
+        
+        if not member_ids:
+            return JsonResponse({'error': 'No members to invite'}, status=400)
+        
+        # Get employees to invite
+        employees_to_invite = Employee.objects.filter(id__in=member_ids)
+        
+        invited_count = 0
+        for emp in employees_to_invite:
+            # Add employee to channel if not already a member
+            if not channel.members.filter(id=emp.id).exists():
+                channel.members.add(emp)
+                invited_count += 1
+                
+                # Create membership record
+                ChatChannelMembership.objects.get_or_create(
+                    channel=channel,
+                    employee=emp,
+                    defaults={'joined_at': timezone.now()}
+                )
+                
+                # Create notification
+                ChatNotification.objects.create(
+                    recipient=emp,
+                    notification_type='channel_invite',
+                    related_channel=channel,
+                    content=f"You've been invited to join #{channel.name}"
+                )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Successfully invited {invited_count} member(s) to the channel'
+        })
+        
+    except Employee.DoesNotExist:
+        return JsonResponse({'error': 'Employee profile not found'}, status=403)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

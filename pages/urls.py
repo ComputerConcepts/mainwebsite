@@ -170,4 +170,7 @@ urlpatterns = [
     path('employee/chat/channel/<uuid:channel_id>/boards/', views_chat.channel_boards, name='channel_boards'),
     path('employee/chat/channel/<uuid:channel_id>/files/', views_chat.channel_files, name='channel_files'),
     path('employee/chat/download/<uuid:file_share_id>/', views_chat.download_shared_file, name='download_shared_file'),
+    
+    # Chat member management
+    path('api/channels/<uuid:channel_id>/invite/', views_chat.invite_channel_members, name='invite_channel_members'),
 ]
