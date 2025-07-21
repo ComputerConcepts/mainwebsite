@@ -324,15 +324,17 @@ function startDirectMessage() {
 }
 
 function initializeDMEmployees() {
-    const options = document.querySelectorAll('#dmRecipient option[value!=""]');
-    allDMEmployees = Array.from(options).map(option => ({
-        id: option.value,
-        name: option.dataset.name,
-        department: option.dataset.department || 'Employee',
-        email: option.dataset.email,
-        online: option.dataset.online === 'true',
-        initials: option.dataset.name.split(' ').map(n => n[0]).join('').toUpperCase()
-    }));
+    const options = document.querySelectorAll('#dmRecipient option');
+    allDMEmployees = Array.from(options)
+        .filter(option => option.value !== '') // Filter out empty value options
+        .map(option => ({
+            id: option.value,
+            name: option.dataset.name,
+            department: option.dataset.department || 'Employee',
+            email: option.dataset.email,
+            online: option.dataset.online === 'true',
+            initials: option.dataset.name.split(' ').map(n => n[0]).join('').toUpperCase()
+        }));
 }
 
 function setupDMSearch() {
