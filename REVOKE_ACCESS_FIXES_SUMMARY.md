@@ -97,13 +97,40 @@ alert('Error: ' + (data.error || data.message || 'Unknown error occurred'));
 - ✅ Uses same API endpoint as file sharing (`/api/employees/search-email/`)
 - ✅ Better user experience for finding employees
 
+### 8. **Transfer Ownership - API Data Issue** ✅ FIXED
+**Problem**: The employee search API was missing the `employee.id` field needed for transfer ownership, causing "Unknown error" when transferring.
+
+**Root Cause**: The search API returned user data but not the Employee model ID that the transfer ownership endpoint expects.
+
+**Fix**: Updated the search API to include employee ID:
+```python
+results.append({
+    'id': employee.id,  # Add employee ID for transfer ownership
+    'email': user.email,
+    'name': f"{user.first_name} {user.last_name}".strip(),
+    'department': employee.department,
+    'display': f"{user.first_name} {user.last_name} ({user.email})"
+})
+```
+
+### 9. **Transfer Ownership - Enhanced Error Handling** ✅ IMPROVED
+**Problem**: Generic "Unknown error" messages didn't help identify the actual issue.
+
+**Fix**: Added comprehensive error handling and debugging:
+- Specific HTTP status code handling (403, 404, 400)
+- Better error message extraction (`data.error || data.message`)
+- Console logging for debugging
+- Input validation before API calls
+
 ## Testing
 
 ### Revoke Access Testing:
 Test file: `test_revoke_access_fixes.js`
 
 ### Transfer Ownership Testing:
-Test file: `test_transfer_ownership_search.js`
+Test files: 
+- `test_transfer_ownership_search.js` - Basic functionality testing
+- `debug_transfer_ownership.js` - Advanced debugging and troubleshooting
 
 ### How to Test:
 1. Open a file detail page that has shares or needs ownership transfer
@@ -111,6 +138,14 @@ Test file: `test_transfer_ownership_search.js`
 3. Copy and paste the appropriate test script
 4. Run the suggested test commands
 5. Verify the functionality works correctly
+
+### Debugging "Unknown error" in Transfer Ownership:
+1. Run `debug_transfer_ownership.js` in browser console
+2. Call `diagnoseTransferOwnership()` to check setup
+3. Open transfer modal and search for an employee
+4. Call `diagnoseTransferOwnership()` again to verify employee ID is set
+5. Check Network tab for API responses
+6. Look for specific error messages in console logs
 
 ### Expected Behavior:
 

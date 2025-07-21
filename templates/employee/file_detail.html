@@ -771,11 +771,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Function to select an owner
 function selectOwner(employeeId, name, email) {
+    console.log(`👤 Selecting owner: ID=${employeeId}, Name=${name}, Email=${email}`);
+    
     const hiddenInput = document.getElementById('newOwner');
     const searchInput = document.getElementById('newOwnerSearch');
     const suggestionsDiv = document.getElementById('ownerSuggestions');
     const selectedOwnerDiv = document.getElementById('selectedOwner');
     const selectedOwnerName = document.getElementById('selectedOwnerName');
+    
+    if (!hiddenInput || !searchInput || !selectedOwnerDiv || !selectedOwnerName) {
+        console.error('❌ Missing required form elements for owner selection');
+        return;
+    }
     
     // Set the values
     hiddenInput.value = employeeId;
@@ -785,6 +792,8 @@ function selectOwner(employeeId, name, email) {
     // Show selected owner
     selectedOwnerName.textContent = `${name} (${email})`;
     selectedOwnerDiv.style.display = 'block';
+    
+    console.log(`✅ Owner selected successfully - Hidden input value: "${hiddenInput.value}"`);
 }
 
 // Function to clear owner selection
@@ -1028,12 +1037,18 @@ function transferOwnership() {
     const reason = document.getElementById('transferReason').value;
     const confirmed = document.getElementById('confirmTransfer').checked;
     
-    if (!newOwnerId) {
+    console.log(`🔄 Transfer ownership function called`);
+    console.log(`   New Owner ID: "${newOwnerId}"`);
+    console.log(`   Confirmed: ${confirmed}`);
+    
+    if (!newOwnerId || newOwnerId.trim() === '') {
+        console.error('❌ No employee selected for transfer');
         alert('Please select a new owner by searching for them in the field above');
         return;
     }
     
     if (!confirmed) {
+        console.error('❌ Transfer not confirmed');
         alert('Please confirm that you understand the consequences of transferring ownership');
         return;
     }
@@ -1042,28 +1057,54 @@ function transferOwnership() {
     const selectedOwnerNameSpan = document.getElementById('selectedOwnerName');
     const newOwnerName = selectedOwnerNameSpan ? selectedOwnerNameSpan.textContent : 'selected user';
     
+    console.log(`   Selected Owner: "${newOwnerName}"`);
+    
     if (confirm(`Are you sure you want to transfer ownership of this file to ${newOwnerName}? This action cannot be undone.`)) {
         const formData = new FormData();
         formData.append('new_owner_id', newOwnerId);
         formData.append('reason', reason);
         formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
         
+        console.log(`🔄 Transferring ownership to employee ID: ${newOwnerId}`);
+        console.log(`📋 Transfer reason: ${reason || 'No reason provided'}`);
+        
         fetch(`/employee/files/transfer-ownership/{{ file.id }}/`, {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log(`📡 Transfer response: ${response.status} ${response.statusText}`);
+            
+            if (!response.ok) {
+                // Handle specific status codes
+                if (response.status === 403) {
+                    throw new Error('Permission denied. You may not be the owner of this file.');
+                } else if (response.status === 404) {
+                    throw new Error('File or employee not found.');
+                } else if (response.status === 400) {
+                    throw new Error('Invalid request. Please check the selected employee.');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            }
+            
+            return response.json();
+        })
         .then(data => {
+            console.log('📡 Transfer response data:', data);
+            
             if (data.success) {
                 alert(`Ownership transferred successfully to ${newOwnerName}!`);
                 location.reload();
             } else {
-                alert('Error transferring ownership: ' + (data.message || 'Unknown error'));
+                const errorMsg = data.error || data.message || 'Unknown error occurred';
+                console.error('❌ Transfer failed:', errorMsg);
+                alert('Error transferring ownership: ' + errorMsg);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('Error transferring ownership');
+            console.error('❌ Transfer request failed:', error);
+            alert('Error transferring ownership: ' + error.message);
         });
     }
 }

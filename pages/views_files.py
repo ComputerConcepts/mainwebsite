@@ -1068,6 +1068,7 @@ def search_employees_by_email(request):
             try:
                 employee = Employee.objects.get(user=user)
                 results.append({
+                    'id': employee.id,  # Add employee ID for transfer ownership
                     'email': user.email,
                     'name': f"{user.first_name} {user.last_name}".strip(),
                     'department': employee.department,
