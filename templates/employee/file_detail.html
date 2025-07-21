@@ -52,6 +52,32 @@
     .badge.bg-marketing { background-color: #e83e8c !important; }
     .badge.bg-personal { background-color: #6c757d !important; }
     .badge.bg-general { background-color: #17a2b8 !important; }
+    
+    /* Modal Fixes */
+    .modal {
+        z-index: 1055 !important;
+    }
+    
+    .modal-backdrop {
+        z-index: 1050 !important;
+    }
+    
+    #ownerSuggestions,
+    #emailSuggestions {
+        z-index: 1060 !important;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    .suggestion-item:hover {
+        background-color: #f8f9fa !important;
+    }
+    
+    /* Ensure modal content is scrollable on small screens */
+    .modal-dialog {
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+    }
 </style>
 {% endblock %}
 
@@ -710,64 +736,107 @@ document.addEventListener('click', function(e) {
 
 // Owner search autocomplete functionality
 document.addEventListener('DOMContentLoaded', function() {
-    const ownerSearchInput = document.getElementById('newOwnerSearch');
-    if (ownerSearchInput) {
-        ownerSearchInput.addEventListener('input', function(e) {
-            const query = e.target.value.trim();
+    console.log('🔧 DOM Content Loaded - Initializing modal functionality');
+    
+    // Initialize modal event listeners
+    const transferModal = document.getElementById('transferOwnershipModal');
+    if (transferModal) {
+        console.log('✅ Transfer modal found, setting up event listeners');
+        
+        // Reset form when modal opens
+        transferModal.addEventListener('show.bs.modal', function () {
+            console.log('🎭 Modal opening - resetting form');
+            clearOwnerSelection();
+            document.getElementById('transferReason').value = '';
+            document.getElementById('confirmTransfer').checked = false;
+        });
+        
+        // Clean up when modal closes
+        transferModal.addEventListener('hide.bs.modal', function () {
+            console.log('🎭 Modal closing - cleaning up');
             const suggestionsDiv = document.getElementById('ownerSuggestions');
-            
-            if (query.length < 2) {
+            if (suggestionsDiv) {
                 suggestionsDiv.style.display = 'none';
-                return;
             }
-            
-            // Fetch suggestions from the server
-            fetch(`/api/employees/search-email/?q=${encodeURIComponent(query)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.results && data.results.length > 0) {
-                        suggestionsDiv.innerHTML = '';
-                        data.results.forEach(result => {
-                            const suggestionItem = document.createElement('div');
-                            suggestionItem.className = 'p-2 border-bottom suggestion-item';
-                            suggestionItem.style.cursor = 'pointer';
-                            suggestionItem.innerHTML = `
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-user-circle me-2 text-muted"></i>
-                                    <div>
-                                        <div class="fw-medium">${result.name}</div>
-                                        <small class="text-muted">${result.email}</small>
-                                        ${result.department ? `<small class="text-muted ms-2">• ${result.department}</small>` : ''}
-                                    </div>
-                                </div>
-                            `;
-                            suggestionItem.addEventListener('click', function() {
-                                selectOwner(result.id, result.name, result.email);
-                            });
-                            
-                            // Hover effects
-                            suggestionItem.addEventListener('mouseenter', function() {
-                                this.style.backgroundColor = '#f8f9fa';
-                            });
-                            suggestionItem.addEventListener('mouseleave', function() {
-                                this.style.backgroundColor = 'white';
-                            });
-                            
-                            suggestionsDiv.appendChild(suggestionItem);
-                        });
-                        suggestionsDiv.style.display = 'block';
-                    } else {
-                        suggestionsDiv.innerHTML = '<div class="p-2 text-muted">No employees found</div>';
-                        suggestionsDiv.style.display = 'block';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching owner suggestions:', error);
-                    suggestionsDiv.style.display = 'none';
-                });
         });
     }
+    
+    const ownerSearchInput = document.getElementById('newOwnerSearch');
+    if (ownerSearchInput) {
+        console.log('✅ Owner search input found, setting up autocomplete');
+        
+        // Clear any existing event listeners and add new one
+        ownerSearchInput.removeEventListener('input', handleOwnerSearch);
+        ownerSearchInput.addEventListener('input', handleOwnerSearch);
+    } else {
+        console.log('❌ Owner search input not found');
+    }
 });
+
+// Separate function for owner search to avoid closure issues
+function handleOwnerSearch(e) {
+    const query = e.target.value.trim();
+    const suggestionsDiv = document.getElementById('ownerSuggestions');
+    
+    console.log(`🔍 Owner search query: "${query}"`);
+    
+    if (query.length < 2) {
+        suggestionsDiv.style.display = 'none';
+        return;
+    }
+    
+    // Fetch suggestions from the server
+    fetch(`/api/employees/search-email/?q=${encodeURIComponent(query)}`)
+        .then(response => {
+            console.log(`📡 Search API response: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            console.log(`📡 Search results:`, data);
+            
+            if (data.results && data.results.length > 0) {
+                suggestionsDiv.innerHTML = '';
+                data.results.forEach(result => {
+                    const suggestionItem = document.createElement('div');
+                    suggestionItem.className = 'p-2 border-bottom suggestion-item';
+                    suggestionItem.style.cursor = 'pointer';
+                    suggestionItem.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-user-circle me-2 text-muted"></i>
+                            <div>
+                                <div class="fw-medium">${result.name}</div>
+                                <small class="text-muted">${result.email}</small>
+                                ${result.department ? `<small class="text-muted ms-2">• ${result.department}</small>` : ''}
+                            </div>
+                        </div>
+                    `;
+                    suggestionItem.addEventListener('click', function() {
+                        selectOwner(result.id, result.name, result.email);
+                    });
+                    
+                    // Hover effects
+                    suggestionItem.addEventListener('mouseenter', function() {
+                        this.style.backgroundColor = '#f8f9fa';
+                    });
+                    suggestionItem.addEventListener('mouseleave', function() {
+                        this.style.backgroundColor = 'white';
+                    });
+                    
+                    suggestionsDiv.appendChild(suggestionItem);
+                });
+                suggestionsDiv.style.display = 'block';
+                console.log(`✅ Displayed ${data.results.length} suggestions`);
+            } else {
+                suggestionsDiv.innerHTML = '<div class="p-2 text-muted">No employees found</div>';
+                suggestionsDiv.style.display = 'block';
+                console.log('ℹ️ No employees found');
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error fetching owner suggestions:', error);
+            suggestionsDiv.style.display = 'none';
+        });
+}
 
 // Function to select an owner
 function selectOwner(employeeId, name, email) {
@@ -798,19 +867,77 @@ function selectOwner(employeeId, name, email) {
 
 // Function to clear owner selection
 function clearOwnerSelection() {
+    console.log('🧹 Clearing owner selection');
+    
     const hiddenInput = document.getElementById('newOwner');
     const searchInput = document.getElementById('newOwnerSearch');
     const selectedOwnerDiv = document.getElementById('selectedOwner');
     
-    // Clear values
-    hiddenInput.value = '';
-    searchInput.value = '';
-    searchInput.style.display = 'block';
-    selectedOwnerDiv.style.display = 'none';
+    if (hiddenInput) hiddenInput.value = '';
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.style.display = 'block';
+    }
+    if (selectedOwnerDiv) selectedOwnerDiv.style.display = 'none';
     
     // Focus on search input
-    searchInput.focus();
+    if (searchInput) searchInput.focus();
 }
+
+// Modal debugging and fixing functions
+function fixModalIssues() {
+    console.log('🔧 Fixing common modal issues...');
+    
+    // Remove any stuck backdrops
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    backdrops.forEach(backdrop => backdrop.remove());
+    
+    // Reset body classes
+    document.body.classList.remove('modal-open');
+    document.body.style.paddingRight = '';
+    document.body.style.overflow = '';
+    
+    // Reset modal state
+    const modal = document.getElementById('transferOwnershipModal');
+    if (modal) {
+        modal.style.display = '';
+        modal.setAttribute('aria-hidden', 'true');
+        modal.classList.remove('show');
+    }
+    
+    console.log('✅ Modal issues fixed');
+}
+
+// Test modal functionality
+function testModal() {
+    console.log('🧪 Testing modal functionality...');
+    
+    const modal = document.getElementById('transferOwnershipModal');
+    if (!modal) {
+        console.error('❌ Modal not found');
+        return false;
+    }
+    
+    try {
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(modal);
+        modalInstance.show();
+        console.log('✅ Modal should be visible now');
+        
+        setTimeout(() => {
+            modalInstance.hide();
+            console.log('✅ Modal test completed');
+        }, 3000);
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Modal test failed:', error);
+        return false;
+    }
+}
+
+// Expose debugging functions
+window.fixModalIssues = fixModalIssues;
+window.testModal = testModal;
 
 // Share management functions
 document.getElementById('shareForm').addEventListener('submit', function(e) {
