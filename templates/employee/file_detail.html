@@ -538,7 +538,7 @@ function loadPDF(url) {
                     <a href="${url}" target="_blank" class="btn btn-sm btn-primary">
                         <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
                     </a>
-                    <a href="{% url 'download_file' file.id %}" class="btn btn-sm btn-success ms-2">
+                    <a href="/employee/files/download/{{ file.id }}/" class="btn btn-sm btn-success ms-2">
                         <i class="fas fa-download me-1"></i>Download
                     </a>
                 </div>
@@ -562,10 +562,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         <strong>PDF Preview Not Available</strong><br>
                         Your browser cannot display this PDF file. Please download it to view.
                         <div class="mt-2">
-                            <a href="{% url 'serve_file' file.id %}" target="_blank" class="btn btn-sm btn-primary">
+                            <a href="/employee/files/serve/{{ file.id }}/" target="_blank" class="btn btn-sm btn-primary">
                                 <i class="fas fa-external-link-alt me-1"></i>Open in New Tab
                             </a>
-                            <a href="{% url 'download_file' file.id %}" class="btn btn-sm btn-success ms-2">
+                            <a href="/employee/files/download/{{ file.id }}/" class="btn btn-sm btn-success ms-2">
                                 <i class="fas fa-download me-1"></i>Download
                             </a>
                         </div>
@@ -598,7 +598,7 @@ function deleteFile() {
             return cookieValue;
         }
         
-        fetch(`{% url 'delete_file' file.id %}`, {
+        fetch(`/employee/files/delete/{{ file.id }}/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCookie('csrftoken')
@@ -613,7 +613,7 @@ function deleteFile() {
         .then(data => {
             if (data.success) {
                 alert('File deleted successfully!');
-                window.location.href = '{% url "file_manager" %}';
+                window.location.href = '/employee/files/';
             } else {
                 alert('Error: ' + (data.message || 'Delete failed'));
             }
@@ -644,7 +644,7 @@ document.getElementById('shareForm').addEventListener('submit', function(e) {
     formData.append('message', message);
     formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
     
-    fetch(`{% url 'share_file' file.id %}`, {
+    fetch(`/employee/files/share/{{ file.id }}/`, {
         method: 'POST',
         body: formData
     })
@@ -664,7 +664,7 @@ document.getElementById('shareForm').addEventListener('submit', function(e) {
 });
 
 function updatePermission(shareId, newPermission) {
-    fetch(`{% url 'update_file_share' file.id '0' %}`.replace('0', shareId), {
+    fetch(`/employee/files/update-share/{{ file.id }}/${shareId}/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
@@ -688,7 +688,7 @@ function updatePermission(shareId, newPermission) {
 
 function revokeAccess(shareId, userName) {
     if (confirm(`Remove access for ${userName}?`)) {
-        fetch(`{% url 'unshare_file' file.id '0' %}`.replace('0', shareId), {
+        fetch(`/employee/files/unshare/{{ file.id }}/${shareId}/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
@@ -741,7 +741,7 @@ function transferOwnership() {
         formData.append('reason', reason);
         formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
         
-        fetch(`{% url 'transfer_file_ownership' file.id %}`, {
+        fetch(`/employee/files/transfer-ownership/{{ file.id }}/`, {
             method: 'POST',
             body: formData
         })
