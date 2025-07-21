@@ -162,7 +162,7 @@
     <div class="chat-input">
         <form id="messageForm" onsubmit="sendMessage(event)">
             <div class="input-group">
-                <input type="text" class="form-control" id="messageInput" placeholder="Type a message to {{ recipient.user.first_name }}..." maxlength="2000" required>
+                <input type="text" class="form-control" id="messageInput" placeholder="Type a message to {{ recipient.user.first_name }}..." maxlength="2000" value="{{ initial_message }}" required>
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-paper-plane"></i>
                 </button>

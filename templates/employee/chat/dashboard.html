@@ -19,13 +19,14 @@
     
     .channel-item, .dm-item {
         display: flex;
-        align-items: center;
-        padding: 8px 12px;
+        align-items: flex-start;
+        padding: 12px;
         text-decoration: none;
         color: #333;
-        border-radius: 6px;
+        border-radius: 8px;
         margin: 2px 0;
         transition: background-color 0.2s;
+        min-height: 60px;
     }
     
     .channel-item:hover, .dm-item:hover {
@@ -40,24 +41,28 @@
     }
     
     .channel-icon, .dm-avatar {
-        width: 32px;
-        height: 32px;
-        margin-right: 8px;
+        width: 40px;
+        height: 40px;
+        margin-right: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
         border-radius: 50%;
         background-color: #e9ecef;
         font-weight: bold;
+        font-size: 16px;
+        flex-shrink: 0;
     }
     
     .unread-badge {
         background-color: #dc3545;
         color: white;
-        border-radius: 10px;
-        padding: 2px 6px;
+        border-radius: 12px;
+        padding: 4px 8px;
         font-size: 11px;
-        margin-left: auto;
+        font-weight: bold;
+        min-width: 20px;
+        text-align: center;
     }
     
     .online-indicator {
@@ -139,10 +144,47 @@
             
             <!-- Direct Messages -->
             <div class="sidebar-section">
-                <h6>Direct Messages</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Recent Direct Messages</h6>
+                    <button class="btn btn-sm btn-outline-primary" onclick="startDirectMessage()" title="Start new DM">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
                 {% for dm in recent_dms %}
-                {% comment %} This would need more complex logic to show the other participant {% endcomment %}
+                <a href="{% url 'chat_direct_message' dm.participant.id %}" class="dm-item">
+                    <div class="dm-avatar position-relative">
+                        {{ dm.participant.user.first_name|first|upper }}
+                        {% if dm.participant in online_employees %}
+                        <span class="position-absolute bottom-0 end-0 online-indicator" style="width: 12px; height: 12px; border: 2px solid white;"></span>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>{{ dm.participant.user.get_full_name }}</strong>
+                            {% if dm.unread_count > 0 %}
+                            <span class="unread-badge">{{ dm.unread_count }}</span>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">{{ dm.participant.department }}</small>
+                        <div class="text-truncate" style="max-width: 180px;">
+                            <small class="text-muted">
+                                {% if dm.latest_message.sender == employee %}
+                                    You: {{ dm.latest_message.content|truncatechars:30 }}
+                                {% else %}
+                                    {{ dm.latest_message.content|truncatechars:30 }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        <small class="text-muted">{{ dm.latest_message.created_at|timesince }} ago</small>
+                    </div>
+                </a>
+                {% empty %}
+                <p class="text-muted small px-3">No recent conversations</p>
                 {% endfor %}
+                
+                {% if recent_dms|length > 0 %}
+                <hr class="my-2">
+                {% endif %}
                 
                 <!-- Online Users -->
                 <h6 class="mt-3">Online Now</h6>
@@ -190,10 +232,20 @@
                     <label for="dmRecipient" class="form-label">Select Employee</label>
                     <select class="form-select" id="dmRecipient">
                         <option value="">Choose an employee...</option>
-                        {% for emp in online_employees %}
-                        <option value="{{ emp.id }}">{{ emp.user.get_full_name }} ({{ emp.department }})</option>
+                        {% for emp in all_employees %}
+                        <option value="{{ emp.id }}">
+                            {{ emp.user.get_full_name }}
+                            {% if emp.department %} - {{ emp.department }}{% endif %}
+                            {% if emp in online_employees %}
+                                <span class="text-success">●</span>
+                            {% endif %}
+                        </option>
                         {% endfor %}
                     </select>
+                </div>
+                <div class="mb-3">
+                    <label for="dmMessage" class="form-label">Initial Message (Optional)</label>
+                    <textarea class="form-control" id="dmMessage" rows="3" placeholder="Type your message..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -213,8 +265,17 @@ function startDirectMessage() {
 
 function openDirectMessage() {
     const recipientId = document.getElementById('dmRecipient').value;
+    const initialMessage = document.getElementById('dmMessage').value.trim();
+    
     if (recipientId) {
-        window.location.href = `/employee/chat/dm/${recipientId}/`;
+        let url = `/employee/chat/dm/${recipientId}/`;
+        if (initialMessage) {
+            // Add initial message as a URL parameter
+            url += `?msg=${encodeURIComponent(initialMessage)}`;
+        }
+        window.location.href = url;
+    } else {
+        alert('Please select an employee to message.');
     }
 }
 

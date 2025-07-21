@@ -145,6 +145,10 @@ EMAIL_HOST_USER = 'noreplycomputerconcepts@gmail.com'
 EMAIL_HOST_PASSWORD = 'mmsn wgyv kejj kpms'
 DEFAULT_FROM_EMAIL = 'noreplycomputerconcepts@gmail.com'
 
+# Authentication settings
+LOGIN_URL = '/employee/login/'
+LOGIN_REDIRECT_URL = '/employee/dashboard/'
+
 # AI Analysis Configuration
 AI_ANALYSIS_ENABLED = True
 AI_ANALYSIS_AUTO_PROCESS = True  # Automatically process new applications

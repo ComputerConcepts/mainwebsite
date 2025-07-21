@@ -31,24 +31,57 @@ def chat_dashboard(request):
         latest_message_time=Max('messages__created_at')
     ).order_by('-latest_message_time')
     
-    # Get recent direct messages
-    recent_dms = ChatMessage.objects.filter(
-        Q(sender=employee, channel__isnull=True) | 
-        Q(recipient=employee, channel__isnull=True)
-    ).values('sender', 'recipient').annotate(
-        latest_time=Max('created_at')
-    ).order_by('-latest_time')[:10]
+    # Get recent direct messages - organized by conversation
+    # Find all users who have had DM conversations with current employee
+    dm_conversations = []
+    
+    # Get all users who have either sent to or received from current employee
+    dm_participants = Employee.objects.filter(
+        Q(sent_messages__recipient=employee, sent_messages__channel__isnull=True) |
+        Q(received_messages__sender=employee, received_messages__channel__isnull=True)
+    ).distinct().exclude(id=employee.id)
+    
+    for participant in dm_participants:
+        # Get the latest message between current employee and this participant
+        latest_message = ChatMessage.objects.filter(
+            Q(sender=employee, recipient=participant, channel__isnull=True) |
+            Q(sender=participant, recipient=employee, channel__isnull=True)
+        ).order_by('-created_at').first()
+        
+        if latest_message:
+            # Count unread messages from this participant
+            unread_count = ChatMessage.objects.filter(
+                sender=participant,
+                recipient=employee,
+                channel__isnull=True
+            ).exclude(
+                read_receipts__reader=employee
+            ).count()
+            
+            dm_conversations.append({
+                'participant': participant,
+                'latest_message': latest_message,
+                'unread_count': unread_count
+            })
+    
+    # Sort by latest message time
+    dm_conversations.sort(key=lambda x: x['latest_message'].created_at, reverse=True)
+    recent_dms = dm_conversations[:10]  # Show top 10 recent conversations
     
     # Get online employees (simplified - could be enhanced with WebSockets)
     online_employees = Employee.objects.filter(
         user__last_login__gte=timezone.now() - timezone.timedelta(minutes=15)
     ).exclude(id=employee.id)[:20]
     
+    # Get all employees for DM selection
+    all_employees = Employee.objects.exclude(id=employee.id).select_related('user').order_by('user__first_name', 'user__last_name')
+    
     context = {
         'employee': employee,
         'channels': channels,
         'recent_dms': recent_dms,
         'online_employees': online_employees,
+        'all_employees': all_employees,
     }
     
     return render(request, 'employee/chat/dashboard.html', context)
@@ -134,10 +167,14 @@ def chat_direct_message(request, recipient_id):
             message=msg, reader=employee
         )
     
+    # Get initial message from URL parameter (if any)
+    initial_message = request.GET.get('msg', '')
+    
     context = {
         'employee': employee,
         'recipient': recipient,
         'messages': messages_page,
+        'initial_message': initial_message,
     }
     
     return render(request, 'employee/chat/direct_message.html', context)
