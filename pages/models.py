@@ -179,6 +179,11 @@ class Employee(models.Model):
     def get_full_name(self):
         return f"{self.user.first_name} {self.user.last_name}"
     
+    @property
+    def username(self):
+        """Backward compatibility property for username access"""
+        return self.user.username
+    
     def is_admin(self):
         return self.role in ['admin', 'super_admin']
     
@@ -949,6 +954,10 @@ class AIFileAnalysis(models.Model):
     ai_recommendations = models.JSONField(default=list, help_text="AI-generated recommendations")
     suggested_tags = models.JSONField(default=list, help_text="AI-suggested tags")
     suggested_category = models.CharField(max_length=100, blank=True)
+    
+    # Analysis data storage
+    analysis_data = models.JSONField(default=dict, help_text="Complete analysis results and metadata")
+    tags = models.JSONField(default=list, help_text="Generated tags for the file")
     
     # Processing metadata
     processing_time_ms = models.IntegerField(null=True, blank=True)

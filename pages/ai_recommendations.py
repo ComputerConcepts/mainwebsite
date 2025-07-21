@@ -5,6 +5,7 @@ Provides intelligent suggestions for file organization, workflow optimization, a
 
 import os
 import re
+import logging
 from typing import Dict, List, Tuple, Set
 from collections import defaultdict, Counter
 from datetime import datetime, timedelta
@@ -12,6 +13,8 @@ import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class SmartRecommendationEngine:
@@ -397,6 +400,70 @@ class SmartRecommendationEngine:
                 tags.add(clean_topic)
         
         return sorted(list(tags))
+    
+    def generate_recommendations(self, file_document, file_analysis, user_context=None):
+        """Generate AI-powered recommendations for a file"""
+        recommendations = []
+        
+        try:
+            # File organization recommendations
+            if file_analysis.get('category'):
+                category = file_analysis['category']
+                recommendations.append({
+                    'type': 'organization',
+                    'title': f'Organize as {category}',
+                    'description': f'This file appears to be a {category}. Consider organizing it in the appropriate folder.',
+                    'action': 'categorize',
+                    'category': category
+                })
+            
+            # Tagging recommendations
+            suggested_tags = self.generate_smart_tags(file_analysis)
+            if suggested_tags:
+                recommendations.append({
+                    'type': 'tagging',
+                    'title': 'Add tags for better discovery',
+                    'description': f'Suggested tags: {", ".join(suggested_tags[:5])}',
+                    'action': 'add_tags',
+                    'tags': suggested_tags[:5]
+                })
+            
+            # Security recommendations
+            if file_analysis.get('contains_sensitive_info'):
+                recommendations.append({
+                    'type': 'security',
+                    'title': 'Security Review Required',
+                    'description': 'This file contains sensitive information. Consider restricting access.',
+                    'action': 'review_permissions',
+                    'priority': 'high'
+                })
+            
+            # Quality recommendations
+            quality_score = file_analysis.get('quality_score', 0)
+            if quality_score < 50:
+                recommendations.append({
+                    'type': 'quality',
+                    'title': 'Document Quality Review',
+                    'description': 'This document may benefit from editing and formatting improvements.',
+                    'action': 'review_quality',
+                    'priority': 'medium'
+                })
+            
+            # Collaboration recommendations
+            if file_analysis.get('key_topics'):
+                recommendations.append({
+                    'type': 'collaboration',
+                    'title': 'Share with relevant team members',
+                    'description': 'This file may be relevant to other team members working on similar topics.',
+                    'action': 'suggest_sharing',
+                    'priority': 'low'
+                })
+            
+            return recommendations[:10]  # Return top 10 recommendations
+            
+        except Exception as e:
+            logger.error(f"Error generating recommendations: {str(e)}")
+            return []
 
 
 def create_recommendation_engine():

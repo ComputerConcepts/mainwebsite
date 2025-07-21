@@ -29,6 +29,19 @@ class KnowledgeGraph:
             ngram_range=(1, 2)
         )
         
+    def add_entity(self, entity_info: Dict):
+        """Add an entity to the knowledge graph"""
+        entity_id = entity_info.get('id', '')
+        if entity_id:
+            self.graph.add_node(entity_id, **entity_info)
+    
+    def add_relationship(self, source_id: str, target_id: str, relationship_type: str, weight: float = 1.0):
+        """Add a relationship between entities"""
+        if source_id and target_id:
+            self.graph.add_edge(source_id, target_id, 
+                              relationship=relationship_type, 
+                              weight=weight)
+        
     def build_knowledge_graph(self, file_analyses: List[Dict]) -> Dict:
         """Build knowledge graph from file analyses"""
         if not file_analyses:

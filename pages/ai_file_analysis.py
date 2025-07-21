@@ -186,7 +186,7 @@ class AIFileAnalyzer:
                 'created_date': datetime.fromtimestamp(stat.st_ctime).isoformat(),
                 'modified_date': datetime.fromtimestamp(stat.st_mtime).isoformat(),
                 'file_hash': file_hash,
-                'uploaded_by': file_document.uploaded_by.username if file_document.uploaded_by else None,
+                'uploaded_by': file_document.uploaded_by.user.username if file_document.uploaded_by else None,
                 'upload_date': file_document.created_at.isoformat() if hasattr(file_document, 'created_at') else None
             }
             
@@ -242,7 +242,10 @@ class AIFileAnalyzer:
             
             for other_analysis in other_analyses:
                 try:
-                    if other_analysis.analysis_data and 'file_analysis' in other_analysis.analysis_data:
+                    # Check if analysis_data exists and has the required structure
+                    if (hasattr(other_analysis, 'analysis_data') and 
+                        other_analysis.analysis_data and 
+                        'file_analysis' in other_analysis.analysis_data):
                         other_file_analysis = other_analysis.analysis_data['file_analysis']
                         
                         # Calculate content similarity
@@ -335,15 +338,17 @@ class AIFileAnalyzer:
                 'id': f"file_{file_document.id}",
                 'type': 'file',
                 'name': file_document.file.name,
-                'tags': analysis.tags,
-                'uploaded_by': file_document.uploaded_by.username if file_document.uploaded_by else None
+                'tags': getattr(analysis, 'tags', []),
+                'uploaded_by': file_document.uploaded_by.user.username if file_document.uploaded_by else None
             }
             
             # Add to knowledge graph
             self.knowledge_graph.add_entity(file_info)
             
             # Create relationships with similar files
-            if analysis.analysis_data and 'similarity_scores' in analysis.analysis_data:
+            if (hasattr(analysis, 'analysis_data') and 
+                analysis.analysis_data and 
+                'similarity_scores' in analysis.analysis_data):
                 for similar_file in analysis.analysis_data['similarity_scores']:
                     if similar_file['similarity'] > 0.3:  # Strong similarity
                         self.knowledge_graph.add_relationship(
@@ -383,7 +388,7 @@ class AIFileAnalyzer:
         """Generate suggestions for file usage"""
         suggestions = []
         
-        if analysis.analysis_data:
+        if hasattr(analysis, 'analysis_data') and analysis.analysis_data:
             # Analyze file type and content to suggest usage
             file_analysis = analysis.analysis_data.get('file_analysis', {})
             metadata = analysis.analysis_data.get('metadata', {})
@@ -398,7 +403,7 @@ class AIFileAnalyzer:
                 suggestions.append("Add descriptive tags for better organization")
                 suggestions.append("Consider creating image galleries or presentations")
             
-            if 'resume' in analysis.tags:
+            if hasattr(analysis, 'tags') and 'resume' in analysis.tags:
                 suggestions.append("Review candidate qualifications")
                 suggestions.append("Add to recruitment pipeline")
             
@@ -408,7 +413,9 @@ class AIFileAnalyzer:
         """Get files related to the current file"""
         related_files = []
         
-        if analysis.analysis_data and 'similarity_scores' in analysis.analysis_data:
+        if (hasattr(analysis, 'analysis_data') and 
+            analysis.analysis_data and 
+            'similarity_scores' in analysis.analysis_data):
             similarity_scores = analysis.analysis_data['similarity_scores']
             
             for similar_file in similarity_scores[:5]:  # Top 5 related files
