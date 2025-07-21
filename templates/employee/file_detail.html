@@ -1304,11 +1304,9 @@ function transferOwnership() {
                 console.log('✅ Transfer reported as successful');
                 alert(`Ownership transferred successfully to ${data.new_owner || newOwnerName}!`);
                 
-                // Add a delay before reload to see if there are any console messages
-                console.log('🔄 Reloading page in 2 seconds...');
-                setTimeout(() => {
-                    location.reload();
-                }, 2000);
+                // Redirect to files list since user no longer owns this file
+                console.log('🔄 Redirecting to files list...');
+                window.location.href = '/employee/files/';
             } else {
                 const errorMsg = data.error || data.message || 'Unknown error occurred';
                 console.error('❌ Transfer failed:', errorMsg);
