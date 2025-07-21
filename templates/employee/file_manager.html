@@ -167,13 +167,13 @@
             <div class="mb-3">
                 <h6>Quick Access</h6>
                 <ul class="list-unstyled">
-                    <li><a href="{% url 'file_manager' %}" class="text-decoration-none d-block py-1">
+                    <li><a href="{% url 'file_manager' %}" class="text-decoration-none d-block py-1 {% if not show_shared_only and not show_recent_only %}fw-bold text-primary{% endif %}">
                         <i class="fas fa-home me-2"></i>My Files
                     </a></li>
-                    <li><a href="{% url 'file_manager' %}?shared=true" class="text-decoration-none d-block py-1">
+                    <li><a href="{% url 'file_manager' %}?shared=true" class="text-decoration-none d-block py-1 {% if show_shared_only %}fw-bold text-primary{% endif %}">
                         <i class="fas fa-share-alt me-2"></i>Shared with me
                     </a></li>
-                    <li><a href="{% url 'file_manager' %}?recent=true" class="text-decoration-none d-block py-1">
+                    <li><a href="{% url 'file_manager' %}?recent=true" class="text-decoration-none d-block py-1 {% if show_recent_only %}fw-bold text-primary{% endif %}">
                         <i class="fas fa-clock me-2"></i>Recent
                     </a></li>
                     <li><a href="{% url 'file_activity' %}" class="text-decoration-none d-block py-1">
@@ -228,7 +228,16 @@
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item active">
-                    <i class="fas fa-home"></i> My Files
+                    {% if show_shared_only %}
+                        <i class="fas fa-share-alt"></i> Shared with Me
+                    {% elif show_recent_only %}
+                        <i class="fas fa-clock"></i> Recent Files
+                    {% else %}
+                        <i class="fas fa-home"></i> My Files
+                        {% for folder in breadcrumbs %}
+                            / {{ folder.name }}
+                        {% endfor %}
+                    {% endif %}
                 </li>
             </ol>
         </nav>
@@ -246,11 +255,13 @@
         </div>
         
         <!-- Upload Zone -->
+        {% if not show_shared_only and not show_recent_only %}
         <div class="upload-zone" id="uploadZone">
             <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
             <h5>Drop files here to upload</h5>
             <p class="text-muted">or <a href="#" data-bs-toggle="modal" data-bs-target="#uploadModal">browse files</a></p>
         </div>
+        {% endif %}
         
         <!-- Files Grid -->
         <div class="file-grid">

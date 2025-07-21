@@ -31,10 +31,14 @@ def file_manager(request):
         messages.error(request, 'Employee profile not found.')
         return redirect('employee_dashboard')
     
+    # Check if showing only shared files or recent files
+    show_shared_only = request.GET.get('shared') == 'true'
+    show_recent_only = request.GET.get('recent') == 'true'
+    
     # Get current folder
     folder_id = request.GET.get('folder')
     current_folder = None
-    if folder_id:
+    if folder_id and not show_shared_only and not show_recent_only:  # Don't navigate folders in special views
         # Allow access to folders created by user OR shared with user
         current_folder = FileFolder.objects.filter(
             Q(id=folder_id) & 
@@ -46,15 +50,27 @@ def file_manager(request):
     
     # Get breadcrumb navigation
     breadcrumbs = []
-    if current_folder:
+    if current_folder and not show_shared_only and not show_recent_only:
         folder = current_folder
         while folder:
             breadcrumbs.append(folder)
             folder = folder.parent
         breadcrumbs.reverse()
     
-    # Get files and folders
-    if current_folder:
+    # Get files and folders based on view mode
+    if show_shared_only:
+        # Show only shared files (no folder navigation)
+        folders = FileFolder.objects.none()  # No folders in shared view
+        files = FileDocument.objects.filter(
+            Q(shared_with=employee) | Q(is_public=True)
+        ).exclude(uploaded_by=employee).distinct()
+    elif show_recent_only:
+        # Show only recent files (no folder navigation)
+        folders = FileFolder.objects.none()  # No folders in recent view
+        files = FileDocument.objects.filter(
+            Q(uploaded_by=employee) | Q(shared_with=employee)
+        ).order_by('-last_accessed')[:20]  # Show last 20 accessed files
+    elif current_folder:
         # Show folders that are children of current folder AND user has access to
         folders = FileFolder.objects.filter(
             Q(parent=current_folder) & 
@@ -112,6 +128,8 @@ def file_manager(request):
         'upload_form': FileUploadForm(user=request.user),
         'folder_form': FolderForm(user=request.user),
         'search_form': FileSearchForm(),
+        'show_shared_only': show_shared_only,  # Add this to control template display
+        'show_recent_only': show_recent_only,  # Add this to control template display
     }
     
     return render(request, 'employee/file_manager.html', context)
