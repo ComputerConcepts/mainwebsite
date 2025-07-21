@@ -46,29 +46,42 @@
                         
                         <div class="mb-4">
                             <label class="form-label">Invite Members</label>
-                            <div class="form-text mb-2">
-                                Select employees to invite to this channel. You can always add more later.
+                            <div class="form-text mb-3">
+                                Search and select employees to invite to this channel. You can always add more later.
                             </div>
-                            <div class="row">
-                                {% for emp in all_employees %}
-                                <div class="col-md-6 mb-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" 
-                                               id="member_{{ emp.id }}" name="members" value="{{ emp.id }}">
-                                        <label class="form-check-label" for="member_{{ emp.id }}">
-                                            <div class="d-flex align-items-center">
-                                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2"
-                                                     style="width: 24px; height: 24px; font-size: 12px;">
-                                                    {{ emp.user.first_name|first|upper }}
-                                                </div>
-                                                <div>
-                                                    <div class="fw-bold">{{ emp.user.get_full_name }}</div>
-                                                    <small class="text-muted">{{ emp.department }}</small>
-                                                </div>
-                                            </div>
-                                        </label>
-                                    </div>
+                            
+                            <!-- Search Input -->
+                            <div class="mb-3">
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-search"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="memberSearch" 
+                                           placeholder="Search employees by name or department...">
                                 </div>
+                            </div>
+                            
+                            <!-- Selected Members Display -->
+                            <div id="selectedMembers" class="mb-3" style="display: none;">
+                                <label class="form-label">Selected Members:</label>
+                                <div id="selectedMembersList" class="d-flex flex-wrap gap-2"></div>
+                            </div>
+                            
+                            <!-- Search Results -->
+                            <div id="searchResults" class="border rounded p-3" style="max-height: 300px; overflow-y: auto; display: none;">
+                                <div class="text-muted text-center py-3">
+                                    <i class="fas fa-search fa-2x mb-2"></i>
+                                    <p>Start typing to search for employees...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- All Members (Hidden, for fallback) -->
+                            <div id="allMembersContainer" style="display: none;">
+                                {% for emp in all_employees %}
+                                <input type="checkbox" id="member_{{ emp.id }}" name="members" value="{{ emp.id }}" 
+                                       data-name="{{ emp.user.get_full_name }}" 
+                                       data-department="{{ emp.department }}"
+                                       data-email="{{ emp.user.email }}">
                                 {% endfor %}
                             </div>
                         </div>
@@ -99,27 +112,179 @@ document.getElementById('name').addEventListener('input', function(e) {
     e.target.value = value;
 });
 
-// Select all/none functionality
-function toggleAllMembers() {
-    const checkboxes = document.querySelectorAll('input[name="members"]');
-    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-    
+// Member search functionality
+let selectedMembers = new Set();
+let allEmployees = [];
+
+// Initialize employee data from hidden checkboxes
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('#allMembersContainer input[type="checkbox"]');
     checkboxes.forEach(cb => {
-        cb.checked = !allChecked;
+        allEmployees.push({
+            id: cb.value,
+            name: cb.dataset.name,
+            department: cb.dataset.department,
+            email: cb.dataset.email,
+            initials: cb.dataset.name.split(' ').map(n => n[0]).join('').toUpperCase()
+        });
+    });
+});
+
+// Search input handler
+document.getElementById('memberSearch').addEventListener('input', function(e) {
+    const query = e.target.value.trim().toLowerCase();
+    const resultsContainer = document.getElementById('searchResults');
+    
+    if (query.length < 2) {
+        resultsContainer.style.display = 'none';
+        return;
+    }
+    
+    const filtered = allEmployees.filter(emp => 
+        !selectedMembers.has(emp.id) && (
+            emp.name.toLowerCase().includes(query) ||
+            emp.department.toLowerCase().includes(query) ||
+            emp.email.toLowerCase().includes(query)
+        )
+    );
+    
+    displaySearchResults(filtered);
+    resultsContainer.style.display = 'block';
+});
+
+// Display search results
+function displaySearchResults(employees) {
+    const container = document.getElementById('searchResults');
+    
+    if (employees.length === 0) {
+        container.innerHTML = `
+            <div class="text-muted text-center py-3">
+                <i class="fas fa-user-slash fa-2x mb-2"></i>
+                <p>No employees found matching your search.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const html = employees.map(emp => `
+        <div class="d-flex align-items-center justify-content-between p-2 border-bottom employee-result" 
+             style="cursor: pointer;" onclick="addMember('${emp.id}', '${emp.name}', '${emp.department}')">
+            <div class="d-flex align-items-center">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3"
+                     style="width: 32px; height: 32px; font-size: 14px;">
+                    ${emp.initials}
+                </div>
+                <div>
+                    <div class="fw-bold">${emp.name}</div>
+                    <small class="text-muted">${emp.department}</small>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+    `).join('');
+    
+    container.innerHTML = html;
+    
+    // Add hover effects
+    container.querySelectorAll('.employee-result').forEach(result => {
+        result.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8f9fa';
+        });
+        result.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = '';
+        });
     });
 }
 
-// Add select all button
-document.addEventListener('DOMContentLoaded', function() {
-    const membersLabel = document.querySelector('label[class="form-label"]:last-of-type');
-    if (membersLabel && membersLabel.textContent.includes('Invite Members')) {
-        const toggleBtn = document.createElement('button');
-        toggleBtn.type = 'button';
-        toggleBtn.className = 'btn btn-sm btn-outline-secondary ms-2';
-        toggleBtn.textContent = 'Select All';
-        toggleBtn.onclick = toggleAllMembers;
-        membersLabel.appendChild(toggleBtn);
+// Add member to selection
+function addMember(id, name, department) {
+    selectedMembers.add(id);
+    
+    // Check the hidden checkbox
+    const checkbox = document.getElementById('member_' + id);
+    if (checkbox) {
+        checkbox.checked = true;
+    }
+    
+    // Update selected members display
+    updateSelectedMembersDisplay();
+    
+    // Clear search and hide results
+    document.getElementById('memberSearch').value = '';
+    document.getElementById('searchResults').style.display = 'none';
+}
+
+// Remove member from selection
+function removeMember(id) {
+    selectedMembers.delete(id);
+    
+    // Uncheck the hidden checkbox
+    const checkbox = document.getElementById('member_' + id);
+    if (checkbox) {
+        checkbox.checked = false;
+    }
+    
+    // Update selected members display
+    updateSelectedMembersDisplay();
+}
+
+// Update selected members display
+function updateSelectedMembersDisplay() {
+    const container = document.getElementById('selectedMembers');
+    const list = document.getElementById('selectedMembersList');
+    
+    if (selectedMembers.size === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    const selectedEmployees = allEmployees.filter(emp => selectedMembers.has(emp.id));
+    
+    const html = selectedEmployees.map(emp => `
+        <span class="badge bg-primary d-flex align-items-center gap-2 p-2">
+            <div class="rounded-circle bg-light text-primary d-flex align-items-center justify-content-center"
+                 style="width: 20px; height: 20px; font-size: 10px;">
+                ${emp.initials}
+            </div>
+            <span>${emp.name}</span>
+            <button type="button" class="btn-close btn-close-white" style="font-size: 10px;" 
+                    onclick="removeMember('${emp.id}')"></button>
+        </span>
+    `).join('');
+    
+    list.innerHTML = html;
+    container.style.display = 'block';
+}
+
+// Hide search results when clicking outside
+document.addEventListener('click', function(e) {
+    const searchInput = document.getElementById('memberSearch');
+    const searchResults = document.getElementById('searchResults');
+    
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.style.display = 'none';
     }
 });
 </script>
+
+<style>
+.employee-result:hover {
+    background-color: #f8f9fa !important;
+}
+
+#selectedMembersList .badge {
+    font-size: 14px;
+    font-weight: normal;
+}
+
+#searchResults {
+    border: 1px solid #dee2e6 !important;
+}
+
+.btn-close-white {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+</style>
 {% endblock %}
