@@ -2,6 +2,8 @@
 File Management Views - Drive-like interface for file management
 """
 import os
+import json
+import traceback
 import mimetypes
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -455,9 +457,10 @@ def serve_file(request, file_id):
         employee = Employee.objects.get(user=request.user)
         file_doc = get_object_or_404(FileDocument, id=file_id)
         
-        # Check permissions
+        # Check permissions (check both sharing methods)
         if not (file_doc.uploaded_by == employee or 
                 employee in file_doc.shared_with.all() or 
+                file_doc.shares.filter(shared_with=employee).exists() or
                 file_doc.is_public):
             raise Http404("File not found")
         
@@ -483,7 +486,6 @@ def serve_file(request, file_id):
         # Set proper MIME type based on file extension if not set
         mime_type = file_doc.mime_type
         if not mime_type:
-            import mimetypes
             mime_type, _ = mimetypes.guess_type(file_doc.file.path)
             if not mime_type:
                 mime_type = 'application/octet-stream'
@@ -498,7 +500,6 @@ def serve_file(request, file_id):
     except Employee.DoesNotExist:
         raise Http404("Employee profile not found")
     except Exception as e:
-        import traceback
         print(f"Error serving file: {str(e)}")
         print(traceback.format_exc())
         raise Http404(f"Error serving file: {str(e)}")
@@ -511,9 +512,10 @@ def download_file(request, file_id):
         employee = Employee.objects.get(user=request.user)
         file_doc = get_object_or_404(FileDocument, id=file_id)
         
-        # Check permissions
+        # Check permissions (check both sharing methods)
         if not (file_doc.uploaded_by == employee or 
                 employee in file_doc.shared_with.all() or 
+                file_doc.shares.filter(shared_with=employee).exists() or
                 file_doc.is_public):
             raise Http404("File not found")
         
@@ -555,9 +557,10 @@ def view_file(request, file_id):
         employee = Employee.objects.get(user=request.user)
         file_doc = get_object_or_404(FileDocument, id=file_id)
         
-        # Check permissions
+        # Check permissions (check both sharing methods)
         if not (file_doc.uploaded_by == employee or 
                 employee in file_doc.shared_with.all() or 
+                file_doc.shares.filter(shared_with=employee).exists() or
                 file_doc.is_public):
             raise Http404("File not found")
         
@@ -1468,10 +1471,12 @@ def get_file_details(request, file_id):
         employee = Employee.objects.get(user=request.user)
         file_doc = get_object_or_404(FileDocument, id=file_id)
         
-        # Check if user has access to this file
+        # Check if user has access to this file (check both sharing methods)
         has_access = (
             file_doc.uploaded_by == employee or
+            file_doc.shared_with.filter(id=employee.id).exists() or
             file_doc.shares.filter(shared_with=employee).exists() or
+            file_doc.is_public or
             employee.is_admin()
         )
         
@@ -1490,11 +1495,22 @@ def get_file_details(request, file_id):
                 'created_at': share.created_at.strftime('%b %d, %Y')
             } for share in shares]
         
+        def format_file_size(size_bytes):
+            """Format file size in human readable format"""
+            if size_bytes == 0:
+                return "0 B"
+            size_names = ["B", "KB", "MB", "GB", "TB"]
+            i = 0
+            while size_bytes >= 1024 and i < len(size_names) - 1:
+                size_bytes /= 1024.0
+                i += 1
+            return f"{size_bytes:.1f} {size_names[i]}"
+        
         file_data = {
             'id': str(file_doc.id),
             'name': file_doc.name,
-            'size': file_doc.get_file_size_display(),
-            'content_type': file_doc.content_type,
+            'size': format_file_size(file_doc.file_size) if file_doc.file_size else '0 B',
+            'mime_type': file_doc.mime_type,
             'file_type': file_doc.file_type,
             'owner_name': file_doc.uploaded_by.get_full_name(),
             'is_owner': file_doc.uploaded_by == employee,
