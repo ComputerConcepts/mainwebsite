@@ -9,68 +9,147 @@
         height: calc(100vh - 120px);
         overflow-y: auto;
         border-right: 1px solid #e0e0e0;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 20px 15px;
     }
     
     .chat-main {
         height: calc(100vh - 120px);
         display: flex;
         flex-direction: column;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    }
+    
+    .chat-header {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+    }
+    
+    .chat-header h5 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1.4rem;
+    }
+    
+    .chat-header .dropdown-toggle {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+    
+    .chat-header .dropdown-toggle:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-2px);
     }
     
     .channel-item, .dm-item {
         display: flex;
         align-items: flex-start;
-        padding: 12px;
+        padding: 16px;
         text-decoration: none;
         color: #333;
-        border-radius: 8px;
-        margin: 2px 0;
-        transition: background-color 0.2s;
-        min-height: 60px;
+        border-radius: 12px;
+        margin: 6px 0;
+        transition: all 0.3s ease;
+        min-height: 70px;
+        background: white;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .channel-item::before, .dm-item::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #007bff, #0056b3);
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
     }
     
     .channel-item:hover, .dm-item:hover {
-        background-color: #f8f9fa;
+        background: white;
         text-decoration: none;
         color: #333;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+    
+    .channel-item:hover::before, .dm-item:hover::before {
+        transform: scaleX(1);
     }
     
     .channel-item.active, .dm-item.active {
-        background-color: #007bff;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
         color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
     }
     
     .channel-icon, .dm-avatar {
-        width: 40px;
-        height: 40px;
-        margin-right: 12px;
+        width: 48px;
+        height: 48px;
+        margin-right: 15px;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 50%;
-        background-color: #e9ecef;
-        font-weight: bold;
-        font-size: 16px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        font-weight: 600;
+        font-size: 18px;
         flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
+    }
+    
+    .dm-avatar {
+        border-radius: 50%;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
     }
     
     .unread-badge {
-        background-color: #dc3545;
+        background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
         color: white;
-        border-radius: 12px;
-        padding: 4px 8px;
+        border-radius: 20px;
+        padding: 6px 12px;
         font-size: 11px;
-        font-weight: bold;
-        min-width: 20px;
+        font-weight: 600;
+        min-width: 24px;
         text-align: center;
+        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
     }
     
     .online-indicator {
-        width: 8px;
-        height: 8px;
-        background-color: #28a745;
+        width: 12px;
+        height: 12px;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
         border-radius: 50%;
         margin-left: auto;
+        box-shadow: 0 0 8px rgba(40, 167, 69, 0.4);
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+    
+    @keyframes glow {
+        from { box-shadow: 0 0 8px rgba(40, 167, 69, 0.4); }
+        to { box-shadow: 0 0 15px rgba(40, 167, 69, 0.7); }
     }
     
     .chat-welcome {
@@ -80,32 +159,180 @@
         height: 100%;
         text-align: center;
         color: #6c757d;
+        padding: 40px;
+    }
+    
+    .welcome-content {
+        background: white;
+        padding: 60px 40px;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .welcome-icon {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        width: 80px;
+        height: 80px;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 30px;
+        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.2);
+    }
+    
+    .welcome-content h4 {
+        color: #2c3e50;
+        font-weight: 600;
+        margin-bottom: 15px;
+    }
+    
+    .welcome-content p {
+        color: #6c757d;
+        margin-bottom: 30px;
+        font-size: 1.1rem;
+    }
+    
+    .welcome-content .btn {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        border: none;
+        padding: 12px 30px;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+    }
+    
+    .welcome-content .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
     }
     
     .sidebar-section {
-        margin-bottom: 20px;
+        margin-bottom: 30px;
     }
     
     .sidebar-section h6 {
-        color: #6c757d;
-        font-size: 12px;
+        color: #495057;
+        font-size: 13px;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 8px;
-        padding: 0 12px;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
+        padding: 0 5px;
+        font-weight: 600;
+        position: relative;
+    }
+    
+    .sidebar-section h6::after {
+        content: '';
+        position: absolute;
+        bottom: -5px;
+        left: 5px;
+        width: 30px;
+        height: 2px;
+        background: linear-gradient(90deg, #007bff, #0056b3);
+        border-radius: 1px;
+    }
+    
+    .section-add-btn {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        color: white;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+    }
+    
+    .section-add-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
     }
     
     /* DM Modal Search Styles */
+    .employee-result {
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        margin: 5px 0;
+    }
+    
     .employee-result:hover {
         background-color: #f8f9fa !important;
+        transform: translateX(5px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
     
     #selectedEmployeeDisplay {
         border: 1px solid #dee2e6;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     }
     
     #employeeSearchResults {
         border: 1px solid #dee2e6 !important;
+        border-radius: 12px;
+        background: white;
+    }
+    
+    /* Enhanced Modal Styles */
+    .modal-content {
+        border-radius: 15px;
+        border: none;
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+    }
+    
+    .modal-header {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        border-radius: 15px 15px 0 0;
+        padding: 20px 25px;
+    }
+    
+    .modal-body {
+        padding: 25px;
+    }
+    
+    .modal-footer {
+        padding: 20px 25px;
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-control, .form-select {
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.1);
+    }
+    
+    .input-group-text {
+        border-radius: 10px 0 0 10px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 1px solid #dee2e6;
+    }
+    
+    /* Responsive improvements */
+    @media (max-width: 768px) {
+        .chat-sidebar {
+            height: auto;
+            max-height: 300px;
+        }
+        
+        .chat-main {
+            height: auto;
+            min-height: 400px;
+        }
+        
+        .welcome-content {
+            padding: 40px 20px;
+        }
     }
 </style>
 {% endblock %}
@@ -115,11 +342,11 @@
     <div class="row">
         <!-- Chat Sidebar -->
         <div class="col-md-3 chat-sidebar">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Chat</h5>
+            <div class="chat-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">💬 Chat Hub</h5>
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-plus"></i>
+                    <button class="btn btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-plus me-1"></i> New
                     </button>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="{% url 'create_channel' %}">
@@ -134,14 +361,16 @@
             
             <!-- Channels -->
             <div class="sidebar-section">
-                <h6>Channels</h6>
+                <h6><i class="fas fa-hashtag me-2"></i>Channels</h6>
                 {% for channel in channels %}
                 <a href="{% url 'chat_channel' channel.id %}" class="channel-item">
                     <div class="channel-icon">#</div>
                     <div class="flex-grow-1">
                         <div class="fw-bold">{{ channel.name }}</div>
                         {% if channel.get_latest_message %}
-                        <small class="text-muted">{{ channel.get_latest_message.created_at|timesince }} ago</small>
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>{{ channel.get_latest_message.created_at|timesince }} ago
+                        </small>
                         {% endif %}
                     </div>
                     {% comment %}
@@ -151,15 +380,18 @@
                     {% endcomment %}
                 </a>
                 {% empty %}
-                <p class="text-muted small px-3">No channels yet</p>
+                <div class="text-muted small px-3 py-2 text-center" style="background: rgba(255,255,255,0.7); border-radius: 10px;">
+                    <i class="fas fa-comment-slash mb-2 d-block"></i>
+                    No channels yet
+                </div>
                 {% endfor %}
             </div>
             
             <!-- Direct Messages -->
             <div class="sidebar-section">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="mb-0">Recent Direct Messages</h6>
-                    <button class="btn btn-sm btn-outline-primary" onclick="startDirectMessage()" title="Start new DM">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0"><i class="fas fa-envelope me-2"></i>Direct Messages</h6>
+                    <button class="btn section-add-btn" onclick="startDirectMessage()" title="Start new DM">
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
@@ -178,40 +410,52 @@
                             <span class="unread-badge">{{ dm.unread_count }}</span>
                             {% endif %}
                         </div>
-                        <small class="text-muted">{{ dm.participant.department }}</small>
+                        <small class="text-muted">
+                            <i class="fas fa-building me-1"></i>{{ dm.participant.department }}
+                        </small>
                         <div class="text-truncate" style="max-width: 180px;">
                             <small class="text-muted">
                                 {% if dm.latest_message.sender == employee %}
-                                    You: {{ dm.latest_message.content|truncatechars:30 }}
+                                    <i class="fas fa-reply me-1"></i>You: {{ dm.latest_message.content|truncatechars:25 }}
                                 {% else %}
                                     {{ dm.latest_message.content|truncatechars:30 }}
                                 {% endif %}
                             </small>
                         </div>
-                        <small class="text-muted">{{ dm.latest_message.created_at|timesince }} ago</small>
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>{{ dm.latest_message.created_at|timesince }} ago
+                        </small>
                     </div>
                 </a>
                 {% empty %}
-                <p class="text-muted small px-3">No recent conversations</p>
+                <div class="text-muted small px-3 py-2 text-center" style="background: rgba(255,255,255,0.7); border-radius: 10px;">
+                    <i class="fas fa-comments mb-2 d-block"></i>
+                    No recent conversations
+                </div>
                 {% endfor %}
                 
                 {% if recent_dms|length > 0 %}
-                <hr class="my-2">
+                <hr class="my-3" style="border-color: rgba(255,255,255,0.3);">
                 {% endif %}
                 
                 <!-- Online Users -->
-                <h6 class="mt-3">Online Now</h6>
+                <h6 class="mt-3"><i class="fas fa-circle text-success me-2"></i>Online Now</h6>
                 {% for online_user in online_employees %}
                 <a href="{% url 'chat_direct_message' online_user.id %}" class="dm-item">
                     <div class="dm-avatar">{{ online_user.user.first_name|first|upper }}</div>
                     <div class="flex-grow-1">
-                        <div>{{ online_user.user.get_full_name }}</div>
-                        <small class="text-muted">{{ online_user.department }}</small>
+                        <div class="fw-bold">{{ online_user.user.get_full_name }}</div>
+                        <small class="text-muted">
+                            <i class="fas fa-building me-1"></i>{{ online_user.department }}
+                        </small>
                     </div>
                     <div class="online-indicator"></div>
                 </a>
                 {% empty %}
-                <p class="text-muted small px-3">No one online</p>
+                <div class="text-muted small px-3 py-2 text-center" style="background: rgba(255,255,255,0.7); border-radius: 10px;">
+                    <i class="fas fa-user-slash mb-2 d-block"></i>
+                    No one online
+                </div>
                 {% endfor %}
             </div>
         </div>
@@ -219,13 +463,20 @@
         <!-- Chat Main Area -->
         <div class="col-md-9 chat-main">
             <div class="chat-welcome">
-                <div>
-                    <i class="fas fa-comments fa-4x mb-3 text-muted"></i>
-                    <h4>Welcome to Employee Chat</h4>
-                    <p class="text-muted">Select a channel or start a direct message to begin chatting.</p>
-                    <a href="{% url 'create_channel' %}" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i>Create Your First Channel
-                    </a>
+                <div class="welcome-content">
+                    <div class="welcome-icon">
+                        <i class="fas fa-comments fa-2x"></i>
+                    </div>
+                    <h4> Welcome to Employee Chat Hub</h4>
+                    <p>Connect, collaborate, and communicate seamlessly with your team. Start by creating a channel or sending a direct message!</p>
+                    <div class="d-flex gap-3 justify-content-center flex-wrap">
+                        <a href="{% url 'create_channel' %}" class="btn btn-primary">
+                            <i class="fas fa-hashtag me-2"></i>Create Channel
+                        </a>
+                        <button class="btn btn-outline-primary" onclick="startDirectMessage()">
+                            <i class="fas fa-paper-plane me-2"></i>Send Message
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
