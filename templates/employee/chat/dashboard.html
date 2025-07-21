@@ -242,7 +242,7 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="employeeSearch" class="form-label">Select Employee</label>
+                    <label for="employeeSearch" class="form-label">Search for Employee</label>
                     <div class="input-group">
                         <span class="input-group-text">
                             <i class="fas fa-search"></i>
@@ -266,20 +266,23 @@
                     </div>
                 </div>
                 
-                <!-- Hidden select for compatibility -->
-                <select class="form-select d-none" id="dmRecipient">
-                    <option value="">Choose an employee...</option>
-                    {% for emp in all_employees %}
-                    <option value="{{ emp.id }}" 
-                            data-name="{{ emp.user.get_full_name }}" 
-                            data-department="{{ emp.department }}"
-                            data-email="{{ emp.user.email }}"
-                            data-online="{% if emp in online_employees %}true{% else %}false{% endif %}">
-                        {{ emp.user.get_full_name }}
-                        {% if emp.department %} - {{ emp.department }}{% endif %}
-                    </option>
-                    {% endfor %}
-                </select>
+                <!-- Fallback dropdown (visible when no search) -->
+                <div class="mb-3">
+                    <label for="dmRecipient" class="form-label">Or select from list:</label>
+                    <select class="form-select" id="dmRecipient" onchange="handleDropdownSelection()">
+                        <option value="">Choose an employee...</option>
+                        {% for emp in all_employees %}
+                        <option value="{{ emp.id }}" 
+                                data-name="{{ emp.user.get_full_name }}" 
+                                data-department="{{ emp.department }}"
+                                data-email="{{ emp.user.email }}"
+                                data-online="{% if emp in online_employees %}true{% else %}false{% endif %}">
+                            {{ emp.user.get_full_name }}
+                            {% if emp.department %} - {{ emp.department }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
                 
                 <div class="mb-3">
                     <label for="dmMessage" class="form-label">Initial Message (Optional)</label>
@@ -300,6 +303,7 @@
 // DM Modal functionality
 let selectedEmployeeId = null;
 let allDMEmployees = [];
+let dmSearchTimeout = null;
 
 function startDirectMessage() {
     // Reset modal state
@@ -313,6 +317,9 @@ function startDirectMessage() {
     // Initialize employee data
     initializeDMEmployees();
     
+    // Set up search functionality
+    setupDMSearch();
+    
     new bootstrap.Modal(document.getElementById('startDMModal')).show();
 }
 
@@ -321,32 +328,48 @@ function initializeDMEmployees() {
     allDMEmployees = Array.from(options).map(option => ({
         id: option.value,
         name: option.dataset.name,
-        department: option.dataset.department,
+        department: option.dataset.department || 'Employee',
         email: option.dataset.email,
         online: option.dataset.online === 'true',
         initials: option.dataset.name.split(' ').map(n => n[0]).join('').toUpperCase()
     }));
 }
 
-// Employee search functionality
-document.getElementById('employeeSearch').addEventListener('input', function(e) {
-    const query = e.target.value.trim().toLowerCase();
-    const resultsContainer = document.getElementById('employeeSearchResults');
+function setupDMSearch() {
+    const searchInput = document.getElementById('employeeSearch');
     
-    if (query.length < 2) {
-        resultsContainer.style.display = 'none';
-        return;
-    }
+    // Remove any existing event listeners by cloning the element
+    const newSearchInput = searchInput.cloneNode(true);
+    searchInput.parentNode.replaceChild(newSearchInput, searchInput);
     
-    const filtered = allDMEmployees.filter(emp => 
-        emp.name.toLowerCase().includes(query) ||
-        emp.department.toLowerCase().includes(query) ||
-        emp.email.toLowerCase().includes(query)
-    );
-    
-    displayDMSearchResults(filtered);
-    resultsContainer.style.display = 'block';
-});
+    // Add fresh event listener
+    document.getElementById('employeeSearch').addEventListener('input', function(e) {
+        const query = e.target.value.trim().toLowerCase();
+        const resultsContainer = document.getElementById('employeeSearchResults');
+        
+        // Clear previous timeout
+        if (dmSearchTimeout) {
+            clearTimeout(dmSearchTimeout);
+        }
+        
+        if (query.length < 2) {
+            resultsContainer.style.display = 'none';
+            return;
+        }
+        
+        // Debounce search
+        dmSearchTimeout = setTimeout(() => {
+            const filtered = allDMEmployees.filter(emp => 
+                emp.name.toLowerCase().includes(query) ||
+                emp.department.toLowerCase().includes(query) ||
+                emp.email.toLowerCase().includes(query)
+            );
+            
+            displayDMSearchResults(filtered);
+            resultsContainer.style.display = 'block';
+        }, 300);
+    });
+}
 
 function displayDMSearchResults(employees) {
     const container = document.getElementById('employeeSearchResults');
@@ -400,7 +423,7 @@ function displayDMSearchResults(employees) {
 function selectDMEmployee(id, name, department, online) {
     selectedEmployeeId = id;
     
-    // Update hidden select
+    // Update hidden select for compatibility
     document.getElementById('dmRecipient').value = id;
     
     // Show selected employee
@@ -446,19 +469,43 @@ function clearDMSelection() {
     document.getElementById('startChatBtn').disabled = true;
 }
 
+function handleDropdownSelection() {
+    const dropdown = document.getElementById('dmRecipient');
+    const selectedOption = dropdown.options[dropdown.selectedIndex];
+    
+    if (selectedOption.value) {
+        const name = selectedOption.dataset.name;
+        const department = selectedOption.dataset.department || 'Employee';
+        const online = selectedOption.dataset.online === 'true';
+        
+        selectDMEmployee(selectedOption.value, name, department, online);
+    } else {
+        clearDMSelection();
+    }
+}
+
 function openDirectMessage() {
     const recipientId = selectedEmployeeId || document.getElementById('dmRecipient').value;
     const initialMessage = document.getElementById('dmMessage').value.trim();
     
-    if (recipientId) {
-        let url = `/employee/chat/dm/${recipientId}/`;
-        if (initialMessage) {
-            url += `?msg=${encodeURIComponent(initialMessage)}`;
-        }
-        window.location.href = url;
-    } else {
+    if (!recipientId) {
         alert('Please select an employee to message.');
+        return;
     }
+    
+    let url = `/employee/chat/dm/${recipientId}/`;
+    if (initialMessage) {
+        url += `?msg=${encodeURIComponent(initialMessage)}`;
+    }
+    
+    // Close the modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('startDMModal'));
+    if (modal) {
+        modal.hide();
+    }
+    
+    // Navigate to the direct message page
+    window.location.href = url;
 }
 
 // Hide search results when clicking outside
@@ -469,6 +516,28 @@ document.addEventListener('click', function(e) {
     if (searchInput && searchResults && 
         !searchInput.contains(e.target) && !searchResults.contains(e.target)) {
         searchResults.style.display = 'none';
+    }
+});
+
+// Ensure the modal is properly initialized when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Pre-initialize employees data if modal exists
+    const modal = document.getElementById('startDMModal');
+    if (modal) {
+        // Set up modal event listeners
+        modal.addEventListener('shown.bs.modal', function() {
+            // Focus on search input when modal opens
+            const searchInput = document.getElementById('employeeSearch');
+            if (searchInput) {
+                searchInput.focus();
+            }
+        });
+        
+        modal.addEventListener('hidden.bs.modal', function() {
+            // Clean up when modal closes
+            clearDMSelection();
+            document.getElementById('employeeSearchResults').style.display = 'none';
+        });
     }
 });
 
