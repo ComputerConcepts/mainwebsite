@@ -276,7 +276,7 @@
                 <div class="mb-3">
                     <h6 class="text-muted">Shared with {{ shares|length }} person{{ shares|length|pluralize }}</h6>
                     {% for share in shares %}
-                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded" data-share-id="{{ share.id }}">
                         <div>
                             <strong>{{ share.shared_with.get_full_name }}</strong>
                             <small class="text-muted d-block">{{ share.get_permission_display }}</small>
@@ -766,6 +766,17 @@ function updatePermission(shareId, newPermission) {
 function revokeAccess(shareId, userName) {
     console.log(`🔧 Revoking access for ${userName}, Share ID: ${shareId}`);
     
+    // Input validation
+    if (!shareId || shareId.trim() === '') {
+        console.error('❌ Invalid share ID provided');
+        alert('Error: Invalid share ID. Please refresh the page and try again.');
+        return;
+    }
+    
+    if (!userName || userName.trim() === '') {
+        userName = 'this user'; // Fallback for display
+    }
+    
     if (!confirm(`Remove access for ${userName}?`)) {
         console.log('🚫 User cancelled revoke action');
         return;
@@ -802,7 +813,14 @@ function revokeAccess(shareId, userName) {
         console.log(`📡 Response: ${response.status} ${response.statusText}`);
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            // Handle specific status codes
+            if (response.status === 403) {
+                throw new Error('Permission denied. You may not have rights to unshare this file.');
+            } else if (response.status === 404) {
+                throw new Error('File or share not found. It may have already been removed.');
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
         }
         
         return response.json();
@@ -816,25 +834,16 @@ function revokeAccess(shareId, userName) {
             
             // Remove from both sidebar and modal
             const shareItems = document.querySelectorAll(`[data-share-id="${shareId}"]`);
+            console.log(`🗑️ Found ${shareItems.length} share items to remove`);
             shareItems.forEach(item => {
                 item.style.transition = 'opacity 0.3s ease';
                 item.style.opacity = '0';
                 setTimeout(() => item.remove(), 300);
             });
             
-            // Also remove from sidebar if it exists
-            const sidebarRevokeButton = document.querySelector(`button[onclick*="revokeAccess('${shareId}'"]`);
-            if (sidebarRevokeButton) {
-                const sidebarShareItem = sidebarRevokeButton.closest('.d-flex');
-                if (sidebarShareItem) {
-                    sidebarShareItem.style.transition = 'opacity 0.3s ease';
-                    sidebarShareItem.style.opacity = '0';
-                    setTimeout(() => sidebarShareItem.remove(), 300);
-                }
-            }
-            
-            // Update the modal count
+            // Update the modal count and sidebar count
             setTimeout(() => {
+                // Update modal
                 const currentSharesDiv = document.getElementById('currentShares');
                 if (currentSharesDiv) {
                     const remainingShares = currentSharesDiv.querySelectorAll('.share-item').length;
@@ -854,11 +863,37 @@ function revokeAccess(shareId, userName) {
                         `;
                     }
                 }
+                
+                // Update sidebar sharing section
+                const remainingSidebarShares = document.querySelectorAll('.file-info-card [data-share-id]');
+                const sidebarShareCount = document.querySelector('.file-info-card h6.text-muted');
+                if (sidebarShareCount) {
+                    const newCount = remainingSidebarShares.length;
+                    sidebarShareCount.textContent = `Shared with ${newCount} person${newCount !== 1 ? 's' : ''}`;
+                    
+                    // If no shares left in sidebar, show "not shared" message
+                    if (newCount === 0) {
+                        const sidebarSharesContainer = sidebarShareCount.nextElementSibling;
+                        if (sidebarSharesContainer && sidebarSharesContainer.classList.contains('mb-3')) {
+                            sidebarSharesContainer.innerHTML = `
+                                <div class="text-center py-3">
+                                    <i class="fas fa-lock fa-2x text-muted mb-2"></i>
+                                    <p class="text-muted mb-0">This file is not shared with anyone</p>
+                                    {% if can_edit %}
+                                    <button class="btn btn-sm btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#shareModal">
+                                        <i class="fas fa-share-alt me-1"></i>Share Now
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            `;
+                        }
+                    }
+                }
             }, 350);
             
         } else {
-            console.error('❌ Server returned error:', data.error);
-            alert('Error: ' + (data.error || 'Unknown error occurred'));
+            console.error('❌ Server returned error:', data.error || data.message);
+            alert('Error: ' + (data.error || data.message || 'Unknown error occurred'));
             
             // Restore button
             if (revokeButton) {
