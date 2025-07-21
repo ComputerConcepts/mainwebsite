@@ -503,6 +503,26 @@ class FileDocument(models.Model):
         if self.file:
             return self.file.path
         return None
+    
+    @property
+    def is_image(self):
+        """Check if file is an image"""
+        return self.file_type == 'image' or (self.mime_type and self.mime_type.startswith('image/'))
+    
+    @property
+    def is_pdf(self):
+        """Check if file is a PDF"""
+        return self.file_type == 'pdf' or (self.mime_type and 'pdf' in self.mime_type.lower())
+    
+    @property
+    def is_video(self):
+        """Check if file is a video"""
+        return self.file_type == 'video' or (self.mime_type and self.mime_type.startswith('video/'))
+    
+    @property
+    def is_audio(self):
+        """Check if file is an audio file"""
+        return self.file_type == 'audio' or (self.mime_type and self.mime_type.startswith('audio/'))
 
 
 class FileActivity(models.Model):

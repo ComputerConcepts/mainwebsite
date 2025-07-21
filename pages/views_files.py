@@ -590,10 +590,20 @@ def view_file(request, file_id):
         # Add AI analysis
         ai_analysis = None
         try:
+            from .ai_assistant import create_free_ai_assistant
             analyzer, bot = create_free_ai_assistant()
             file_path = file_doc.get_file_path()
             if file_path and os.path.exists(file_path):
                 ai_analysis = analyzer.analyze_file(file_path, file_doc.name)
+        except ImportError as e:
+            # AI assistant not available
+            ai_analysis = {
+                'summary': 'AI analysis not available - dependencies missing',
+                'category': 'unknown',
+                'key_topics': [],
+                'has_text': False,
+                'error': f'Import error: {str(e)}'
+            }
         except Exception as e:
             # If analysis fails, create a basic structure
             ai_analysis = {
@@ -612,6 +622,7 @@ def view_file(request, file_id):
             'activities': activities,
             'can_edit': file_doc.uploaded_by == employee,
             'ai_analysis': ai_analysis,
+            'available_employees': Employee.objects.exclude(id=employee.id) if file_doc.uploaded_by == employee else None,
         }
         
         return render(request, 'employee/file_detail.html', context)
