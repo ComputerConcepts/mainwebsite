@@ -472,12 +472,20 @@
                     {% csrf_token %}
                     <div class="mb-3">
                         <label class="form-label">Transfer to:</label>
-                        <select class="form-select" id="newOwner" required>
-                            <option value="">Select new owner...</option>
-                            {% for employee in available_employees %}
-                            <option value="{{ employee.id }}">{{ employee.get_full_name }} ({{ employee.user.email }})</option>
-                            {% endfor %}
-                        </select>
+                        <div class="position-relative">
+                            <input type="text" class="form-control" id="newOwnerSearch" placeholder="Start typing to search employees..." required autocomplete="off">
+                            <input type="hidden" id="newOwner" required>
+                            <div id="ownerSuggestions" class="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-sm" style="z-index: 1000; max-height: 200px; overflow-y: auto; display: none;"></div>
+                        </div>
+                        <div id="selectedOwner" class="mt-2" style="display: none;">
+                            <div class="alert alert-info">
+                                <i class="fas fa-user me-2"></i>
+                                <strong>Selected: </strong><span id="selectedOwnerName"></span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="clearOwnerSelection()">
+                                    <i class="fas fa-times"></i> Change
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -688,11 +696,112 @@ document.getElementById('shareEmail').addEventListener('input', function(e) {
 document.addEventListener('click', function(e) {
     const emailInput = document.getElementById('shareEmail');
     const suggestionsDiv = document.getElementById('emailSuggestions');
+    const ownerInput = document.getElementById('newOwnerSearch');
+    const ownerSuggestions = document.getElementById('ownerSuggestions');
     
     if (!emailInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
         suggestionsDiv.style.display = 'none';
     }
+    
+    if (ownerInput && ownerSuggestions && !ownerInput.contains(e.target) && !ownerSuggestions.contains(e.target)) {
+        ownerSuggestions.style.display = 'none';
+    }
 });
+
+// Owner search autocomplete functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const ownerSearchInput = document.getElementById('newOwnerSearch');
+    if (ownerSearchInput) {
+        ownerSearchInput.addEventListener('input', function(e) {
+            const query = e.target.value.trim();
+            const suggestionsDiv = document.getElementById('ownerSuggestions');
+            
+            if (query.length < 2) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            // Fetch suggestions from the server
+            fetch(`/api/employees/search-email/?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.length > 0) {
+                        suggestionsDiv.innerHTML = '';
+                        data.results.forEach(result => {
+                            const suggestionItem = document.createElement('div');
+                            suggestionItem.className = 'p-2 border-bottom suggestion-item';
+                            suggestionItem.style.cursor = 'pointer';
+                            suggestionItem.innerHTML = `
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-user-circle me-2 text-muted"></i>
+                                    <div>
+                                        <div class="fw-medium">${result.name}</div>
+                                        <small class="text-muted">${result.email}</small>
+                                        ${result.department ? `<small class="text-muted ms-2">• ${result.department}</small>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                            suggestionItem.addEventListener('click', function() {
+                                selectOwner(result.id, result.name, result.email);
+                            });
+                            
+                            // Hover effects
+                            suggestionItem.addEventListener('mouseenter', function() {
+                                this.style.backgroundColor = '#f8f9fa';
+                            });
+                            suggestionItem.addEventListener('mouseleave', function() {
+                                this.style.backgroundColor = 'white';
+                            });
+                            
+                            suggestionsDiv.appendChild(suggestionItem);
+                        });
+                        suggestionsDiv.style.display = 'block';
+                    } else {
+                        suggestionsDiv.innerHTML = '<div class="p-2 text-muted">No employees found</div>';
+                        suggestionsDiv.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching owner suggestions:', error);
+                    suggestionsDiv.style.display = 'none';
+                });
+        });
+    }
+});
+
+// Function to select an owner
+function selectOwner(employeeId, name, email) {
+    const hiddenInput = document.getElementById('newOwner');
+    const searchInput = document.getElementById('newOwnerSearch');
+    const suggestionsDiv = document.getElementById('ownerSuggestions');
+    const selectedOwnerDiv = document.getElementById('selectedOwner');
+    const selectedOwnerName = document.getElementById('selectedOwnerName');
+    
+    // Set the values
+    hiddenInput.value = employeeId;
+    searchInput.style.display = 'none';
+    suggestionsDiv.style.display = 'none';
+    
+    // Show selected owner
+    selectedOwnerName.textContent = `${name} (${email})`;
+    selectedOwnerDiv.style.display = 'block';
+}
+
+// Function to clear owner selection
+function clearOwnerSelection() {
+    const hiddenInput = document.getElementById('newOwner');
+    const searchInput = document.getElementById('newOwnerSearch');
+    const selectedOwnerDiv = document.getElementById('selectedOwner');
+    
+    // Clear values
+    hiddenInput.value = '';
+    searchInput.value = '';
+    searchInput.style.display = 'block';
+    selectedOwnerDiv.style.display = 'none';
+    
+    // Focus on search input
+    searchInput.focus();
+}
 
 // Share management functions
 document.getElementById('shareForm').addEventListener('submit', function(e) {
@@ -920,7 +1029,7 @@ function transferOwnership() {
     const confirmed = document.getElementById('confirmTransfer').checked;
     
     if (!newOwnerId) {
-        alert('Please select a new owner');
+        alert('Please select a new owner by searching for them in the field above');
         return;
     }
     
@@ -929,8 +1038,9 @@ function transferOwnership() {
         return;
     }
     
-    const selectedOption = document.querySelector(`#newOwner option[value="${newOwnerId}"]`);
-    const newOwnerName = selectedOption ? selectedOption.text : 'selected user';
+    // Get the selected owner name from the display
+    const selectedOwnerNameSpan = document.getElementById('selectedOwnerName');
+    const newOwnerName = selectedOwnerNameSpan ? selectedOwnerNameSpan.textContent : 'selected user';
     
     if (confirm(`Are you sure you want to transfer ownership of this file to ${newOwnerName}? This action cannot be undone.`)) {
         const formData = new FormData();
