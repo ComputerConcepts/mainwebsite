@@ -141,25 +141,6 @@
         </div>
         {% endif %}
 
-        <!-- Debug Information -->
-        {% if debug_shared_count is not None %}
-        <div class="alert alert-info">
-            <strong>Debug Information:</strong><br>
-            • {{ debug_shared_count }} shared boards found<br>
-            • {{ debug_total_board_shares }} total BoardShare records<br>
-            • {{ debug_all_boards_count }} total boards in system<br>
-            • {{ debug_all_employees_count }} total employees<br>
-            {% if debug_shared_ids %}
-                • Shared board IDs: {{ debug_shared_ids|join:", " }}
-            {% endif %}
-            <div class="mt-2">
-                <a href="{% url 'create_test_shared_boards' %}" class="btn btn-sm btn-warning">
-                    <i class="fas fa-bug me-2"></i>Create Test Shared Board
-                </a>
-            </div>
-        </div>
-        {% endif %}
-
         <!-- Boards Content -->
         {% if show_shared %}
             <!-- Shared Boards Section -->
@@ -277,7 +258,6 @@
             {% if shared_boards %}
             <div class="section-header mb-3 mt-5">
                 <h5><i class="fas fa-share-alt me-2"></i>Boards Shared with You ({{ shared_boards.count }})</h5>
-                <p class="text-muted small">These are boards explicitly shared with you via BoardShare</p>
             </div>
             
             <div class="row">

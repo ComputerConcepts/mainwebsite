@@ -44,17 +44,6 @@ def project_boards(request):
     shared_board_ids = BoardShare.objects.filter(shared_with=employee).values_list('board_id', flat=True)
     shared_boards = Board.objects.filter(id__in=shared_board_ids, is_archived=False)
     
-    # Debug information
-    total_board_shares = BoardShare.objects.filter(shared_with=employee).count()
-    all_boards_count = Board.objects.filter(is_archived=False).count()
-    all_employees_count = Employee.objects.count()
-    
-    print(f"DEBUG - Employee: {employee.user.username}")
-    print(f"DEBUG - Total BoardShare records for this user: {total_board_shares}")
-    print(f"DEBUG - All boards in system: {all_boards_count}")
-    print(f"DEBUG - All employees: {all_employees_count}")
-    print(f"DEBUG - Shared board IDs: {list(shared_board_ids)}")
-    
     # Apply filters based on navigation
     if show_shared:
         # Show only shared boards
@@ -94,11 +83,6 @@ def project_boards(request):
         'show_shared': show_shared,
         'show_recent': show_recent,
         'search_query': search_query,
-        'debug_shared_count': shared_boards.count(),
-        'debug_shared_ids': list(shared_board_ids),
-        'debug_total_board_shares': total_board_shares,
-        'debug_all_boards_count': all_boards_count,
-        'debug_all_employees_count': all_employees_count,
     }
     
     return render(request, 'employee/boards/boards_list.html', context)
@@ -1023,56 +1007,3 @@ def transfer_board_ownership(request, board_id):
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-
-
-@login_required
-def create_test_shared_boards(request):
-    """Debug view to create test shared boards"""
-    if not is_employee_authenticated(request):
-        return redirect('employee_login')
-    
-    employee = Employee.objects.get(user=request.user)
-    
-    # Get all employees except current one
-    other_employees = Employee.objects.exclude(id=employee.id)
-    
-    if not other_employees.exists():
-        messages.error(request, 'Need at least 2 employees to create shared boards')
-        return redirect('project_boards')
-    
-    # Create or get a test board
-    test_board, created = Board.objects.get_or_create(
-        title='Test Shared Board',
-        defaults={
-            'description': 'This is a test board to verify sharing functionality',
-            'created_by': employee,
-            'is_public': False
-        }
-    )
-    
-    # Share with first other employee
-    other_employee = other_employees.first()
-    board_share, share_created = BoardShare.objects.get_or_create(
-        board=test_board,
-        shared_with=other_employee,
-        defaults={
-            'shared_by': employee,
-            'permission': 'view'
-        }
-    )
-    
-    if created:
-        messages.success(request, f'Created test board: {test_board.title}')
-    
-    if share_created:
-        messages.success(request, f'Shared board with {other_employee.user.username}')
-    else:
-        messages.info(request, f'Board already shared with {other_employee.user.username}')
-    
-    # Show debug info
-    total_shares = BoardShare.objects.count()
-    user_shares = BoardShare.objects.filter(shared_with=employee).count()
-    
-    messages.info(request, f'Debug: Total BoardShare records: {total_shares}, Your shared boards: {user_shares}')
-    
-    return redirect('project_boards')
