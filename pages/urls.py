@@ -79,6 +79,7 @@ urlpatterns = [
     # Project Board URLs
     path('employee/boards/', views_boards.project_boards, name='project_boards'),
     path('employee/boards/create/', views_boards.create_board, name='create_board'),
+    path('employee/boards/debug/create-test-shared/', views_boards.create_test_shared_boards, name='create_test_shared_boards'),
     path('employee/boards/<uuid:board_id>/', views_boards.board_detail, name='board_detail'),
     path('employee/boards/<uuid:board_id>/delete/', views_boards.delete_board, name='delete_board'),
     path('employee/boards/<uuid:board_id>/share/', views_boards.share_board, name='share_board'),
