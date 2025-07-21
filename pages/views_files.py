@@ -61,15 +61,30 @@ def file_manager(request):
     if show_shared_only:
         # Show only shared files (no folder navigation)
         folders = FileFolder.objects.none()  # No folders in shared view
-        files = FileDocument.objects.filter(
-            Q(shared_with=employee) | Q(is_public=True)
-        ).exclude(uploaded_by=employee).distinct()
+        
+        # Get files shared through both methods:
+        # 1. Direct shared_with ManyToMany relationship
+        # 2. Through FileShare model
+        shared_files_direct = FileDocument.objects.filter(
+            shared_with=employee
+        ).exclude(uploaded_by=employee)
+        
+        shared_files_through_share = FileDocument.objects.filter(
+            shares__shared_with=employee
+        ).exclude(uploaded_by=employee)
+        
+        public_files = FileDocument.objects.filter(
+            is_public=True
+        ).exclude(uploaded_by=employee)
+        
+        # Combine all shared files and remove duplicates
+        files = (shared_files_direct | shared_files_through_share | public_files).distinct()
     elif show_recent_only:
         # Show only recent files (no folder navigation)
         folders = FileFolder.objects.none()  # No folders in recent view
         files = FileDocument.objects.filter(
-            Q(uploaded_by=employee) | Q(shared_with=employee)
-        ).order_by('-last_accessed')[:20]  # Show last 20 accessed files
+            Q(uploaded_by=employee) | Q(shared_with=employee) | Q(shares__shared_with=employee)
+        ).order_by('-last_accessed')[:20].distinct()  # Show last 20 accessed files
     elif current_folder:
         # Show folders that are children of current folder AND user has access to
         folders = FileFolder.objects.filter(
@@ -80,7 +95,7 @@ def file_manager(request):
         # Show files in current folder that user has access to
         files = FileDocument.objects.filter(
             Q(folder=current_folder) & 
-            (Q(uploaded_by=employee) | Q(shared_with=employee))
+            (Q(uploaded_by=employee) | Q(shared_with=employee) | Q(shares__shared_with=employee))
         ).distinct()
     else:
         # Root level - show user's folders and folders shared with them
@@ -92,18 +107,29 @@ def file_manager(request):
         # Root level - show user's files and files shared with them (no folder)
         files = FileDocument.objects.filter(
             Q(folder=None) & 
-            (Q(uploaded_by=employee) | Q(shared_with=employee))
+            (Q(uploaded_by=employee) | Q(shared_with=employee) | Q(shares__shared_with=employee))
         ).distinct()
     
-    # Get shared files
-    shared_files = FileDocument.objects.filter(
-        Q(shared_with=employee) | Q(is_public=True)
+    # Get shared files (for sidebar statistics)
+    shared_files_direct = FileDocument.objects.filter(
+        shared_with=employee
     ).exclude(uploaded_by=employee)
+    
+    shared_files_through_share = FileDocument.objects.filter(
+        shares__shared_with=employee
+    ).exclude(uploaded_by=employee)
+    
+    public_files = FileDocument.objects.filter(
+        is_public=True
+    ).exclude(uploaded_by=employee)
+    
+    # Combine all shared files for sidebar count
+    shared_files = (shared_files_direct | shared_files_through_share | public_files).distinct()
     
     # Get recent files
     recent_files = FileDocument.objects.filter(
-        Q(uploaded_by=employee) | Q(shared_with=employee)
-    ).order_by('-last_accessed')[:10]
+        Q(uploaded_by=employee) | Q(shared_with=employee) | Q(shares__shared_with=employee)
+    ).order_by('-last_accessed')[:10].distinct()
     
     # Get file statistics
     total_files = FileDocument.objects.filter(uploaded_by=employee).count()

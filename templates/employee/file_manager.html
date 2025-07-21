@@ -303,8 +303,16 @@
         {% if not files %}
             <div class="text-center py-5">
                 <i class="fas fa-file fa-3x text-muted mb-3"></i>
-                <h4>No files uploaded yet</h4>
-                <p class="text-muted">Upload files to get started</p>
+                {% if show_shared_only %}
+                    <h4>No shared files found</h4>
+                    <p class="text-muted">Files shared with you by other team members will appear here</p>
+                {% elif show_recent_only %}
+                    <h4>No recent files</h4>
+                    <p class="text-muted">Files you've recently accessed will appear here</p>
+                {% else %}
+                    <h4>No files uploaded yet</h4>
+                    <p class="text-muted">Upload files to get started</p>
+                {% endif %}
             </div>
         {% endif %}
     </div>
