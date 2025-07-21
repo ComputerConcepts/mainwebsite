@@ -87,13 +87,7 @@
             <div>
                 <h2 class="mb-1">
                     <i class="fas fa-project-diagram me-2"></i>
-                    {% if request.GET.shared %}
-                        Boards Shared with Me
-                    {% elif request.GET.recent %}
-                        Recent Boards
-                    {% else %}
-                        My Project Boards
-                    {% endif %}
+                    Project Boards
                 </h2>
                 <p class="text-muted mb-0">{{ total_boards }} total boards</p>
             </div>
@@ -107,24 +101,7 @@
             </div>
         </div>
 
-        <!-- Navigation Tabs -->
-        <ul class="nav nav-tabs mb-4">
-            <li class="nav-item">
-                <a class="nav-link {% if not request.GET.shared and not request.GET.recent %}active{% endif %}" 
-                   href="{% url 'project_boards' %}">
-                    <i class="fas fa-home me-2"></i>All My Boards
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if request.GET.recent %}active{% endif %}" 
-                   href="{% url 'project_boards' %}?recent=true">
-                    <i class="fas fa-clock me-2"></i>Recent
-                </a>
-            </li>
-        </ul>
-
         <!-- Search Bar -->
-        {% if not request.GET.shared and not request.GET.recent %}
         <div class="search-bar">
             <form method="GET" class="d-flex">
                 <input type="text" class="form-control me-2" name="search" 
@@ -139,174 +116,131 @@
                 {% endif %}
             </form>
         </div>
-        {% endif %}
 
         <!-- Boards Content -->
-        {% if show_shared %}
-            <!-- Shared Boards Section -->
-            <div class="section-header mb-3">
-                <h5><i class="fas fa-share-alt me-2"></i>Boards Shared with Me ({{ shared_boards.count }})</h5>
-            </div>
-            
-            {% if shared_boards %}
-            <div class="row">
-                {% for board in shared_boards %}
-                <div class="col-md-4 col-lg-3 mb-4">
-                    <div class="card board-card h-100">
-                        <div class="card-body">
-                            <h6 class="card-title">{{ board.title }}</h6>
-                            <p class="card-text text-muted small">{{ board.description|truncatechars:100 }}</p>
-                            <div class="board-stats">
-                                <small class="text-muted">
-                                    <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists •
-                                    <i class="fas fa-users me-1"></i>{{ board.members.count }} members
-                                </small>
-                            </div>
-                        </div>
-                        <div class="card-footer bg-transparent">
-                            <a href="{% url 'board_detail' board.id %}" class="btn btn-sm btn-primary w-100">
-                                Open Board
-                            </a>
+        <!-- Created Boards Section -->
+        {% if created_boards %}
+        <div class="section-header mb-3">
+            <h5><i class="fas fa-user me-2"></i>Boards Created by You ({{ created_boards.count }})</h5>
+        </div>
+        
+        <div class="row">
+            {% for board in created_boards %}
+            <div class="col-md-4 col-lg-3 mb-4">
+                <div class="card board-card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ board.title }}</h6>
+                        <p class="card-text text-muted small">{{ board.description|truncatechars:100 }}</p>
+                        <div class="board-stats">
+                            <small class="text-muted">
+                                <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists •
+                                <i class="fas fa-users me-1"></i>{{ board.members.count }} members
+                            </small>
                         </div>
                     </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="text-center py-5">
-                <i class="fas fa-share-alt fa-3x text-muted mb-3"></i>
-                <h5 class="text-muted">No boards shared with you</h5>
-                <p class="text-muted">Boards that others share with you will appear here.</p>
-            </div>
-            {% endif %}
-            
-        {% else %}
-            <!-- Created Boards Section -->
-            {% if created_boards %}
-            <div class="section-header mb-3">
-                <h5><i class="fas fa-user me-2"></i>Boards Created by You ({{ created_boards.count }})</h5>
-            </div>
-            
-            <div class="row">
-                {% for board in created_boards %}
-                <div class="col-md-4 col-lg-3 mb-4">
-                    <div class="card board-card h-100">
-                        <div class="card-body">
-                            <h6 class="card-title">{{ board.title }}</h6>
-                            <p class="card-text text-muted small">{{ board.description|truncatechars:100 }}</p>
-                            <div class="board-stats">
-                                <small class="text-muted">
-                                    <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists •
-                                    <i class="fas fa-users me-1"></i>{{ board.members.count }} members
-                                </small>
-                            </div>
-                        </div>
-                        <div class="card-footer bg-transparent">
-                            <a href="{% url 'board_detail' board.id %}" class="btn btn-sm btn-primary w-100">
-                                Open Board
-                            </a>
-                        </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'board_detail' board.id %}" class="btn btn-sm btn-primary w-100">
+                            Open Board
+                        </a>
                     </div>
                 </div>
-                {% endfor %}
-                
-                <!-- Create New Board Card -->
-                <div class="col-md-4 col-lg-3 mb-4">
-                    <a href="{% url 'create_board' %}" class="card create-board-btn h-100">
-                        <div class="text-center">
-                            <i class="fas fa-plus fa-2x mb-2"></i>
-                            <h6 class="mb-0">Create New Board</h6>
-                        </div>
-                    </a>
-                </div>
             </div>
-            {% endif %}
-
-            <!-- Member Boards Section -->
-            {% if member_boards %}
-            <div class="section-header mb-3 mt-5">
-                <h5><i class="fas fa-users me-2"></i>Boards You're a Member Of ({{ member_boards.count }})</h5>
-            </div>
+            {% endfor %}
             
-            <div class="row">
-                {% for board in member_boards %}
-                <div class="col-md-4 col-lg-3 mb-4">
-                    <div class="card board-card h-100">
-                        <div class="card-body">
-                            <h6 class="card-title">{{ board.title }}</h6>
-                            <p class="card-text text-muted small">{{ board.description|truncatechars:100 }}</p>
-                            <div class="board-stats">
-                                <small class="text-muted">
-                                    <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists •
-                                    <i class="fas fa-users me-1"></i>{{ board.members.count }} members •
-                                    <i class="fas fa-user me-1"></i>by {{ board.created_by.first_name }}
-                                </small>
-                            </div>
-                        </div>
-                        <div class="card-footer bg-transparent">
-                            <a href="{% url 'board_detail' board.id %}" class="btn btn-sm btn-primary w-100">
-                                Open Board
-                            </a>
-                        </div>
+            <!-- Create New Board Card -->
+            <div class="col-md-4 col-lg-3 mb-4">
+                <a href="{% url 'create_board' %}" class="card create-board-btn h-100">
+                    <div class="text-center">
+                        <i class="fas fa-plus fa-2x mb-2"></i>
+                        <h6 class="mb-0">Create New Board</h6>
                     </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <!-- Shared Boards Section (when not in shared view) -->
-            {% if shared_boards %}
-            <div class="section-header mb-3 mt-5">
-                <h5><i class="fas fa-share-alt me-2"></i>Boards Shared with You ({{ shared_boards.count }})</h5>
-            </div>
-            
-            <div class="row">
-                {% for board in shared_boards %}
-                <div class="col-md-4 col-lg-3 mb-4">
-                    <div class="card board-card h-100">
-                        <div class="card-body">
-                            <h6 class="card-title">{{ board.title }}</h6>
-                            <p class="card-text text-muted small">{{ board.description|truncatechars:100 }}</p>
-                            <div class="board-stats">
-                                <small class="text-muted">
-                                    <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists •
-                                    <i class="fas fa-users me-1"></i>{{ board.members.count }} members •
-                                    <i class="fas fa-share me-1"></i>shared
-                                </small>
-                            </div>
-                        </div>
-                        <div class="card-footer bg-transparent">
-                            <a href="{% url 'board_detail' board.id %}" class="btn btn-sm btn-primary w-100">
-                                Open Board
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <!-- Empty State -->
-            {% if not created_boards and not member_boards and not shared_boards %}
-            <div class="text-center py-5">
-                <i class="fas fa-project-diagram fa-3x text-muted mb-3"></i>
-                <h5 class="text-muted">No boards found</h5>
-                <p class="text-muted">
-                    {% if search_query %}
-                        No boards match your search for "{{ search_query }}".
-                    {% elif show_recent %}
-                        No recent boards to show.
-                    {% else %}
-                        Get started by creating your first project board.
-                    {% endif %}
-                </p>
-                {% if not search_query %}
-                <a href="{% url 'create_board' %}" class="btn btn-primary">
-                    <i class="fas fa-plus me-2"></i>Create Your First Board
                 </a>
-                {% endif %}
             </div>
+        </div>
+        {% endif %}
+
+        <!-- Member Boards Section -->
+        {% if member_boards %}
+        <div class="section-header mb-3 mt-5">
+            <h5><i class="fas fa-users me-2"></i>Boards You're a Member Of ({{ member_boards.count }})</h5>
+        </div>
+        
+        <div class="row">
+            {% for board in member_boards %}
+            <div class="col-md-4 col-lg-3 mb-4">
+                <div class="card board-card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ board.title }}</h6>
+                        <p class="card-text text-muted small">{{ board.description|truncatechars:100 }}</p>
+                        <div class="board-stats">
+                            <small class="text-muted">
+                                <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists •
+                                <i class="fas fa-users me-1"></i>{{ board.members.count }} members •
+                                <i class="fas fa-user me-1"></i>by {{ board.created_by.first_name }}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'board_detail' board.id %}" class="btn btn-sm btn-primary w-100">
+                            Open Board
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Shared Boards Section -->
+        {% if shared_boards %}
+        <div class="section-header mb-3 mt-5">
+            <h5><i class="fas fa-share-alt me-2"></i>Boards Shared with You ({{ shared_boards.count }})</h5>
+        </div>
+        
+        <div class="row">
+            {% for board in shared_boards %}
+            <div class="col-md-4 col-lg-3 mb-4">
+                <div class="card board-card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ board.title }}</h6>
+                        <p class="card-text text-muted small">{{ board.description|truncatechars:100 }}</p>
+                        <div class="board-stats">
+                            <small class="text-muted">
+                                <i class="fas fa-list me-1"></i>{{ board.lists.count }} lists •
+                                <i class="fas fa-users me-1"></i>{{ board.members.count }} members •
+                                <i class="fas fa-share me-1"></i>shared
+                            </small>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{% url 'board_detail' board.id %}" class="btn btn-sm btn-primary w-100">
+                            Open Board
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Empty State -->
+        {% if not created_boards and not member_boards and not shared_boards %}
+        <div class="text-center py-5">
+            <i class="fas fa-project-diagram fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No boards found</h5>
+            <p class="text-muted">
+                {% if search_query %}
+                    No boards match your search for "{{ search_query }}".
+                {% else %}
+                    Get started by creating your first project board.
+                {% endif %}
+            </p>
+            {% if not search_query %}
+            <a href="{% url 'create_board' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Create Your First Board
+            </a>
             {% endif %}
+        </div>
         {% endif %}
     </div>
 </div>

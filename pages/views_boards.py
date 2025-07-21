@@ -32,8 +32,6 @@ def project_boards(request):
     employee = Employee.objects.get(user=request.user)
     
     # Get URL parameters
-    show_shared = request.GET.get('shared', False)
-    show_recent = request.GET.get('recent', False)
     search_query = request.GET.get('search', '').strip()
     
     # Base querysets
@@ -44,22 +42,8 @@ def project_boards(request):
     shared_board_ids = BoardShare.objects.filter(shared_with=employee).values_list('board_id', flat=True)
     shared_boards = Board.objects.filter(id__in=shared_board_ids, is_archived=False)
     
-    # Apply filters based on navigation
-    if show_shared:
-        # Show only shared boards
-        created_boards = Board.objects.none()
-        member_boards = Board.objects.none()
-    elif show_recent:
-        # Show recent boards from all categories (last 30 days)
-        from datetime import timedelta
-        thirty_days_ago = timezone.now() - timedelta(days=30)
-        
-        created_boards = created_boards.filter(updated_at__gte=thirty_days_ago).order_by('-updated_at')
-        member_boards = member_boards.filter(updated_at__gte=thirty_days_ago).order_by('-updated_at')
-        shared_boards = shared_boards.filter(updated_at__gte=thirty_days_ago).order_by('-updated_at')
-    else:
-        # For regular view, remove shared boards from member_boards to avoid duplication
-        member_boards = member_boards.exclude(id__in=shared_board_ids)
+    # For regular view, remove shared boards from member_boards to avoid duplication
+    member_boards = member_boards.exclude(id__in=shared_board_ids)
     
     # Apply search filter
     if search_query:
@@ -69,19 +53,16 @@ def project_boards(request):
         member_boards = member_boards.filter(search_filter)
         shared_boards = shared_boards.filter(search_filter)
     
-    # Order by update time if not showing recent (which is already ordered)
-    if not show_recent:
-        created_boards = created_boards.order_by('-updated_at')
-        member_boards = member_boards.order_by('-updated_at')
-        shared_boards = shared_boards.order_by('-updated_at')
+    # Order by update time
+    created_boards = created_boards.order_by('-updated_at')
+    member_boards = member_boards.order_by('-updated_at')
+    shared_boards = shared_boards.order_by('-updated_at')
     
     context = {
         'created_boards': created_boards,
         'member_boards': member_boards,
         'shared_boards': shared_boards,
         'total_boards': created_boards.count() + member_boards.count() + shared_boards.count(),
-        'show_shared': show_shared,
-        'show_recent': show_recent,
         'search_query': search_query,
     }
     
