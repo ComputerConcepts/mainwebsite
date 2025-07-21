@@ -1067,8 +1067,18 @@ function transferOwnership() {
         
         console.log(`🔄 Transferring ownership to employee ID: ${newOwnerId}`);
         console.log(`📋 Transfer reason: ${reason || 'No reason provided'}`);
+        console.log(`📋 CSRF token: ${document.querySelector('[name=csrfmiddlewaretoken]').value}`);
         
-        fetch(`/employee/files/transfer-ownership/{{ file.id }}/`, {
+        // Log all form data being sent
+        console.log('📋 Form data being sent:');
+        for (let pair of formData.entries()) {
+            console.log(`   ${pair[0]}: "${pair[1]}"`);
+        }
+        
+        const transferUrl = `/employee/files/transfer-ownership/{{ file.id }}/`;
+        console.log(`📡 Transfer URL: ${transferUrl}`);
+        
+        fetch(transferUrl, {
             method: 'POST',
             body: formData
         })
@@ -1092,13 +1102,21 @@ function transferOwnership() {
         })
         .then(data => {
             console.log('📡 Transfer response data:', data);
+            console.log('📡 Full response object:', JSON.stringify(data, null, 2));
             
             if (data.success) {
+                console.log('✅ Transfer reported as successful');
                 alert(`Ownership transferred successfully to ${newOwnerName}!`);
-                location.reload();
+                
+                // Add a delay before reload to see if there are any console messages
+                console.log('🔄 Reloading page in 2 seconds...');
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
             } else {
                 const errorMsg = data.error || data.message || 'Unknown error occurred';
                 console.error('❌ Transfer failed:', errorMsg);
+                console.error('❌ Full error response:', data);
                 alert('Error transferring ownership: ' + errorMsg);
             }
         })

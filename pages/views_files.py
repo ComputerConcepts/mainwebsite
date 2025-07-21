@@ -1446,16 +1446,37 @@ def transfer_file_ownership(request, file_id):
         employee = Employee.objects.get(user=request.user)
         file_doc = get_object_or_404(FileDocument, id=file_id)
         
+        # Debug logging
+        print(f"🔄 Transfer ownership request received")
+        print(f"   File ID: {file_id}")
+        print(f"   Current owner: {employee.get_full_name()} (ID: {employee.id})")
+        print(f"   POST data: {dict(request.POST)}")
+        
         # Only the current owner can transfer ownership
         if file_doc.uploaded_by != employee:
+            print(f"❌ Permission denied - file owner is {file_doc.uploaded_by.get_full_name()}, requester is {employee.get_full_name()}")
             return JsonResponse({'error': 'Only the file owner can transfer ownership'}, status=403)
         
         new_owner_id = request.POST.get('new_owner_id')
-        new_owner = get_object_or_404(Employee, id=new_owner_id)
+        print(f"   New owner ID from POST: '{new_owner_id}' (type: {type(new_owner_id)})")
+        
+        if not new_owner_id:
+            print(f"❌ No new owner ID provided")
+            return JsonResponse({'error': 'No new owner specified'}, status=400)
+        
+        try:
+            new_owner = Employee.objects.get(id=new_owner_id)
+            print(f"   Found new owner: {new_owner.get_full_name()} (ID: {new_owner.id})")
+        except Employee.DoesNotExist:
+            print(f"❌ Employee with ID '{new_owner_id}' not found")
+            return JsonResponse({'error': f'Employee with ID {new_owner_id} not found'}, status=404)
         
         old_owner_name = employee.get_full_name()
+        print(f"   Transferring from {old_owner_name} to {new_owner.get_full_name()}")
+        
         file_doc.uploaded_by = new_owner
         file_doc.save()
+        print(f"✅ File ownership updated in database")
         
         # Log the activity
         FileActivity.objects.create(
@@ -1466,13 +1487,24 @@ def transfer_file_ownership(request, file_id):
             ip_address=request.META.get('REMOTE_ADDR'),
             user_agent=request.META.get('HTTP_USER_AGENT', '')
         )
+        print(f"✅ Activity logged")
         
         messages.success(request, f'File ownership transferred to {new_owner.get_full_name()}')
-        return JsonResponse({'success': True})
+        print(f"✅ Returning success response")
+        return JsonResponse({
+            'success': True, 
+            'message': f'Ownership transferred to {new_owner.get_full_name()}',
+            'new_owner': new_owner.get_full_name()
+        })
         
     except Employee.DoesNotExist:
+        print(f"❌ Employee profile not found for user {request.user}")
         return JsonResponse({'error': 'Employee profile not found'}, status=401)
     except Exception as e:
+        print(f"❌ Unexpected error in transfer_file_ownership: {str(e)}")
+        print(f"❌ Exception type: {type(e).__name__}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
         return JsonResponse({'error': str(e)}, status=500)
 
 
