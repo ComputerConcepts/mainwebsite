@@ -521,9 +521,15 @@
                     
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="confirmTransfer" required>
-                        <label class="form-check-label" for="confirmTransfer">
-                            I understand that I will lose ownership of this file
+                        <label class="form-check-label fw-bold text-warning" for="confirmTransfer">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            I understand that I will lose ownership of this file and cannot undo this action
                         </label>
+                    </div>
+                    
+                    <div class="alert alert-info" id="confirmationHelper" style="display: none;">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Almost ready!</strong> Please check the confirmation box above to proceed with the transfer.
                     </div>
                 </form>
             </div>
@@ -758,7 +764,31 @@ document.addEventListener('DOMContentLoaded', function() {
             if (suggestionsDiv) {
                 suggestionsDiv.style.display = 'none';
             }
+            
+            // Hide helper message
+            const confirmationHelper = document.getElementById('confirmationHelper');
+            if (confirmationHelper) {
+                confirmationHelper.style.display = 'none';
+            }
         });
+        
+        // Add checkbox change listener for better UX
+        const confirmCheckbox = document.getElementById('confirmTransfer');
+        if (confirmCheckbox) {
+            confirmCheckbox.addEventListener('change', function() {
+                const confirmationHelper = document.getElementById('confirmationHelper');
+                if (confirmationHelper) {
+                    // Hide helper when checkbox is checked
+                    if (this.checked) {
+                        confirmationHelper.style.display = 'none';
+                    }
+                }
+                
+                // Remove any highlighting
+                this.style.outline = '';
+                this.style.outlineOffset = '';
+            });
+        }
     }
     
     const ownerSearchInput = document.getElementById('newOwnerSearch');
@@ -1163,20 +1193,52 @@ function transferOwnership() {
     const newOwnerId = document.getElementById('newOwner').value;
     const reason = document.getElementById('transferReason').value;
     const confirmed = document.getElementById('confirmTransfer').checked;
+    const confirmationHelper = document.getElementById('confirmationHelper');
     
     console.log(`🔄 Transfer ownership function called`);
     console.log(`   New Owner ID: "${newOwnerId}"`);
     console.log(`   Confirmed: ${confirmed}`);
     
+    // Hide helper message initially
+    if (confirmationHelper) {
+        confirmationHelper.style.display = 'none';
+    }
+    
     if (!newOwnerId || newOwnerId.trim() === '') {
         console.error('❌ No employee selected for transfer');
         alert('Please select a new owner by searching for them in the field above');
+        
+        // Focus on the search input
+        const searchInput = document.getElementById('newOwnerSearch');
+        if (searchInput) {
+            searchInput.focus();
+        }
         return;
     }
     
     if (!confirmed) {
         console.error('❌ Transfer not confirmed');
-        alert('Please confirm that you understand the consequences of transferring ownership');
+        
+        // Show helper message and highlight checkbox
+        if (confirmationHelper) {
+            confirmationHelper.style.display = 'block';
+        }
+        
+        // Highlight the checkbox
+        const checkbox = document.getElementById('confirmTransfer');
+        if (checkbox) {
+            checkbox.focus();
+            checkbox.style.outline = '2px solid #ffc107';
+            checkbox.style.outlineOffset = '2px';
+            
+            // Remove highlight after 3 seconds
+            setTimeout(() => {
+                checkbox.style.outline = '';
+                checkbox.style.outlineOffset = '';
+            }, 3000);
+        }
+        
+        alert('Please confirm that you understand the consequences of transferring ownership by checking the checkbox below');
         return;
     }
     
@@ -1186,7 +1248,14 @@ function transferOwnership() {
     
     console.log(`   Selected Owner: "${newOwnerName}"`);
     
-    if (confirm(`Are you sure you want to transfer ownership of this file to ${newOwnerName}? This action cannot be undone.`)) {
+    if (confirm(`Are you sure you want to transfer ownership of this file to ${newOwnerName}?\n\nThis action cannot be undone and you will lose all ownership rights to this file.`)) {
+        // Disable the transfer button to prevent double-clicks
+        const transferButton = document.querySelector('button[onclick="transferOwnership()"]');
+        if (transferButton) {
+            transferButton.disabled = true;
+            transferButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Transferring...';
+        }
+        
         const formData = new FormData();
         formData.append('new_owner_id', newOwnerId);
         formData.append('reason', reason);
@@ -1233,7 +1302,7 @@ function transferOwnership() {
             
             if (data.success) {
                 console.log('✅ Transfer reported as successful');
-                alert(`Ownership transferred successfully to ${newOwnerName}!`);
+                alert(`Ownership transferred successfully to ${data.new_owner || newOwnerName}!`);
                 
                 // Add a delay before reload to see if there are any console messages
                 console.log('🔄 Reloading page in 2 seconds...');
@@ -1245,12 +1314,26 @@ function transferOwnership() {
                 console.error('❌ Transfer failed:', errorMsg);
                 console.error('❌ Full error response:', data);
                 alert('Error transferring ownership: ' + errorMsg);
+                
+                // Re-enable button
+                if (transferButton) {
+                    transferButton.disabled = false;
+                    transferButton.innerHTML = '<i class="fas fa-exchange-alt me-1"></i>Transfer Ownership';
+                }
             }
         })
         .catch(error => {
             console.error('❌ Transfer request failed:', error);
             alert('Error transferring ownership: ' + error.message);
+            
+            // Re-enable button
+            if (transferButton) {
+                transferButton.disabled = false;
+                transferButton.innerHTML = '<i class="fas fa-exchange-alt me-1"></i>Transfer Ownership';
+            }
         });
+    } else {
+        console.log('🚫 User cancelled the transfer confirmation');
     }
 }
 </script>
