@@ -12,11 +12,11 @@
     .sidebar {
         background: white;
         border-right: 1px solid #dee2e6;
-        height: 100vh;
+        height: calc(100vh - 56px);
         position: fixed;
         width: 280px;
         overflow-y: auto;
-        top: 0;
+        top: 56px;
         left: 0;
         z-index: 1000;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -25,8 +25,9 @@
     
     .main-content {
         margin-left: 280px;
+        margin-top: 56px;
         padding: 30px;
-        min-height: 100vh;
+        min-height: calc(100vh - 56px);
         transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
@@ -47,6 +48,8 @@
         .sidebar {
             transform: translateX(-100%);
             width: 280px;
+            height: 100vh;
+            top: 0;
             box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
         }
         
@@ -56,11 +59,13 @@
         
         .main-content {
             margin-left: 0;
+            margin-top: 56px;
             padding: 20px;
         }
         
         .mobile-sidebar-toggle {
             display: block !important;
+            top: 70px; /* Below the header */
         }
     }
     
@@ -72,7 +77,7 @@
     
     .mobile-sidebar-toggle {
         position: fixed;
-        top: 20px;
+        top: 70px;
         left: 20px;
         z-index: 1001;
         background: #007bff;
@@ -308,10 +313,12 @@
         
         .search-bar, .upload-zone, .breadcrumb {
             margin-left: 60px; /* Account for mobile toggle button */
+            margin-top: 10px; /* Extra spacing below header */
         }
         
         .main-content {
             padding: 15px;
+            margin-top: 56px;
         }
     }
     
