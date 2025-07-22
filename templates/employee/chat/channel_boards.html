@@ -5,69 +5,318 @@
 
 {% block extra_css %}
 <style>
+    body {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        min-height: 100vh;
+    }
+    
+    .container-fluid {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        margin: 20px;
+        padding: 0 !important;
+        overflow: hidden;
+    }
+    
     .chat-header {
-        padding: 15px 20px;
-        border-bottom: 1px solid #e0e0e0;
-        background-color: #f8f9fa;
+        padding: 20px 25px;
+        border-bottom: none;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+    }
+    
+    .chat-header h5 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1.4rem;
+    }
+    
+    .chat-header small {
+        opacity: 0.9;
+        font-size: 0.95rem;
     }
     
     .tab-link {
-        padding: 8px 16px;
-        border-radius: 20px;
+        padding: 10px 20px;
+        border-radius: 25px;
         text-decoration: none;
-        color: #666;
-        background-color: #e9ecef;
-        transition: all 0.3s;
+        color: rgba(255, 255, 255, 0.8);
+        background: rgba(255, 255, 255, 0.15);
+        transition: all 0.3s ease;
         font-size: 0.9rem;
-        margin-right: 10px;
+        font-weight: 500;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        margin-right: 12px;
     }
     
     .tab-link:hover, .tab-link.active {
-        background-color: #007bff;
+        background: rgba(255, 255, 255, 0.25);
         color: white;
         text-decoration: none;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+    }
+    
+    .content-area {
+        padding: 25px;
     }
     
     .board-card {
-        transition: transform 0.2s, box-shadow 0.2s;
+        border: none;
+        border-radius: 15px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        background: white;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .board-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
     }
     
     .board-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 123, 255, 0.15);
+    }
+    
+    .board-card .card-body {
+        padding: 20px;
+    }
+    
+    .board-card .card-title {
+        color: #2c3e50;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 10px;
     }
     
     .shared-badge {
         position: absolute;
-        top: -8px;
-        right: -8px;
-        background: linear-gradient(45deg, #007bff, #0056b3);
+        top: 15px;
+        right: 15px;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
         color: white;
         border-radius: 50%;
-        width: 24px;
-        height: 24px;
+        width: 32px;
+        height: 32px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 12px;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        animation: pulse 2s infinite;
     }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3); }
+        50% { box-shadow: 0 4px 20px rgba(40, 167, 69, 0.5); }
+        100% { box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3); }
+    }
+    
+    .avatar-sm .bg-primary {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
+    }
+    
+    .message-preview {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-left: 4px solid #007bff;
+        border-radius: 8px;
+        padding: 12px 15px;
+        margin-bottom: 15px;
+        font-style: italic;
+        color: #495057;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        border: none;
+        border-radius: 10px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
+    }
+    
+    .btn-outline-secondary {
+        border-color: rgba(255, 255, 255, 0.3);
+        color: rgba(255, 255, 255, 0.9);
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-outline-secondary:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.5);
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .empty-state {
+        background: white;
+        border-radius: 15px;
+        padding: 60px 40px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        border: 2px dashed #dee2e6;
+    }
+    
+    .empty-state i {
+        color: #6c757d;
+        margin-bottom: 20px;
+    }
+    
+    .empty-state h4 {
+        color: #495057;
+        font-weight: 600;
+        margin-bottom: 15px;
+    }
+    
+    .empty-state p {
+        color: #6c757d;
+        margin-bottom: 25px;
+    }
+    
+    .activity-summary {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        border: none;
+        overflow: hidden;
+    }
+    
+    .activity-summary .card-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        padding: 20px 25px;
+    }
+    
+    .activity-summary .card-body {
+        padding: 25px;
+    }
+    
+    .stat-card {
+        text-align: center;
+        padding: 20px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stat-card h3 {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    
+    .stat-card p {
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .text-primary { color: #007bff !important; }
+    .text-success { color: #28a745 !important; }
+    .text-info { color: #17a2b8 !important; }
+    .text-warning { color: #ffc107 !important; }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .container-fluid {
+            margin: 10px;
+        }
+        
+        .chat-header {
+            padding: 15px 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .tab-link {
+            margin-right: 8px;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+        }
+        
+        .content-area {
+            padding: 20px;
+        }
+        
+        .board-card .card-body {
+            padding: 15px;
+        }
+        
+        .stat-card {
+            margin-bottom: 15px;
+        }
+        
+        .stat-card h3 {
+            font-size: 1.8rem;
+        }
+    }
+    
+    /* Animation for card entrance */
+    .board-card {
+        animation: slideInUp 0.5s ease;
+    }
+    
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Stagger animation for multiple cards */
+    .board-card:nth-child(1) { animation-delay: 0.1s; }
+    .board-card:nth-child(2) { animation-delay: 0.2s; }
+    .board-card:nth-child(3) { animation-delay: 0.3s; }
+    .board-card:nth-child(4) { animation-delay: 0.4s; }
+    .board-card:nth-child(5) { animation-delay: 0.5s; }
+    .board-card:nth-child(6) { animation-delay: 0.6s; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container-fluid">
     <!-- Header -->
-    <div class="chat-header mb-4">
+    <div class="chat-header">
         <div class="d-flex align-items-center">
             <a href="{% url 'chat_channel' channel.id %}" class="btn btn-sm btn-outline-secondary me-3">
                 <i class="fas fa-arrow-left"></i>
             </a>
             <div>
                 <h5 class="mb-0"># {{ channel.name }} - Shared Boards</h5>
-                <small class="text-muted">{{ shared_boards|length }} boards shared in this channel</small>
+                <small class="text-white">{{ shared_boards|length }} boards shared in this channel</small>
             </div>
         </div>
         <div class="d-flex align-items-center">
@@ -83,104 +332,238 @@
         </div>
     </div>
 
-    <!-- Shared Boards -->
-    <div class="row">
-        {% for board_share in shared_boards %}
-        <div class="col-md-6 col-lg-4 mb-4">
-            <div class="card board-card h-100 position-relative">
-                <div class="shared-badge">
-                    <i class="fas fa-share"></i>
-                </div>
-                <div class="card-body">
-                    <h6 class="card-title">{{ board_share.board.title }}</h6>
-                    <p class="card-text text-muted small">{{ board_share.board.description|truncatechars:100 }}</p>
-                    
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="avatar-sm me-2">
-                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                                {{ board_share.shared_by.user.first_name|first|upper }}
+    <!-- Content Area -->
+    <div class="content-area">
+        <!-- Shared Boards -->
+        <div class="row">
+            {% for board_share in shared_boards %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card board-card h-100">
+                    <div class="shared-badge">
+                        <i class="fas fa-share"></i>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="card-title">{{ board_share.board.title }}</h6>
+                        <p class="card-text text-muted small mb-3">{{ board_share.board.description|truncatechars:100 }}</p>
+                        
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="avatar-sm me-2">
+                                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                    {{ board_share.shared_by.user.first_name|first|upper }}
+                                </div>
+                            </div>
+                            <div>
+                                <small class="text-muted">Shared by</small><br>
+                                <small class="fw-bold">{{ board_share.shared_by.user.get_full_name }}</small>
                             </div>
                         </div>
-                        <div>
-                            <small class="text-muted">Shared by</small><br>
-                            <small class="fw-bold">{{ board_share.shared_by.user.get_full_name }}</small>
+                        
+                        {% if board_share.message %}
+                        <div class="message-preview">
+                            <small>"{{ board_share.message }}"</small>
                         </div>
-                    </div>
-                    
-                    {% if board_share.message %}
-                    <div class="bg-light p-2 rounded mb-3">
-                        <small class="text-muted">"{{ board_share.message }}"</small>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="d-flex justify-content-between align-items-center">
-                        <small class="text-muted">{{ board_share.shared_at|date:"M d, Y" }}</small>
-                        <a href="{% url 'board_detail' board_share.board.id %}" class="btn btn-sm btn-primary">
-                            <i class="fas fa-external-link-alt me-1"></i>Open Board
-                        </a>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">{{ board_share.shared_at|date:"M d, Y" }}</small>
+                            <a href="{% url 'board_detail' board_share.board.id %}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Board
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        {% empty %}
-        <div class="col-12">
-            <div class="text-center py-5">
-                <i class="fas fa-clipboard fa-3x text-muted mb-3"></i>
-                <h4 class="text-muted">No Boards Shared Yet</h4>
-                <p class="text-muted">Boards shared in this channel will appear here.</p>
-                <a href="{% url 'chat_channel' channel.id %}" class="btn btn-primary">
-                    <i class="fas fa-plus me-1"></i>Share a Board
-                </a>
+            {% empty %}
+            <div class="col-12">
+                <div class="empty-state">
+                    <i class="fas fa-clipboard fa-4x"></i>
+                    <h4>No Boards Shared Yet</h4>
+                    <p>Boards shared in this channel will appear here. Start collaborating by sharing your project boards!</p>
+                    <a href="{% url 'chat_channel' channel.id %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus me-2"></i>Share a Board
+                    </a>
+                </div>
             </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
 
-    <!-- Channel Activity Summary -->
-    {% if shared_boards %}
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="card-title mb-0">Board Activity Summary</h6>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <h3 class="text-primary">{{ shared_boards|length }}</h3>
-                                <p class="text-muted mb-0">Shared Boards</p>
+        <!-- Channel Activity Summary -->
+        {% if shared_boards %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card activity-summary">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Board Activity Summary
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 col-6">
+                                <div class="stat-card">
+                                    <h3 class="text-primary">{{ shared_boards|length }}</h3>
+                                    <p class="text-muted mb-0">Shared Boards</p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <h3 class="text-success">{{ channel.get_member_count }}</h3>
-                                <p class="text-muted mb-0">Team Members</p>
+                            <div class="col-md-3 col-6">
+                                <div class="stat-card">
+                                    <h3 class="text-success">{{ channel.get_member_count }}</h3>
+                                    <p class="text-muted mb-0">Team Members</p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <h3 class="text-info">{{ shared_boards|length }}</h3>
-                                <p class="text-muted mb-0">Active Projects</p>
+                            <div class="col-md-3 col-6">
+                                <div class="stat-card">
+                                    <h3 class="text-info">{{ shared_boards|length }}</h3>
+                                    <p class="text-muted mb-0">Active Projects</p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <h3 class="text-warning">{{ channel.get_activity_summary.recent_message_count }}</h3>
-                                <p class="text-muted mb-0">Recent Messages</p>
+                            <div class="col-md-3 col-6">
+                                <div class="stat-card">
+                                    <h3 class="text-warning">{{ channel.get_activity_summary.recent_message_count }}</h3>
+                                    <p class="text-muted mb-0">Recent Messages</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Add any specific JavaScript for board management here
+// Enhanced Board Management JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Add smooth animations for stat cards
+    const statCards = document.querySelectorAll('.stat-card');
+    
+    // Intersection Observer for animation on scroll
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, {
+        threshold: 0.1
+    });
+    
+    statCards.forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(card);
+    });
+    
+    // Add loading states for board actions
+    const boardLinks = document.querySelectorAll('.btn-primary[href*="board_detail"]');
+    boardLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn');
+            const originalText = btn.innerHTML;
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+            btn.disabled = true;
+            
+            // Restore button after a delay (in case navigation fails)
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, 3000);
+        });
+    });
+    
+    // Enhance board card interactions
+    const boardCards = document.querySelectorAll('.board-card');
+    boardCards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.borderColor = '#007bff';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.borderColor = '';
+        });
+    });
+    
+    // Add keyboard navigation for accessibility
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'b') {
+            e.preventDefault();
+            window.location.href = document.querySelector('a[href*="chat_channel"]').href;
+        }
+    });
+    
+    // Lazy load any future board content
+    function loadBoardPreview(boardId) {
+        // This would fetch additional board details if needed
+        console.log('Loading preview for board:', boardId);
+    }
+    
+    // Add tooltip for shared badges
+    const sharedBadges = document.querySelectorAll('.shared-badge');
+    sharedBadges.forEach(badge => {
+        badge.title = 'This board was shared in the channel';
+    });
+    
+    // Auto-refresh functionality (optional)
+    let autoRefresh = false;
+    
+    function toggleAutoRefresh() {
+        autoRefresh = !autoRefresh;
+        
+        if (autoRefresh) {
+            const refreshInterval = setInterval(() => {
+                if (!autoRefresh) {
+                    clearInterval(refreshInterval);
+                    return;
+                }
+                
+                // Optionally refresh the page or fetch new data
+                console.log('Auto-refreshing board data...');
+            }, 30000); // Refresh every 30 seconds
+        }
+    }
+    
+    // Add keyboard shortcut for auto-refresh toggle
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+            e.preventDefault();
+            toggleAutoRefresh();
+            console.log('Auto-refresh toggled:', autoRefresh);
+        }
+    });
+});
+
+// Function to handle board sharing from this page
+function shareBoard(boardId) {
+    // This would open a modal or navigate to share the board
+    console.log('Sharing board:', boardId);
+}
+
+// Function to handle board favoriting
+function toggleBoardFavorite(boardId) {
+    // This would toggle the favorite status of a board
+    console.log('Toggling favorite for board:', boardId);
+}
+
+// Search functionality for boards (if needed in future)
+function searchBoards(query) {
+    const boardCards = document.querySelectorAll('.board-card');
+    
+    boardCards.forEach(card => {
+        const title = card.querySelector('.card-title').textContent.toLowerCase();
+        const description = card.querySelector('.card-text').textContent.toLowerCase();
+        
+        if (title.includes(query.toLowerCase()) || description.includes(query.toLowerCase())) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
 </script>
 {% endblock %}
