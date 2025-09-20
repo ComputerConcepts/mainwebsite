@@ -1,0 +1,92 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Edit Onboarding Form{% endblock %}
+
+{% block extra_css %}
+<!-- Same CSS as create_form.html -->
+<style>
+    .form-builder {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .builder-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+    }
+    
+    .form-preview {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin-bottom: 30px;
+    }
+    
+    .field-palette {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        position: sticky;
+        top: 20px;
+    }
+    
+    .field-type {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 15px;
+        margin-bottom: 8px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        cursor: grab;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    
+    .field-type:hover {
+        background: #e9ecef;
+        transform: translateX(5px);
+    }
+    
+    .save-btn {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 15px 40px;
+        border-radius: 25px;
+        border: none;
+        font-weight: 600;
+        font-size: 16px;
+        transition: all 0.3s ease;
+    }
+    
+    .save-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-builder">
+    <div class="builder-header">
+        <h2 class="mb-3">
+            <i class="fas fa-edit"></i> Edit Onboarding Form
+        </h2>
+        <p class="mb-0 opacity-90">Modify your existing onboarding form</p>
+    </div>
+    
+    <div class="text-center">
+        <h4>Form editing functionality will be implemented based on create_form.html</h4>
+        <p class="text-muted">This template extends the same form builder functionality</p>
+        <a href="{% url 'hr_onboarding_dashboard' %}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

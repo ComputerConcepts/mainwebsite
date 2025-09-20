@@ -1,0 +1,329 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}HR Onboarding Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        padding: 25px;
+        color: white;
+        margin-bottom: 25px;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+        transition: transform 0.3s ease;
+    }
+    
+    .dashboard-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stat-number {
+        font-size: 3rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-bottom: 10px;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .recent-activity {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+    
+    .activity-header {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 20px 25px;
+        font-weight: 600;
+    }
+    
+    .activity-item {
+        padding: 15px 25px;
+        border-bottom: 1px solid #f1f3f4;
+        transition: background-color 0.2s ease;
+    }
+    
+    .activity-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    
+    .forms-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 25px;
+    }
+    
+    .form-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        border-left: 4px solid #667eea;
+        transition: all 0.3s ease;
+    }
+    
+    .form-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-under_review { background: #cce5ff; color: #004085; }
+    .status-approved { background: #d4edda; color: #155724; }
+    .status-rejected { background: #f8d7da; color: #721c24; }
+    
+    .quick-actions {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+    }
+    
+    .action-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 25px;
+        border-radius: 25px;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        border: none;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .action-btn.secondary {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .action-btn.secondary:hover {
+        box-shadow: 0 5px 15px rgba(240, 147, 251, 0.4);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 text-dark mb-3">
+                <i class="fas fa-users-cog"></i> HR Onboarding Dashboard
+            </h1>
+            <p class="text-muted">Manage onboarding forms, invitations, and track submissions</p>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <a href="{% url 'create_onboarding_form' %}" class="action-btn">
+            <i class="fas fa-plus"></i> Create New Form
+        </a>
+        <a href="{% url 'send_onboarding_invitation' %}" class="action-btn secondary">
+            <i class="fas fa-paper-plane"></i> Send Invitation
+        </a>
+        <a href="{% url 'onboarding_submissions' %}" class="action-btn">
+            <i class="fas fa-inbox"></i> View Submissions
+        </a>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="dashboard-card">
+                <div class="stat-number">{{ stats.total_forms }}</div>
+                <div class="stat-label">Active Forms</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="stat-number">{{ stats.total_invitations }}</div>
+                <div class="stat-label">Invitations Sent</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="stat-number">{{ stats.pending_submissions }}</div>
+                <div class="stat-label">Pending Reviews</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="dashboard-card" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
+                <div class="stat-number">{{ stats.active_prospects }}</div>
+                <div class="stat-label">Active Prospects</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Recent Submissions -->
+        <div class="col-lg-6">
+            <div class="recent-activity">
+                <div class="activity-header">
+                    <i class="fas fa-clock"></i> Recent Submissions
+                </div>
+                <div class="activity-content">
+                    {% for submission in recent_submissions %}
+                    <div class="activity-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ submission.get_applicant_name }}</h6>
+                                <p class="mb-1 text-muted small">{{ submission.invitation.onboarding_form.title }}</p>
+                                <small class="text-muted">{{ submission.submitted_at|timesince }} ago</small>
+                            </div>
+                            <span class="status-badge status-{{ submission.review_status }}">
+                                {{ submission.get_review_status_display }}
+                            </span>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{% url 'hr_submission_detail' submission.id %}" class="btn btn-sm btn-outline-primary">
+                                Review
+                            </a>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="activity-item text-center text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2"></i>
+                        <p class="mb-0">No recent submissions</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Invitations -->
+        <div class="col-lg-6">
+            <div class="recent-activity">
+                <div class="activity-header" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <i class="fas fa-paper-plane"></i> Recent Invitations
+                </div>
+                <div class="activity-content">
+                    {% for invitation in recent_invitations %}
+                    <div class="activity-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ invitation.prospective_employee.email }}</h6>
+                                <p class="mb-1 text-muted small">{{ invitation.onboarding_form.title }}</p>
+                                <small class="text-muted">Sent {{ invitation.sent_at|timesince }} ago by {{ invitation.sent_by.get_full_name }}</small>
+                            </div>
+                            <span class="status-badge status-{{ invitation.status }}">
+                                {{ invitation.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="activity-item text-center text-muted">
+                        <i class="fas fa-paper-plane fa-2x mb-2"></i>
+                        <p class="mb-0">No recent invitations</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Forms Overview -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <h4 class="mb-3">Onboarding Forms</h4>
+            <div class="forms-grid">
+                {% for form in forms %}
+                <div class="form-card">
+                    <h5 class="mb-3">{{ form.title }}</h5>
+                    <p class="text-muted mb-3">{{ form.description|truncatechars:100 }}</p>
+                    
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <div class="stat-number" style="font-size: 1.5rem; color: #667eea;">{{ form.invitation_count }}</div>
+                            <small class="text-muted">Invitations</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-number" style="font-size: 1.5rem; color: #f5576c;">{{ form.submission_count }}</div>
+                            <small class="text-muted">Submissions</small>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'edit_onboarding_form' form.id %}" class="btn btn-sm btn-outline-primary flex-fill">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <a href="{% url 'send_onboarding_invitation' %}?form={{ form.id }}" class="btn btn-sm btn-outline-success flex-fill">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </a>
+                    </div>
+                    
+                    <div class="mt-2 text-muted small">
+                        Created {{ form.created_at|timesince }} ago by {{ form.created_by.get_full_name }}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center py-5">
+                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No onboarding forms yet</h5>
+                    <p class="text-muted">Create your first onboarding form to get started.</p>
+                    <a href="{% url 'create_onboarding_form' %}" class="action-btn">
+                        <i class="fas fa-plus"></i> Create First Form
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh dashboard every 30 seconds
+    setInterval(function() {
+        // Only refresh if no modals are open
+        if (!document.querySelector('.modal.show')) {
+            location.reload();
+        }
+    }, 30000);
+    
+    // Add hover effects to cards
+    const cards = document.querySelectorAll('.dashboard-card, .form-card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+});
+</script>
+{% endblock %}

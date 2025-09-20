@@ -1,0 +1,275 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Review Submission - {{ submission.get_applicant_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .submission-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+    }
+    
+    .submission-card {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin-bottom: 30px;
+    }
+    
+    .field-display {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-left: 4px solid #667eea;
+    }
+    
+    .field-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 10px;
+    }
+    
+    .field-value {
+        color: #6c757d;
+        line-height: 1.6;
+    }
+    
+    .status-badge {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-under_review { background: #cce5ff; color: #004085; }
+    .status-approved { background: #d4edda; color: #155724; }
+    .status-rejected { background: #f8d7da; color: #721c24; }
+    .status-needs_revision { background: #e2e3e5; color: #383d41; }
+    
+    .review-form {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 25px;
+        border: 2px solid #e9ecef;
+    }
+    
+    .update-btn {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 12px 30px;
+        border-radius: 25px;
+        border: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .update-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+    }
+    
+    .file-download {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 10px;
+        transition: all 0.3s ease;
+    }
+    
+    .file-download:hover {
+        color: white;
+        text-decoration: none;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="submission-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="mb-2">
+                    <i class="fas fa-user-check"></i> {{ submission.get_applicant_name }}
+                </h2>
+                <p class="mb-0 opacity-90">{{ submission.invitation.onboarding_form.title }}</p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <span class="status-badge status-{{ submission.review_status }}">
+                    {{ submission.get_review_status_display }}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Form Data -->
+        <div class="col-lg-8">
+            <div class="submission-card">
+                <h4 class="mb-4">
+                    <i class="fas fa-clipboard-list me-2"></i>Application Details
+                </h4>
+                
+                {% for item in form_display_data %}
+                <div class="field-display">
+                    <div class="field-label">
+                        {{ item.field.field_label }}
+                        {% if item.field.is_required %}<span class="text-danger">*</span>{% endif %}
+                    </div>
+                    <div class="field-value">
+                        {% if item.field.field_type == 'file' %}
+                            {% if item.value %}
+                                <i class="fas fa-file me-2"></i>{{ item.value.original_name }}
+                                <a href="#" class="file-download ms-3">
+                                    <i class="fas fa-download me-1"></i>Download
+                                </a>
+                            {% else %}
+                                <em class="text-muted">No file uploaded</em>
+                            {% endif %}
+                        {% elif item.field.field_type == 'checkbox' %}
+                            {% if item.value %}
+                                {% for option in item.value %}
+                                    <span class="badge bg-primary me-1">{{ option }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <em class="text-muted">None selected</em>
+                            {% endif %}
+                        {% else %}
+                            {{ item.value|default:"<em class='text-muted'>Not provided</em>"|safe }}
+                        {% endif %}
+                    </div>
+                    {% if item.field.help_text %}
+                    <small class="text-muted mt-2 d-block">{{ item.field.help_text }}</small>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                
+                <div class="mt-4 pt-4 border-top">
+                    <h6 class="text-muted">Submission Information</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Submitted:</strong> {{ submission.submitted_at|date:"F j, Y g:i A" }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Reference ID:</strong> {{ submission.id }}
+                        </div>
+                    </div>
+                    {% if submission.ip_address %}
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <strong>IP Address:</strong> {{ submission.ip_address }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Invitation sent by:</strong> {{ submission.invitation.sent_by.get_full_name }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Review Panel -->
+        <div class="col-lg-4">
+            <div class="submission-card">
+                <h4 class="mb-4">
+                    <i class="fas fa-edit me-2"></i>Review & Update
+                </h4>
+                
+                <form method="post" class="review-form">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Review Status</label>
+                        <select class="form-control" name="review_status" required>
+                            {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if submission.review_status == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select class="form-control" name="priority">
+                            {% for value, label in priority_choices %}
+                            <option value="{{ value }}" {% if submission.priority == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Review Notes</label>
+                        <textarea class="form-control" name="review_notes" rows="4" placeholder="Notes for the candidate...">{{ submission.review_notes }}</textarea>
+                        <div class="form-text">These notes will be sent to the candidate if status changes</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Internal HR Notes</label>
+                        <textarea class="form-control" name="hr_notes" rows="3" placeholder="Internal notes (not sent to candidate)...">{{ submission.hr_notes }}</textarea>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label">Next Steps</label>
+                        <textarea class="form-control" name="next_steps" rows="3" placeholder="What happens next in the process...">{{ submission.next_steps }}</textarea>
+                    </div>
+                    
+                    <button type="submit" class="update-btn w-100">
+                        <i class="fas fa-save me-2"></i>Update Submission
+                    </button>
+                </form>
+                
+                {% if submission.reviewed_by %}
+                <div class="mt-4 pt-4 border-top">
+                    <h6 class="text-muted">Review History</h6>
+                    <p class="small">
+                        <strong>Last reviewed by:</strong> {{ submission.reviewed_by.get_full_name }}<br>
+                        <strong>Date:</strong> {{ submission.reviewed_at|date:"F j, Y g:i A" }}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="submission-card">
+                <h5 class="mb-3">Quick Actions</h5>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'onboarding_submissions' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Submissions
+                    </a>
+                    <a href="mailto:{{ submission.invitation.prospective_employee.email }}" class="btn btn-outline-primary">
+                        <i class="fas fa-envelope me-2"></i>Email Candidate
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const updateBtn = document.querySelector('.update-btn');
+    
+    form.addEventListener('submit', function() {
+        updateBtn.disabled = true;
+        updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+    });
+});
+</script>
+{% endblock %}

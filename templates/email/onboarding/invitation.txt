@@ -1,0 +1,40 @@
+Subject: Complete Your Onboarding - Computer Concepts
+
+Hello{% if prospective_employee.first_name %} {{ prospective_employee.first_name }}{% endif %},
+
+Welcome to Computer Concepts! We're excited to have you join our team.
+
+To complete your onboarding process, please use the following information:
+
+Your Secure Access PIN: {{ pin }}
+PIN Expires: {{ pin_expiry|date:"F j, Y g:i A" }}
+
+Complete your onboarding at: {{ onboarding_url }}
+
+{% if custom_message %}
+Personal message from {{ invitation.sent_by.get_full_name }}:
+{{ custom_message }}
+{% endif %}
+
+How to Complete Your Onboarding:
+1. Visit the onboarding link above
+2. Enter your email address and the 6-digit PIN provided
+3. Complete all required fields in the onboarding form
+4. Upload any requested documents
+5. Submit your application for review
+
+IMPORTANT SECURITY INFORMATION:
+- This PIN is unique to you and should not be shared
+- The PIN will expire in 48 hours for security reasons
+- If you experience any issues, please contact HR at hr@onecomputerconcepts.com
+
+Thank you,
+Computer Concepts HR Team
+
+---
+Computer Concepts
+Building the future of technology solutions
+© {{ current_year }} Computer Concepts. All rights reserved.
+
+This email was sent to {{ prospective_employee.email }}. 
+If you believe you received this email in error, please contact our support team.

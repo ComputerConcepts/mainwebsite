@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding Invitation - Computer Concepts</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .welcome-text {
+            font-size: 18px;
+            margin-bottom: 25px;
+            color: #2c3e50;
+        }
+        .pin-section {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 25px 0;
+        }
+        .pin-code {
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        .pin-expiry {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 10px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: transform 0.3s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            text-decoration: none;
+            color: white;
+        }
+        .instructions {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
+            color: #6c757d;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 25px 30px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer p {
+            margin: 5px 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .company-logo {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 15px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            .content {
+                padding: 25px 20px;
+            }
+            .header {
+                padding: 25px 20px;
+            }
+            .pin-code {
+                font-size: 28px;
+                letter-spacing: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="company-logo">CC</div>
+            <h1>Welcome to Computer Concepts!</h1>
+            <p>Complete Your Onboarding Process</p>
+        </div>
+        
+        <div class="content">
+            <div class="welcome-text">
+                Hello{% if prospective_employee.first_name %} {{ prospective_employee.first_name }}{% endif %},
+            </div>
+            
+            <p>Welcome to Computer Concepts! We're excited to have you join our team. To complete your onboarding process, please use the secure PIN below to access your personalized onboarding form.</p>
+            
+            {% if custom_message %}
+            <div style="background-color: #e8f4fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196F3;">
+                <h4 style="margin-top: 0; color: #1976D2;">Personal Message from {{ invitation.sent_by.get_full_name }}:</h4>
+                <p style="margin-bottom: 0; color: #424242; font-style: italic;">{{ custom_message }}</p>
+            </div>
+            {% endif %}
+            
+            <div class="pin-section">
+                <h3 style="margin-top: 0;">Your Secure Access PIN</h3>
+                <div class="pin-code">{{ pin }}</div>
+                <div class="pin-expiry">This PIN expires on {{ pin_expiry|date:"F j, Y g:i A" }}</div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{ onboarding_url }}" class="cta-button">
+                    Start Onboarding Process
+                </a>
+            </div>
+            
+            <div class="instructions">
+                <h3>How to Complete Your Onboarding:</h3>
+                <ol>
+                    <li>Click the "Start Onboarding Process" button above</li>
+                    <li>Enter your email address and the 6-digit PIN provided</li>
+                    <li>Complete all required fields in the onboarding form</li>
+                    <li>Upload any requested documents</li>
+                    <li>Submit your application for review</li>
+                </ol>
+                <p><strong>Need Help?</strong> Contact our HR team at <a href="mailto:hr@onecomputerconcepts.com">hr@onecomputerconcepts.com</a></p>
+            </div>
+            
+            <div style="margin-top: 30px; padding: 20px; background-color: #fff3cd; border-radius: 8px; border: 1px solid #ffeaa7;">
+                <h4 style="margin-top: 0; color: #856404;">Important Security Information:</h4>
+                <ul style="margin-bottom: 0; color: #856404;">
+                    <li>This PIN is unique to you and should not be shared</li>
+                    <li>The PIN will expire in 48 hours for security reasons</li>
+                    <li>If you experience any issues, please contact HR immediately</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Computer Concepts</strong></p>
+            <p>Building the future of technology solutions</p>
+            <p>© {{ current_year }} Computer Concepts. All rights reserved.</p>
+            <p style="font-size: 12px; color: #adb5bd;">
+                This email was sent to {{ prospective_employee.email }}. 
+                If you believe you received this email in error, please contact our support team.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

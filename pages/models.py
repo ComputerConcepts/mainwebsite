@@ -1267,3 +1267,207 @@ class ChatFileShare(models.Model):
             'shared_at': self.shared_at,
             'shared_by': self.shared_by.user.get_full_name() or self.shared_by.user.username
         }
+
+
+# HR Onboarding System Models
+
+class OnboardingForm(models.Model):
+    """Template for HR onboarding forms"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200, help_text="Form title")
+    description = models.TextField(blank=True, help_text="Form description")
+    form_fields = models.JSONField(default=dict, help_text="Form field configuration")
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_onboarding_forms')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+    
+    # Settings
+    pin_expiry_hours = models.IntegerField(default=48, help_text="PIN expiry time in hours")
+    allow_multiple_submissions = models.BooleanField(default=False)
+    send_confirmation_email = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.title
+
+
+class ProspectiveEmployee(models.Model):
+    """Temporary user account for prospective employees"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True)
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    
+    # PIN system
+    current_pin = models.CharField(max_length=6, blank=True)
+    pin_created_at = models.DateTimeField(null=True, blank=True)
+    pin_expiry = models.DateTimeField(null=True, blank=True)
+    pin_attempts = models.IntegerField(default=0)
+    is_pin_locked = models.BooleanField(default=False)
+    
+    # Session tracking
+    last_login = models.DateTimeField(null=True, blank=True)
+    login_attempts = models.IntegerField(default=0)
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='invited_prospects')
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        name = f"{self.first_name} {self.last_name}".strip()
+        return name if name else self.email
+    
+    def is_pin_valid(self):
+        """Check if the current PIN is still valid"""
+        if not self.current_pin or not self.pin_expiry:
+            return False
+        return timezone.now() < self.pin_expiry and not self.is_pin_locked
+    
+    def generate_pin(self):
+        """Generate a new 6-digit PIN"""
+        import random
+        from datetime import timedelta
+        
+        self.current_pin = str(random.randint(100000, 999999))
+        self.pin_created_at = timezone.now()
+        self.pin_expiry = timezone.now() + timedelta(hours=48)  # Default 48 hours
+        self.pin_attempts = 0
+        self.is_pin_locked = False
+        self.save()
+        return self.current_pin
+
+
+class OnboardingInvitation(models.Model):
+    """Track onboarding invitations sent to prospective employees"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    onboarding_form = models.ForeignKey(OnboardingForm, on_delete=models.CASCADE)
+    prospective_employee = models.ForeignKey(ProspectiveEmployee, on_delete=models.CASCADE)
+    
+    # Invitation details
+    sent_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_onboarding_invitations')
+    sent_at = models.DateTimeField(auto_now_add=True)
+    custom_message = models.TextField(blank=True, help_text="Custom message for the invitation")
+    
+    # Status tracking
+    STATUS_CHOICES = [
+        ('sent', 'Sent'),
+        ('opened', 'Opened'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('expired', 'Expired'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='sent')
+    
+    # Activity tracking
+    first_opened = models.DateTimeField(null=True, blank=True)
+    last_activity = models.DateTimeField(null=True, blank=True)
+    completion_date = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        unique_together = ['onboarding_form', 'prospective_employee']
+        ordering = ['-sent_at']
+    
+    def __str__(self):
+        return f"{self.onboarding_form.title} -> {self.prospective_employee.email}"
+
+
+class OnboardingSubmission(models.Model):
+    """Store completed onboarding form submissions"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invitation = models.OneToOneField(OnboardingInvitation, on_delete=models.CASCADE)
+    
+    # Form data
+    form_data = models.JSONField(default=dict, help_text="Submitted form data")
+    uploaded_files = models.JSONField(default=list, help_text="List of uploaded file paths")
+    
+    # Submission tracking
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    
+    # Review process
+    REVIEW_STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('under_review', 'Under Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('needs_revision', 'Needs Revision'),
+    ]
+    review_status = models.CharField(max_length=20, choices=REVIEW_STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True)
+    
+    # HR follow-up
+    hr_notes = models.TextField(blank=True, help_text="Internal HR notes")
+    next_steps = models.TextField(blank=True, help_text="Next steps in the process")
+    priority = models.CharField(max_length=10, choices=[
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    ], default='medium')
+    
+    class Meta:
+        ordering = ['-submitted_at']
+    
+    def __str__(self):
+        return f"{self.invitation.onboarding_form.title} - {self.invitation.prospective_employee.email}"
+    
+    def get_applicant_name(self):
+        """Get the applicant's full name from form data or email"""
+        if 'first_name' in self.form_data and 'last_name' in self.form_data:
+            return f"{self.form_data['first_name']} {self.form_data['last_name']}"
+        return self.invitation.prospective_employee.email
+
+
+class OnboardingFormField(models.Model):
+    """Define field types for onboarding forms"""
+    FIELD_TYPES = [
+        ('text', 'Text Input'),
+        ('textarea', 'Text Area'),
+        ('email', 'Email'),
+        ('phone', 'Phone Number'),
+        ('number', 'Number'),
+        ('date', 'Date'),
+        ('select', 'Dropdown Select'),
+        ('radio', 'Radio Buttons'),
+        ('checkbox', 'Checkboxes'),
+        ('file', 'File Upload'),
+        ('signature', 'Digital Signature'),
+    ]
+    
+    onboarding_form = models.ForeignKey(OnboardingForm, on_delete=models.CASCADE, related_name='fields')
+    field_type = models.CharField(max_length=20, choices=FIELD_TYPES)
+    field_name = models.CharField(max_length=100, help_text="Internal field name")
+    field_label = models.CharField(max_length=200, help_text="Display label")
+    placeholder = models.CharField(max_length=200, blank=True)
+    help_text = models.TextField(blank=True)
+    
+    # Validation
+    is_required = models.BooleanField(default=False)
+    min_length = models.IntegerField(null=True, blank=True)
+    max_length = models.IntegerField(null=True, blank=True)
+    validation_regex = models.CharField(max_length=500, blank=True, help_text="Regex pattern for validation")
+    
+    # Options for select/radio/checkbox fields
+    field_options = models.JSONField(default=list, help_text="Options for select/radio/checkbox fields")
+    
+    # Display
+    order = models.IntegerField(default=0, help_text="Display order")
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['order', 'id']
+        unique_together = ['onboarding_form', 'field_name']
+    
+    def __str__(self):
+        return f"{self.onboarding_form.title} - {self.field_label}"

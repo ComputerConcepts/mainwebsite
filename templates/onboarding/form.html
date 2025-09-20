@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+{% load onboarding_extras %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ invitation.onboarding_form.title }} - Onboarding Form</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .form-container {
+            padding: 40px 20px;
+        }
+        
+        .form-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .form-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .form-header h1 {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .form-header p {
+            color: #666;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        
+        .form-field {
+            margin-bottom: 30px;
+        }
+        
+        .field-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .required {
+            color: #dc3545;
+        }
+        
+        .form-control, .form-select {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px 15px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .form-check {
+            margin-bottom: 10px;
+        }
+        
+        .form-check-input {
+            margin-top: 0.3em;
+        }
+        
+        .form-check-label {
+            margin-left: 8px;
+            font-weight: 500;
+        }
+        
+        .help-text {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 25px;
+            border: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 20px;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .back-btn {
+            background: rgba(108, 117, 125, 0.1);
+            color: #6c757d;
+            border: 2px solid #6c757d;
+            padding: 10px 25px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        
+        .back-btn:hover {
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .progress-bar-container {
+            margin-bottom: 30px;
+        }
+        
+        .progress {
+            height: 8px;
+            border-radius: 4px;
+            background: #f0f0f0;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+        }
+        
+        .field-error {
+            color: #dc3545;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .file-upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .file-upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .file-upload-area.dragover {
+            border-color: #667eea;
+            background: #e3f2fd;
+        }
+        
+        .file-info {
+            background: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .signature-pad {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+            margin-top: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .form-card {
+                margin: 20px;
+                padding: 25px;
+            }
+            
+            .form-header h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <div class="form-card">
+            <!-- Back Button -->
+            <a href="{% url 'onboarding_dashboard' %}" class="back-btn">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+            
+            <!-- Form Header -->
+            <div class="form-header">
+                <h1>{{ invitation.onboarding_form.title }}</h1>
+                {% if invitation.onboarding_form.description %}
+                <p>{{ invitation.onboarding_form.description }}</p>
+                {% endif %}
+                
+                <!-- Progress Bar -->
+                <div class="progress-bar-container">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Progress</span>
+                        <span class="text-muted" id="progressText">0 of {{ form_fields.count }} fields</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: 0%" id="progressBar"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Revision Notice -->
+            {% if is_revision and revision_notes %}
+            <div class="alert alert-warning mb-4" style="border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(255, 193, 7, 0.2);">
+                <div class="d-flex align-items-start">
+                    <i class="fas fa-exclamation-triangle me-3" style="font-size: 1.5rem; margin-top: 5px; color: #856404;"></i>
+                    <div>
+                        <h5 class="alert-heading mb-2" style="color: #856404; font-weight: 600;">
+                            <i class="fas fa-edit me-2"></i>Form Update Required
+                        </h5>
+                        <p class="mb-2" style="color: #664d03; line-height: 1.6;">
+                            Your previous submission has been reviewed and requires some updates. Please review the feedback below and make the necessary changes before resubmitting.
+                        </p>
+                        <div class="revision-feedback" style="background: rgba(255, 193, 7, 0.1); padding: 15px; border-radius: 10px; margin-top: 15px;">
+                            <strong style="color: #856404;">Feedback from HR:</strong>
+                            <p class="mb-0 mt-2" style="color: #664d03;">{{ revision_notes }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Messages -->
+            {% if messages %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+            {% endif %}
+            
+            <!-- Form -->
+            <form method="post" enctype="multipart/form-data" id="onboardingForm">
+                {% csrf_token %}
+                
+                {% for field in form_fields %}
+                <div class="form-field" data-field-type="{{ field.field_type }}">
+                    <label class="field-label">
+                        {{ field.field_label }}
+                        {% if field.is_required %}<span class="required">*</span>{% endif %}
+                    </label>
+                    
+                    {% if field.field_type == 'text' %}
+                        <input type="text" 
+                               class="form-control" 
+                               name="{{ field.field_name }}" 
+                               id="{{ field.field_name }}"
+                               placeholder="{{ field.placeholder }}"
+                               {% if field.is_required %}required{% endif %}
+                               {% if field.min_length %}minlength="{{ field.min_length }}"{% endif %}
+                               {% if field.max_length %}maxlength="{{ field.max_length }}"{% endif %}
+                               value="{{ existing_data|default_if_none:''|get_item:field.field_name|default:'' }}">
+                    
+                    {% elif field.field_type == 'email' %}
+                        <input type="email" 
+                               class="form-control" 
+                               name="{{ field.field_name }}" 
+                               id="{{ field.field_name }}"
+                               placeholder="{{ field.placeholder }}"
+                               {% if field.is_required %}required{% endif %}
+                               value="{{ existing_data|default_if_none:''|get_item:field.field_name|default:'' }}">
+                    
+                    {% elif field.field_type == 'phone' %}
+                        <input type="tel" 
+                               class="form-control" 
+                               name="{{ field.field_name }}" 
+                               id="{{ field.field_name }}"
+                               placeholder="{{ field.placeholder }}"
+                               {% if field.is_required %}required{% endif %}
+                               value="{{ existing_data|default_if_none:''|get_item:field.field_name|default:'' }}">
+                    
+                    {% elif field.field_type == 'number' %}
+                        <input type="number" 
+                               class="form-control" 
+                               name="{{ field.field_name }}" 
+                               id="{{ field.field_name }}"
+                               placeholder="{{ field.placeholder }}"
+                               {% if field.is_required %}required{% endif %}
+                               value="{{ existing_data|default_if_none:''|get_item:field.field_name|default:'' }}">
+                    
+                    {% elif field.field_type == 'date' %}
+                        <input type="date" 
+                               class="form-control" 
+                               name="{{ field.field_name }}" 
+                               id="{{ field.field_name }}"
+                               {% if field.is_required %}required{% endif %}
+                               value="{{ existing_data|default_if_none:''|get_item:field.field_name|default:'' }}">
+                    
+                    {% elif field.field_type == 'textarea' %}
+                        <textarea class="form-control" 
+                                  name="{{ field.field_name }}" 
+                                  id="{{ field.field_name }}"
+                                  placeholder="{{ field.placeholder }}"
+                                  rows="4"
+                                  {% if field.is_required %}required{% endif %}
+                                  {% if field.min_length %}minlength="{{ field.min_length }}"{% endif %}
+                                  {% if field.max_length %}maxlength="{{ field.max_length }}"{% endif %}>{{ existing_data|default_if_none:''|get_item:field.field_name|default:'' }}</textarea>
+                    
+                    {% elif field.field_type == 'select' %}
+                        <select class="form-select" 
+                                name="{{ field.field_name }}" 
+                                id="{{ field.field_name }}"
+                                {% if field.is_required %}required{% endif %}>
+                            <option value="">Choose...</option>
+                            {% for option in field.field_options %}
+                            <option value="{{ option }}" 
+                                    {% if existing_data and existing_data|get_item:field.field_name == option %}selected{% endif %}>
+                                {{ option }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    
+                    {% elif field.field_type == 'radio' %}
+                        {% for option in field.field_options %}
+                        <div class="form-check">
+                            <input class="form-check-input" 
+                                   type="radio" 
+                                   name="{{ field.field_name }}" 
+                                   id="{{ field.field_name }}_{{ forloop.counter }}"
+                                   value="{{ option }}"
+                                   {% if field.is_required %}required{% endif %}
+                                   {% if existing_data and existing_data|get_item:field.field_name == option %}checked{% endif %}>
+                            <label class="form-check-label" for="{{ field.field_name }}_{{ forloop.counter }}">
+                                {{ option }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    
+                    {% elif field.field_type == 'checkbox' %}
+                        {% for option in field.field_options %}
+                        <div class="form-check">
+                            <input class="form-check-input" 
+                                   type="checkbox" 
+                                   name="{{ field.field_name }}" 
+                                   id="{{ field.field_name }}_{{ forloop.counter }}"
+                                   value="{{ option }}"
+                                   {% if existing_data and option in existing_data|get_item:field.field_name %}checked{% endif %}>
+                            <label class="form-check-label" for="{{ field.field_name }}_{{ forloop.counter }}">
+                                {{ option }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    
+                    {% elif field.field_type == 'file' %}
+                        <div class="file-upload-area" onclick="document.getElementById('{{ field.field_name }}').click()">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <p class="mb-0">Click to upload or drag and drop</p>
+                            <small class="text-muted">Maximum file size: 10MB</small>
+                        </div>
+                        <input type="file" 
+                               class="form-control d-none" 
+                               name="{{ field.field_name }}" 
+                               id="{{ field.field_name }}"
+                               {% if field.is_required %}required{% endif %}
+                               onchange="showFileInfo(this)">
+                        <div class="file-info" id="info_{{ field.field_name }}">
+                            <i class="fas fa-file me-2"></i>
+                            <span class="filename"></span>
+                            <small class="filesize text-muted ms-2"></small>
+                        </div>
+                    
+                    {% elif field.field_type == 'signature' %}
+                        <div class="signature-container">
+                            <div class="signature-pad-wrapper" style="border: 2px solid #e0e0e0; border-radius: 10px; background: white; padding: 10px;">
+                                <canvas class="signature-pad" 
+                                        id="{{ field.field_name }}_canvas" 
+                                        width="600" 
+                                        height="200"
+                                        style="width: 100%; height: 200px; cursor: crosshair; display: block;">
+                                    Your browser does not support the canvas element.
+                                </canvas>
+                            </div>
+                            <div class="mt-3 d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSignature('{{ field.field_name }}')">
+                                    <i class="fas fa-eraser me-1"></i>Clear Signature
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="undoSignature('{{ field.field_name }}')">
+                                    <i class="fas fa-undo me-1"></i>Undo
+                                </button>
+                                <small class="text-muted align-self-center ms-2">
+                                    <i class="fas fa-info-circle me-1"></i>Draw your signature above
+                                </small>
+                            </div>
+                            <input type="hidden" name="{{ field.field_name }}" id="{{ field.field_name }}" {% if field.is_required %}required{% endif %}>
+                            <div class="signature-status mt-2" id="{{ field.field_name }}_status">
+                                <small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>Signature required
+                                </small>
+                            </div>
+                        </div>
+                    
+                    {% endif %}
+                    
+                    {% if field.help_text %}
+                    <div class="help-text">{{ field.help_text }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                
+                <!-- Submit Button -->
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <i class="fas fa-paper-plane me-2"></i>Submit Application
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Progress tracking
+        function updateProgress() {
+            const fields = document.querySelectorAll('.form-field');
+            const totalFields = fields.length;
+            let completedFields = 0;
+            
+            fields.forEach(field => {
+                const fieldType = field.dataset.fieldType;
+                let isCompleted = false;
+                
+                if (fieldType === 'radio') {
+                    const radios = field.querySelectorAll('input[type="radio"]');
+                    isCompleted = Array.from(radios).some(radio => radio.checked);
+                } else if (fieldType === 'checkbox') {
+                    const checkboxes = field.querySelectorAll('input[type="checkbox"]');
+                    isCompleted = Array.from(checkboxes).some(checkbox => checkbox.checked);
+                } else if (fieldType === 'file') {
+                    const fileInput = field.querySelector('input[type="file"]');
+                    isCompleted = fileInput && fileInput.files.length > 0;
+                } else if (fieldType === 'signature') {
+                    const hiddenInput = field.querySelector('input[type="hidden"]');
+                    isCompleted = hiddenInput && hiddenInput.value.trim() !== '';
+                } else {
+                    const input = field.querySelector('input, select, textarea');
+                    isCompleted = input && input.value.trim() !== '';
+                }
+                
+                if (isCompleted) completedFields++;
+            });
+            
+            const percentage = (completedFields / totalFields) * 100;
+            document.getElementById('progressBar').style.width = percentage + '%';
+            document.getElementById('progressText').textContent = `${completedFields} of ${totalFields} fields`;
+        }
+        
+        // File upload handling
+        function showFileInfo(input) {
+            const infoDiv = document.getElementById('info_' + input.name);
+            if (input.files.length > 0) {
+                const file = input.files[0];
+                const fileSize = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+                
+                infoDiv.querySelector('.filename').textContent = file.name;
+                infoDiv.querySelector('.filesize').textContent = '(' + fileSize + ')';
+                infoDiv.style.display = 'block';
+            } else {
+                infoDiv.style.display = 'none';
+            }
+            updateProgress();
+        }
+        
+        // Signature handling
+        class SignaturePad {
+            constructor(canvas, fieldName) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.fieldName = fieldName;
+                this.drawing = false;
+                this.strokes = [];
+                this.currentStroke = [];
+                
+                // Set canvas size properly
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width * 2; // High DPI
+                canvas.height = rect.height * 2;
+                this.ctx.scale(2, 2);
+                
+                // Set drawing styles
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 2;
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+                
+                this.setupEventListeners();
+            }
+            
+            setupEventListeners() {
+                // Mouse events
+                this.canvas.addEventListener('mousedown', (e) => this.startDrawing(e));
+                this.canvas.addEventListener('mousemove', (e) => this.draw(e));
+                this.canvas.addEventListener('mouseup', () => this.stopDrawing());
+                this.canvas.addEventListener('mouseout', () => this.stopDrawing());
+                
+                // Touch events for mobile
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousedown', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+                
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousemove', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+                
+                this.canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    const mouseEvent = new MouseEvent('mouseup', {});
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+            }
+            
+            getCoordinates(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+            
+            startDrawing(e) {
+                this.drawing = true;
+                this.currentStroke = [];
+                const coords = this.getCoordinates(e);
+                this.ctx.beginPath();
+                this.ctx.moveTo(coords.x, coords.y);
+                this.currentStroke.push({x: coords.x, y: coords.y});
+            }
+            
+            draw(e) {
+                if (!this.drawing) return;
+                
+                const coords = this.getCoordinates(e);
+                this.ctx.lineTo(coords.x, coords.y);
+                this.ctx.stroke();
+                this.currentStroke.push({x: coords.x, y: coords.y});
+                
+                // Update hidden field with signature data
+                this.updateSignatureData();
+            }
+            
+            stopDrawing() {
+                if (this.drawing) {
+                    this.drawing = false;
+                    this.strokes.push([...this.currentStroke]);
+                    this.currentStroke = [];
+                    this.updateSignatureData();
+                    updateProgress();
+                }
+            }
+            
+            updateSignatureData() {
+                if (this.strokes.length > 0) {
+                    // Convert canvas to base64 image
+                    const dataURL = this.canvas.toDataURL('image/png');
+                    document.getElementById(this.fieldName).value = dataURL;
+                    
+                    // Update status
+                    const statusDiv = document.getElementById(this.fieldName + '_status');
+                    if (statusDiv) {
+                        statusDiv.innerHTML = '<small class="text-success"><i class="fas fa-check-circle me-1"></i>Signature captured</small>';
+                    }
+                } else {
+                    document.getElementById(this.fieldName).value = '';
+                    const statusDiv = document.getElementById(this.fieldName + '_status');
+                    if (statusDiv) {
+                        statusDiv.innerHTML = '<small class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Signature required</small>';
+                    }
+                }
+            }
+            
+            clear() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.strokes = [];
+                this.currentStroke = [];
+                this.updateSignatureData();
+                updateProgress();
+            }
+            
+            undo() {
+                if (this.strokes.length > 0) {
+                    this.strokes.pop();
+                    this.redraw();
+                    this.updateSignatureData();
+                    updateProgress();
+                }
+            }
+            
+            redraw() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.strokes.forEach(stroke => {
+                    if (stroke.length > 0) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(stroke[0].x, stroke[0].y);
+                        
+                        for (let i = 1; i < stroke.length; i++) {
+                            this.ctx.lineTo(stroke[i].x, stroke[i].y);
+                        }
+                        this.ctx.stroke();
+                    }
+                });
+            }
+        }
+        
+        // Initialize signature pads
+        const signaturePads = {};
+        
+        function initializeSignaturePads() {
+            document.querySelectorAll('.signature-pad').forEach(canvas => {
+                const fieldName = canvas.id.replace('_canvas', '');
+                signaturePads[fieldName] = new SignaturePad(canvas, fieldName);
+            });
+        }
+        
+        function clearSignature(fieldName) {
+            if (signaturePads[fieldName]) {
+                signaturePads[fieldName].clear();
+            }
+        }
+        
+        function undoSignature(fieldName) {
+            if (signaturePads[fieldName]) {
+                signaturePads[fieldName].undo();
+            }
+        }
+        
+        // Form submission
+        document.getElementById('onboardingForm').addEventListener('submit', function(e) {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Submitting...';
+        });
+        
+        // Update progress on form changes
+        document.addEventListener('DOMContentLoaded', function() {
+            const formInputs = document.querySelectorAll('input, select, textarea');
+            formInputs.forEach(input => {
+                input.addEventListener('change', updateProgress);
+                input.addEventListener('input', updateProgress);
+            });
+            
+            // Initialize signature pads
+            initializeSignaturePads();
+            
+            // Initial progress update
+            updateProgress();
+        });
+        
+        // Drag and drop for file uploads
+        document.querySelectorAll('.file-upload-area').forEach(area => {
+            area.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('dragover');
+            });
+            
+            area.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+            });
+            
+            area.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+                
+                const fileInput = this.nextElementSibling;
+                fileInput.files = e.dataTransfer.files;
+                showFileInfo(fileInput);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+Subject: Application Received - {{ invitation.onboarding_form.title }}
+
+Hello {{ prospective_employee.first_name|default:"" }},
+
+We have successfully received your onboarding application for {{ invitation.onboarding_form.title }}. Thank you for taking the time to complete all the required information.
+
+WHAT HAPPENS NEXT?
+- Our HR team will review your application
+- You'll receive email updates on your application status  
+- We may contact you for additional information if needed
+- The review process typically takes 3-5 business days
+
+SUBMISSION DETAILS:
+- Submitted: {{ submission.submitted_at|date:"F j, Y g:i A" }}
+- Reference ID: {{ submission.id }}
+- Status: {{ submission.get_review_status_display }}
+
+If you have any questions or need to update your information, please contact our HR team at hr@onecomputerconcepts.com.
+
+Thank you,
+Computer Concepts HR Team
+
+---
+Computer Concepts
+© {{ current_year }} Computer Concepts. All rights reserved.

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding Login - Computer Concepts</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .login-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .login-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            animation: slideUp 0.8s ease;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .login-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .company-logo {
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 36px;
+            font-weight: bold;
+        }
+        
+        .login-body {
+            padding: 40px 30px;
+        }
+        
+        .form-floating {
+            margin-bottom: 20px;
+        }
+        
+        .form-floating .form-control {
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            height: 60px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-floating .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .form-floating label {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        .pin-input {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .login-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 15px;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            width: 100%;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .login-btn:disabled {
+            opacity: 0.7;
+            transform: none;
+            cursor: not-allowed;
+        }
+        
+        .help-section {
+            background: #f8f9fa;
+            padding: 25px 30px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .help-section h6 {
+            color: #495057;
+            margin-bottom: 15px;
+        }
+        
+        .help-section p {
+            color: #6c757d;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .contact-info {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .contact-info:hover {
+            color: #5a6fd8;
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+            margin-bottom: 25px;
+        }
+        
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 25px;
+        }
+        
+        .security-notice h6 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .security-notice ul {
+            margin-bottom: 0;
+            color: #856404;
+            font-size: 14px;
+        }
+        
+        .info-icon {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 24px;
+        }
+        
+        @media (max-width: 576px) {
+            .login-container {
+                padding: 0 15px;
+            }
+            
+            .login-header,
+            .login-body,
+            .help-section {
+                padding: 30px 20px;
+            }
+            
+            .company-logo {
+                width: 60px;
+                height: 60px;
+                font-size: 28px;
+            }
+            
+            .pin-input {
+                font-size: 20px;
+                letter-spacing: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="company-logo">CC</div>
+                    <h2 class="mb-2">Welcome!</h2>
+                    <p class="mb-0 opacity-90">Enter your PIN to access your onboarding form</p>
+                </div>
+                
+                <div class="login-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                <i class="fas {% if message.tags == 'error' %}fa-exclamation-triangle{% elif message.tags == 'success' %}fa-check-circle{% else %}fa-info-circle{% endif %} me-2"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <form method="post" id="loginForm">
+                        {% csrf_token %}
+                        
+                        <div class="form-floating">
+                            <input type="email" class="form-control" id="email" name="email" placeholder="your.email@example.com" required>
+                            <label for="email">
+                                <i class="fas fa-envelope me-2"></i>Email Address
+                            </label>
+                        </div>
+                        
+                        <div class="form-floating">
+                            <input type="text" class="form-control pin-input" id="pin" name="pin" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required>
+                            <label for="pin">
+                                <i class="fas fa-key me-2"></i>6-Digit PIN
+                            </label>
+                        </div>
+                        
+                        <button type="submit" class="login-btn" id="submitBtn">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            Access Onboarding
+                        </button>
+                    </form>
+                    
+                    <div class="security-notice">
+                        <h6>
+                            <i class="fas fa-shield-alt me-2"></i>Security Information
+                        </h6>
+                        <ul class="ps-3">
+                            <li>Your PIN is unique and expires in 48 hours</li>
+                            <li>Do not share your PIN with anyone</li>
+                            <li>Contact HR if you encounter any issues</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="help-section">
+                    <div class="info-icon">
+                        <i class="fas fa-question"></i>
+                    </div>
+                    <h6>Need Help?</h6>
+                    <p>If you don't have your PIN or are experiencing difficulties:</p>
+                    <p>
+                        <a href="mailto:hr@onecomputerconcepts.com" class="contact-info">
+                            <i class="fas fa-envelope me-1"></i>
+                            hr@onecomputerconcepts.com
+                        </a>
+                    </p>
+                    <p class="mt-3 small text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Having trouble? Our HR team is here to help you complete your onboarding process.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <p class="text-white small opacity-75">
+                    © {{ current_year|default:"2024" }} Computer Concepts. All rights reserved.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const pinInput = document.getElementById('pin');
+            const emailInput = document.getElementById('email');
+            const submitBtn = document.getElementById('submitBtn');
+            const form = document.getElementById('loginForm');
+            
+            // Auto-focus email field
+            emailInput.focus();
+            
+            // PIN input formatting
+            pinInput.addEventListener('input', function(e) {
+                // Only allow numbers
+                let value = e.target.value.replace(/[^0-9]/g, '');
+                e.target.value = value;
+                
+                // Auto-submit when PIN is complete
+                if (value.length === 6) {
+                    setTimeout(() => {
+                        form.submit();
+                    }, 500);
+                }
+            });
+            
+            // Enhanced form validation
+            form.addEventListener('submit', function(e) {
+                const email = emailInput.value.trim();
+                const pin = pinInput.value.trim();
+                
+                if (!email || !pin) {
+                    e.preventDefault();
+                    alert('Please enter both email and PIN');
+                    return;
+                }
+                
+                if (pin.length !== 6) {
+                    e.preventDefault();
+                    alert('PIN must be exactly 6 digits');
+                    pinInput.focus();
+                    return;
+                }
+                
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Verifying...';
+            });
+            
+            // Email validation
+            emailInput.addEventListener('blur', function() {
+                const email = this.value.trim();
+                if (email && !isValidEmail(email)) {
+                    this.classList.add('is-invalid');
+                } else {
+                    this.classList.remove('is-invalid');
+                }
+            });
+            
+            // Move to PIN field when email is entered
+            emailInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (this.value.trim() && isValidEmail(this.value.trim())) {
+                        pinInput.focus();
+                    }
+                }
+            });
+            
+            function isValidEmail(email) {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                return emailRegex.test(email);
+            }
+            
+            // Auto-dismiss alerts after 5 seconds
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }, 5000);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -6,6 +6,8 @@ from . import views_admin
 from . import views_files
 from . import views_ai
 from . import views_chat
+from . import views_onboarding_hr
+from . import views_onboarding_portal
 
 
 urlpatterns = [
@@ -175,4 +177,21 @@ urlpatterns = [
     path('api/channels/<uuid:channel_id>/invite/', views_chat.invite_channel_members, name='invite_channel_members'),
     path('api/channels/<uuid:channel_id>/settings/', views_chat.update_channel_settings, name='update_channel_settings'),
     path('api/channels/<uuid:channel_id>/delete/', views_chat.delete_channel, name='delete_channel'),
+    
+    # HR Onboarding System URLs
+    path('employee/hr/onboarding/', views_onboarding_hr.hr_onboarding_dashboard, name='hr_onboarding_dashboard'),
+    path('employee/hr/onboarding/forms/create/', views_onboarding_hr.create_onboarding_form, name='create_onboarding_form'),
+    path('employee/hr/onboarding/forms/<uuid:form_id>/edit/', views_onboarding_hr.edit_onboarding_form, name='edit_onboarding_form'),
+    path('employee/hr/onboarding/invite/', views_onboarding_hr.send_onboarding_invitation, name='send_onboarding_invitation'),
+    path('employee/hr/onboarding/submissions/', views_onboarding_hr.onboarding_submissions, name='onboarding_submissions'),
+    path('employee/hr/onboarding/submissions/<uuid:submission_id>/', views_onboarding_hr.submission_detail, name='hr_submission_detail'),
+    
+    # Prospective Employee Onboarding Portal URLs
+    path('onboarding/', views_onboarding_portal.onboarding_info, name='onboarding_info'),
+    path('onboarding/login/', views_onboarding_portal.onboarding_login, name='onboarding_login'),
+    path('onboarding/dashboard/', views_onboarding_portal.onboarding_dashboard, name='onboarding_dashboard'),
+    path('onboarding/form/<uuid:invitation_id>/', views_onboarding_portal.onboarding_form, name='onboarding_form'),
+    path('onboarding/status/<uuid:submission_id>/', views_onboarding_portal.onboarding_status, name='onboarding_status'),
+    path('onboarding/logout/', views_onboarding_portal.onboarding_logout, name='onboarding_logout'),
+    path('onboarding/api/form/<uuid:form_id>/field/<str:field_name>/options/', views_onboarding_portal.form_field_options, name='form_field_options'),
 ]
