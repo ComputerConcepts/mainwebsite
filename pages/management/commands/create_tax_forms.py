@@ -5,6 +5,8 @@ Based on the attached tax forms: Intake, Schedule C, Income Summary, etc.
 
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
+import secrets
+import string
 from pages.models import TaxFormTemplate, TaxFormField
 
 
@@ -20,15 +22,40 @@ class Command(BaseCommand):
         )
     
     def handle(self, *args, **options):
-        username = options['user']
-        
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            self.stdout.write(
-                self.style.ERROR(f'User "{username}" not found. Please create an admin user first.')
-            )
-            return
+        username = options.get('user')
+
+        user = None
+
+        # If a username was provided, try to use it first
+        if username:
+            try:
+                user = User.objects.get(username=username)
+                self.stdout.write(self.style.SUCCESS(f'Using provided user: {username}'))
+            except User.DoesNotExist:
+                self.stdout.write(self.style.WARNING(f'Provided user "{username}" not found. Trying fallbacks...'))
+
+        # If no user found yet, try to find any superuser
+        if user is None:
+            try:
+                user = User.objects.filter(is_superuser=True).order_by('id').first()
+                if user:
+                    self.stdout.write(self.style.SUCCESS(f'Using superuser: {user.username}'))
+            except Exception:
+                user = None
+
+        # If still no user, try any existing user
+        if user is None:
+            user = User.objects.order_by('id').first()
+            if user:
+                self.stdout.write(self.style.SUCCESS(f'No superuser found; using first available user: {user.username}'))
+
+        # If no users exist at all, create a fallback admin user
+        if user is None:
+            # create a fallback admin user with a generated password
+            pwd = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+            username = 'tax_admin'
+            user = User.objects.create_superuser(username=username, email='', password=pwd)
+            self.stdout.write(self.style.WARNING(f'No users found in database. Created fallback superuser "{username}" with generated password: {pwd}'))
         
         self.stdout.write('Creating predefined tax form templates...')
         
