@@ -1,0 +1,341 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Tax Form Templates{% endblock %}
+
+{% block extra_css %}
+<style>
+.template-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+    margin-bottom: 1.5rem;
+}
+
+.template-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.form-type-badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 20px;
+}
+
+.badge-intake { background: linear-gradient(45deg, #28a745, #20c997); }
+.badge-schedule { background: linear-gradient(45deg, #ffc107, #fd7e14); }
+.badge-income { background: linear-gradient(45deg, #17a2b8, #6f42c1); }
+.badge-dependent { background: linear-gradient(45deg, #dc3545, #e83e8c); }
+.badge-student { background: linear-gradient(45deg, #6610f2, #6f42c1); }
+.badge-photo_id { background: linear-gradient(45deg, #fd7e14, #f5539d); }
+.badge-due_diligence { background: linear-gradient(45deg, #6c757d, #495057); }
+.badge-other { background: linear-gradient(45deg, #6c757d, #495057); }
+
+.search-filter-bar {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stats-row {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    color: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Tax Form Templates</h1>
+            <p class="text-muted mb-0">Create and manage tax form templates for client use</p>
+        </div>
+        <div>
+            <a href="{% url 'tax_admin_dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+            <a href="{% url 'create_tax_form_template' %}" class="btn btn-success">
+                <i class="fas fa-plus me-2"></i>New Template
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Overview -->
+    <div class="stats-row">
+        <div class="row">
+            <div class="col-md-3 stat-item">
+                <div class="stat-number">{{ templates.count }}</div>
+                <div class="stat-label">Total Templates</div>
+            </div>
+            <div class="col-md-3 stat-item">
+                <div class="stat-number">{{ active_templates }}</div>
+                <div class="stat-label">Active Templates</div>
+            </div>
+            <div class="col-md-3 stat-item">
+                <div class="stat-number">{{ total_fields }}</div>
+                <div class="stat-label">Total Fields</div>
+            </div>
+            <div class="col-md-3 stat-item">
+                <div class="stat-number">{{ templates_with_signature }}</div>
+                <div class="stat-label">Require Signature</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter Bar -->
+    <div class="search-filter-bar">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Search Templates</label>
+                <input type="text" name="search" class="form-control" 
+                       placeholder="Search by name or description..." 
+                       value="{{ request.GET.search }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Form Type</label>
+                <select name="form_type" class="form-select">
+                    <option value="">All Types</option>
+                    <option value="intake" {% if request.GET.form_type == 'intake' %}selected{% endif %}>Tax Intake</option>
+                    <option value="schedule_c" {% if request.GET.form_type == 'schedule_c' %}selected{% endif %}>Schedule C</option>
+                    <option value="income_summary" {% if request.GET.form_type == 'income_summary' %}selected{% endif %}>Income Summary</option>
+                    <option value="dependent_care" {% if request.GET.form_type == 'dependent_care' %}selected{% endif %}>Dependent Care</option>
+                    <option value="student_ack" {% if request.GET.form_type == 'student_ack' %}selected{% endif %}>Student Acknowledgment</option>
+                    <option value="photo_id" {% if request.GET.form_type == 'photo_id' %}selected{% endif %}>Photo ID & Banking</option>
+                    <option value="due_diligence" {% if request.GET.form_type == 'due_diligence' %}selected{% endif %}>Due Diligence</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Signature Required</label>
+                <select name="requires_signature" class="form-select">
+                    <option value="">All Templates</option>
+                    <option value="true" {% if request.GET.requires_signature == 'true' %}selected{% endif %}>Signature Required</option>
+                    <option value="false" {% if request.GET.requires_signature == 'false' %}selected{% endif %}>No Signature</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search me-2"></i>Filter
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Templates Grid -->
+    {% if templates %}
+        <div class="row">
+            {% for template in templates %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card template-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <h5 class="card-title mb-0">{{ template.name }}</h5>
+                            <span class="form-type-badge badge text-white badge-{{ template.form_type }}">
+                                {{ template.get_form_type_display }}
+                            </span>
+                        </div>
+                        
+                        <p class="card-text text-muted">{{ template.description|truncatechars:100 }}</p>
+                        
+                        <!-- Template Stats -->
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <small class="text-muted">
+                                    <i class="fas fa-list-ul me-1"></i>{{ template.fields.count }} fields
+                                </small>
+                            </div>
+                            <div class="col-6 text-end">
+                                {% if template.requires_signature %}
+                                    <small class="text-success">
+                                        <i class="fas fa-signature me-1"></i>Signature
+                                    </small>
+                                {% else %}
+                                    <small class="text-muted">
+                                        <i class="fas fa-file-alt me-1"></i>No Signature
+                                    </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Template Meta Info -->
+                        <div class="mb-3">
+                            <small class="text-muted d-block">
+                                Created: {{ template.created_at|date:"M d, Y" }}
+                            </small>
+                            <small class="text-muted d-block">
+                                By: {{ template.created_by.get_full_name|default:template.created_by.username }}
+                            </small>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-info" onclick="previewTemplate('{{ template.id }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <a href="{% url 'edit_tax_form_template' template.id %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button class="btn btn-outline-danger" onclick="confirmDelete('{{ template.id }}', '{{ template.name }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            
+                            <button class="btn btn-sm btn-success" onclick="assignToClients('{{ template.id }}')">
+                                <i class="fas fa-user-plus me-1"></i>Assign
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Pagination -->
+        {% if templates.has_other_pages %}
+        <nav aria-label="Template pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if templates.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.form_type %}&form_type={{ request.GET.form_type }}{% endif %}{% if request.GET.requires_signature %}&requires_signature={{ request.GET.requires_signature }}{% endif %}">First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ templates.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.form_type %}&form_type={{ request.GET.form_type }}{% endif %}{% if request.GET.requires_signature %}&requires_signature={{ request.GET.requires_signature }}{% endif %}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                <li class="page-item active">
+                    <span class="page-link">
+                        Page {{ templates.number }} of {{ templates.paginator.num_pages }}
+                    </span>
+                </li>
+                
+                {% if templates.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ templates.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.form_type %}&form_type={{ request.GET.form_type }}{% endif %}{% if request.GET.requires_signature %}&requires_signature={{ request.GET.requires_signature }}{% endif %}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ templates.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.form_type %}&form_type={{ request.GET.form_type }}{% endif %}{% if request.GET.requires_signature %}&requires_signature={{ request.GET.requires_signature }}{% endif %}">Last</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-5">
+            <i class="fas fa-file-plus fa-4x text-muted mb-4"></i>
+            <h3 class="text-muted mb-3">No Tax Form Templates Found</h3>
+            {% if request.GET.search or request.GET.form_type or request.GET.requires_signature %}
+                <p class="text-muted mb-4">No templates match your current filters. Try adjusting your search criteria.</p>
+                <a href="{% url 'tax_form_templates' %}" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-times me-2"></i>Clear Filters
+                </a>
+            {% else %}
+                <p class="text-muted mb-4">Get started by creating your first tax form template.</p>
+            {% endif %}
+            <a href="{% url 'create_tax_form_template' %}" class="btn btn-success btn-lg">
+                <i class="fas fa-plus me-2"></i>Create First Template
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the template "<strong id="templateName"></strong>"?</p>
+                <p class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>This action cannot be undone and will affect any assigned clients.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Template</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Template Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="previewContent">
+                <!-- Preview content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function previewTemplate(templateId) {
+    // Show the preview modal with template details
+    $('#previewModal').modal('show');
+    $('#previewContent').html('<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Loading preview...</p></div>');
+    
+    // In a real implementation, you would load template details via AJAX
+    setTimeout(() => {
+        $('#previewContent').html('<p>Template preview functionality will be implemented here.</p>');
+    }, 1000);
+}
+
+function confirmDelete(templateId, templateName) {
+    $('#templateName').text(templateName);
+    $('#deleteConfirmModal').modal('show');
+    
+    $('#confirmDeleteBtn').off('click').on('click', function() {
+        // In a real implementation, you would send a DELETE request
+        alert(`Template "${templateName}" would be deleted here`);
+        $('#deleteConfirmModal').modal('hide');
+    });
+}
+
+function assignToClients(templateId) {
+    // Redirect to client assignment page
+    window.location.href = `/employee/tax/clients/?assign=${templateId}`;
+}
+
+// Auto-submit form on filter changes for better UX
+document.addEventListener('DOMContentLoaded', function() {
+    const filterSelects = document.querySelectorAll('select[name="form_type"], select[name="requires_signature"]');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -8,6 +8,7 @@ from . import views_ai
 from . import views_chat
 from . import views_onboarding_hr
 from . import views_onboarding_portal
+from . import views_tax
 
 
 urlpatterns = [
@@ -194,4 +195,30 @@ urlpatterns = [
     path('onboarding/status/<uuid:submission_id>/', views_onboarding_portal.onboarding_status, name='onboarding_status'),
     path('onboarding/logout/', views_onboarding_portal.onboarding_logout, name='onboarding_logout'),
     path('onboarding/api/form/<uuid:form_id>/field/<str:field_name>/options/', views_onboarding_portal.form_field_options, name='form_field_options'),
+    
+    # =============================================================================
+    # TAX PREPARATION SYSTEM URLs
+    # =============================================================================
+    
+    # Tax Admin URLs (Staff/Employee Access)
+    path('employee/tax/', views_tax.tax_admin_dashboard, name='tax_admin_dashboard'),
+    path('employee/tax/templates/', views_tax.tax_form_templates, name='tax_form_templates'),
+    path('employee/tax/templates/create/', views_tax.create_tax_form_template, name='create_tax_form_template'),
+    path('employee/tax/templates/<uuid:template_id>/edit/', views_tax.edit_tax_form_template, name='edit_tax_form_template'),
+    path('employee/tax/templates/<uuid:template_id>/add-field/', views_tax.add_form_field, name='add_tax_form_field'),
+    path('employee/tax/clients/', views_tax.manage_clients, name='manage_tax_clients'),
+    path('employee/tax/clients/create/', views_tax.create_client, name='create_tax_client'),
+    path('employee/tax/clients/<uuid:client_id>/', views_tax.client_detail, name='tax_client_detail'),
+    path('employee/tax/clients/<uuid:client_id>/assign/', views_tax.assign_forms, name='assign_tax_forms'),
+    path('employee/tax/clients/<uuid:client_id>/forms/', views_tax.client_forms, name='client_tax_forms'),
+    path('employee/tax/forms/<uuid:assignment_id>/fill/', views_tax.employee_fill_form, name='employee_fill_form'),
+    
+    # Tax Client Portal URLs (Public Access)
+    path('tax/', views_tax.tax_client_login, name='tax_client_login'),
+    path('tax/login/', views_tax.tax_client_login, name='tax_client_login'),
+    path('tax/logout/', views_tax.tax_client_logout, name='tax_client_logout'),
+    path('tax/debug/', views_tax.tax_client_debug, name='tax_client_debug'),  # Debug view
+    path('tax/dashboard/', views_tax.tax_client_dashboard, name='tax_client_dashboard'),
+    path('tax/form/<uuid:assignment_id>/', views_tax.tax_form_fill, name='tax_form_fill'),
+    path('tax/review/<uuid:submission_id>/', views_tax.tax_client_review_form, name='tax_client_review_form'),
 ]

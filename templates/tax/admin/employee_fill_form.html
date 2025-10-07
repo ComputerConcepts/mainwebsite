@@ -1,0 +1,1094 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Fill Form for {{ assignment.client.full_name }} - Computer Concepts{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border-left: 4px solid #007bff;
+}
+
+.form-field {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e3e6f0;
+}
+
+.field-label {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.field-description {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 0.75rem;
+}
+
+.required-field {
+    color: #dc3545;
+}
+
+.signature-pad-container {
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    background: #f8f9fa;
+    margin-top: 1rem;
+}
+
+.signature-pad {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: white;
+    cursor: crosshair;
+}
+
+.progress-indicator {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.client-info-card {
+    background: #e8f4fd;
+    border: 1px solid #b8daff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.form-actions {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    padding: 1.5rem 0;
+    margin-top: 2rem;
+    border-top: 2px solid #e3e6f0;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-edit fa-fw me-2"></i>Fill Tax Form
+            </h1>
+            <p class="text-muted mb-0">Complete {{ assignment.tax_form.name }} for {{ assignment.client.full_name }}</p>
+        </div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'tax_admin_dashboard' %}">Tax Management</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'manage_tax_clients' %}">Clients</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'tax_client_detail' assignment.client.id %}">{{ assignment.client.full_name }}</a></li>
+                <li class="breadcrumb-item active">Fill Form</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Progress Indicator -->
+    <div class="progress-indicator">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h6 class="mb-1">
+                    <i class="fas fa-file-alt me-2"></i>{{ assignment.tax_form.name }}
+                </h6>
+                <small class="opacity-75">{{ assignment.tax_form.description }}</small>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <span class="badge bg-light text-dark fs-6">
+                    Employee Filling Mode
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Information Card -->
+    <div class="client-info-card">
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="text-primary mb-2">
+                    <i class="fas fa-user me-2"></i>Client Information
+                </h6>
+                <p class="mb-1"><strong>Name:</strong> {{ assignment.client.full_name }}</p>
+                <p class="mb-1"><strong>Email:</strong> {{ assignment.client.email }}</p>
+                {% if assignment.client.phone %}
+                <p class="mb-1"><strong>Phone:</strong> {{ assignment.client.phone }}</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-primary mb-2">
+                    <i class="fas fa-calendar me-2"></i>Assignment Details
+                </h6>
+                <p class="mb-1"><strong>Assigned:</strong> {{ assignment.assigned_at|date:"M j, Y g:i A" }}</p>
+                {% if assignment.due_date %}
+                <p class="mb-1"><strong>Due Date:</strong> {{ assignment.due_date|date:"M j, Y" }}</p>
+                {% endif %}
+                <p class="mb-0"><strong>Status:</strong> 
+                    <span class="badge bg-{% if assignment.status == 'completed' %}success{% elif assignment.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
+                        {{ assignment.get_status_display }}
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" id="taxForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <!-- Income Summary Table (if monthly fields exist) -->
+        {% if form_fields|length > 0 %}
+            {% for field in form_fields %}
+                {% if 'january - service' in field.field_label|lower %}
+                    <div class="form-section income-summary-section">
+                        <div class="form-field">
+                            <label class="field-label">
+                                Income Summary
+                            </label>
+                            <div class="field-description">Enter your monthly service income details</div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-bordered" style="max-width: 600px;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 25%;">Month</th>
+                                            <th style="width: 50%;">Service</th>
+                                            <th style="width: 25%;">$ Made</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for monthly_field in form_fields %}
+                                            {% if '- service' in monthly_field.field_label|lower %}
+                                                <tr>
+                                                    <td class="fw-bold">{{ monthly_field.field_label|cut:' - Service'|title }}</td>
+                                                    <td>
+                                                        <input type="text" 
+                                                               name="field_{{ monthly_field.id }}" 
+                                                               class="form-control form-control-sm" 
+                                                               {% if monthly_field.is_required %}required{% endif %}
+                                                               value="{{ monthly_field.current_value }}"
+                                                               placeholder="Service description">
+                                                    </td>
+                                                    <td>
+                                                        {% with month_name=monthly_field.field_label|cut:' - Service' %}
+                                                        {% for amount_field in form_fields %}
+                                                            {% if month_name|lower in amount_field.field_label|lower and '$ made' in amount_field.field_label|lower %}
+                                                                <input type="number" 
+                                                                       name="field_{{ amount_field.id }}" 
+                                                                       class="form-control form-control-sm monthly-amount" 
+                                                                       {% if amount_field.is_required %}required{% endif %}
+                                                                       value="{{ amount_field.current_value }}"
+                                                                       placeholder="0.00"
+                                                                       step="0.01"
+                                                                       onchange="calculateMonthlyTotal()">
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                        {% endwith %}
+                                                    </td>
+                                                </tr>
+                                            {% endif %}
+                                        {% endfor %}
+                                        <tr class="table-warning">
+                                            <td class="fw-bold">TOTAL</td>
+                                            <td class="text-center fw-bold">-</td>
+                                            <td><input type="number" class="form-control form-control-sm fw-bold" id="monthly-total" placeholder="0.00" step="0.01" readonly></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Enter monthly service details and amounts. Total will be calculated automatically.
+                            </small>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+
+        <!-- Dependent Care Table (if dependent fields exist) -->
+        {% for field in form_fields %}
+            {% if '1. name of child' in field.field_label|lower %}
+                <div class="form-section dependent-care-section">
+                    <div class="form-field">
+                        <label class="field-label">
+                            Standard Dependents
+                        </label>
+                        <div class="field-description">Enter dependent care information for up to 4 children</div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Name of Child</th>
+                                        <th>SSN</th>
+                                        <th>Daycare/Provider Name</th>
+                                        <th>FEIN (or SSN of caregiver)</th>
+                                        <th>Total Amount Paid $</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for i in "1234" %}
+                                        <tr>
+                                            {% for dep_field in form_fields %}
+                                                {% if dep_field.field_label|lower == i|add:'. name of child' %}
+                                                    <td>
+                                                        <input type="text" 
+                                                               name="field_{{ dep_field.id }}" 
+                                                               class="form-control form-control-sm" 
+                                                               {% if dep_field.is_required %}required{% endif %}
+                                                               value="{{ dep_field.current_value }}"
+                                                               placeholder="Child's name">
+                                                    </td>
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% for dep_field in form_fields %}
+                                                {% if dep_field.field_label|lower == i|add:'. ssn' %}
+                                                    <td>
+                                                        <input type="text" 
+                                                               name="field_{{ dep_field.id }}" 
+                                                               class="form-control form-control-sm" 
+                                                               {% if dep_field.is_required %}required{% endif %}
+                                                               value="{{ dep_field.current_value }}"
+                                                               placeholder="000-00-0000"
+                                                               pattern="[0-9]{3}-[0-9]{2}-[0-9]{4}"
+                                                               maxlength="11">
+                                                    </td>
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% for dep_field in form_fields %}
+                                                {% if dep_field.field_label|lower == i|add:'. daycare or provider name' %}
+                                                    <td>
+                                                        <input type="text" 
+                                                               name="field_{{ dep_field.id }}" 
+                                                               class="form-control form-control-sm" 
+                                                               {% if dep_field.is_required %}required{% endif %}
+                                                               value="{{ dep_field.current_value }}"
+                                                               placeholder="Provider name">
+                                                    </td>
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% for dep_field in form_fields %}
+                                                {% if dep_field.field_label|lower == i|add:'. fein (or social of caregiver)' %}
+                                                    <td>
+                                                        <input type="text" 
+                                                               name="field_{{ dep_field.id }}" 
+                                                               class="form-control form-control-sm" 
+                                                               {% if dep_field.is_required %}required{% endif %}
+                                                               value="{{ dep_field.current_value }}"
+                                                               placeholder="00-0000000 or 000-00-0000">
+                                                    </td>
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% for dep_field in form_fields %}
+                                                {% if dep_field.field_label|lower == i|add:'. total amount paid $' %}
+                                                    <td>
+                                                        <input type="number" 
+                                                               name="field_{{ dep_field.id }}" 
+                                                               class="form-control form-control-sm" 
+                                                               {% if dep_field.is_required %}required{% endif %}
+                                                               value="{{ dep_field.current_value }}"
+                                                               placeholder="0.00"
+                                                               step="0.01">
+                                                    </td>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Enter information for up to 4 dependent children requiring care.
+                        </small>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Form Fields -->
+        {% for field in form_fields %}
+        {% if field.field_type == 'signature' or field.field_type == 'section_header' or '- service' in field.field_label|lower or '$ made' in field.field_label|lower or 'january' in field.field_label|lower or 'february' in field.field_label|lower or 'march' in field.field_label|lower or 'april' in field.field_label|lower or 'may' in field.field_label|lower or 'june' in field.field_label|lower or 'july' in field.field_label|lower or 'august' in field.field_label|lower or 'september' in field.field_label|lower or 'october' in field.field_label|lower or 'november' in field.field_label|lower or 'december' in field.field_label|lower or '. name of child' in field.field_label|lower or '. ssn' in field.field_label|lower or '. daycare or provider name' in field.field_label|lower or '. fein (or social of caregiver)' in field.field_label|lower or '. total amount paid $' in field.field_label|lower %}
+            {% comment %}Skip signature fields, section headers, monthly fields and dependent care fields as they're handled separately{% endcomment %}
+        {% else %}
+        <div class="form-section">
+            <div class="form-field">
+                <label class="field-label">
+                    {{ field.field_label }}
+                    {% if field.is_required %}
+                        <span class="required-field">*</span>
+                    {% endif %}
+                </label>
+                
+                {% if field.help_text %}
+                <div class="field-description">{{ field.help_text }}</div>
+                {% endif %}
+
+                {% if field.field_type == 'text' %}
+                    <input type="text" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="Enter {{ field.field_label|lower }}">
+
+                {% elif field.field_type == 'email' %}
+                    <input type="email" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="Enter email address">
+
+                {% elif field.field_type == 'phone' %}
+                    <input type="tel" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="Enter phone number">
+
+                {% elif field.field_type == 'number' %}
+                    <input type="number" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="Enter amount"
+                           step="0.01">
+
+                {% elif field.field_type == 'date' %}
+                    <input type="date" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}">
+
+                {% elif field.field_type == 'dropdown' %}
+                    <select name="field_{{ field.id }}" 
+                            class="form-select" 
+                            {% if field.is_required %}required{% endif %}>
+                        <option value="">Select {{ field.field_label|lower }}...</option>
+                        {% for option in field.field_options %}
+                            <option value="{{ option }}" 
+                                    {% if field.current_value == option %}selected{% endif %}>
+                                {{ option }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                {% elif field.field_type == 'checkbox' %}
+                    <div class="form-check">
+                        <input type="checkbox" 
+                               name="field_{{ field.id }}" 
+                               class="form-check-input" 
+                               value="yes"
+                               {% if field.current_value == 'yes' %}checked{% endif %}
+                               id="field_{{ field.id }}">
+                        <label class="form-check-label" for="field_{{ field.id }}">
+                            {{ field.help_text|default:"Yes" }}
+                        </label>
+                    </div>
+
+                {% elif field.field_type == 'table' or 'dependent' in field.field_name|lower or 'list all' in field.field_label|lower or 'list' in field.field_label|lower or 'income summary' in field.field_label|lower or 'summary' in field.field_label|lower or 'income' in field.field_label|lower %}
+                    <!-- DEBUG: FOUND TABLE FIELD - Name: "{{ field.field_name }}" | Label: "{{ field.field_label }}" | Type: "{{ field.field_type }}" -->
+                    <div class="table-field-container">
+                        {% if 'dependent' in field.field_name|lower or 'care' in field.field_label|lower %}
+                            <!-- Dependent Care Table -->
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="table_{{ field.id }}">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Name of Child</th>
+                                            <th>SSN</th>
+                                            <th>Daycare/Provider Name</th>
+                                            <th>FEIN (or SSN of caregiver)</th>
+                                            <th>Total Amount Paid $</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody_{{ field.id }}">
+                                        {% if field.current_value %}
+                                            <!-- Load existing data if any -->
+                                        {% endif %}
+                                        <tr>
+                                            <td><input type="text" class="form-control form-control-sm" placeholder="Child's Name" onchange="updateTableData(this)"></td>
+                                            <td><input type="text" class="form-control form-control-sm" placeholder="000-00-0000" pattern="[0-9]{3}-[0-9]{2}-[0-9]{4}" maxlength="11" onchange="updateTableData(this)"></td>
+                                            <td><input type="text" class="form-control form-control-sm" placeholder="Daycare/Provider Name" onchange="updateTableData(this)"></td>
+                                            <td><input type="text" class="form-control form-control-sm" placeholder="00-0000000 or 000-00-0000" onchange="updateTableData(this)"></td>
+                                            <td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-danger" onclick="removeTableRow(this)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-success" onclick="addDependentCareRow('{{ field.id }}')">
+                                    <i class="fas fa-plus me-1"></i>Add Another Dependent
+                                </button>
+                            </div>
+                        {% elif 'income summary' in field.field_label|lower or 'summary' in field.field_label|lower %}
+                            <!-- Income Summary Table -->
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="table_{{ field.id }}" style="max-width: 600px;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 25%;">Month</th>
+                                            <th style="width: 50%;">Service</th>
+                                            <th style="width: 25%;">$ Made</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody_{{ field.id }}">
+                                        <!-- Pre-populate with all 12 months -->
+                                        <tr><td class="fw-bold">January</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">February</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">March</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">April</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">May</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">June</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">July</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">August</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">September</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">October</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">November</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr><td class="fw-bold">December</td><td><input type="text" class="form-control form-control-sm" placeholder="Service description" onchange="updateTableData(this)"></td><td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td></tr>
+                                        <tr class="table-warning"><td class="fw-bold">TOTAL</td><td class="text-center fw-bold">-</td><td><input type="number" class="form-control form-control-sm fw-bold" placeholder="0.00" step="0.01" readonly id="total_{{ field.id }}"></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Enter monthly service details and amounts. Total will be calculated automatically.
+                                </small>
+                            </div>
+                        {% else %}
+                            <!-- Generic Table -->
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="table_{{ field.id }}">
+                                    <thead class="table-light">
+                                        <tr id="header_{{ field.id }}">
+                                            <th>Item</th>
+                                            <th>Description</th>
+                                            <th>Amount</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody_{{ field.id }}">
+                                        <tr>
+                                            <td><input type="text" class="form-control form-control-sm" placeholder="Item" onchange="updateTableData(this)"></td>
+                                            <td><input type="text" class="form-control form-control-sm" placeholder="Description" onchange="updateTableData(this)"></td>
+                                            <td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-danger" onclick="removeTableRow(this)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-success" onclick="addGenericTableRow('{{ field.id }}')">
+                                    <i class="fas fa-plus me-1"></i>Add Row
+                                </button>
+                            </div>
+                        {% endif %}
+                        <input type="hidden" name="field_{{ field.id }}" id="hidden_{{ field.id }}" value="{{ field.current_value }}">
+                    </div>
+
+                {% elif field.field_type == 'textarea' %}
+                    <textarea name="field_{{ field.id }}" 
+                              class="form-control" 
+                              rows="4"
+                              {% if field.is_required %}required{% endif %}
+                              placeholder="Enter {{ field.field_label|lower }}">{{ field.current_value }}</textarea>
+
+                {% elif field.field_type == 'file' %}
+                    <input type="file" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                    <small class="form-text text-muted">
+                        Accepted formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
+                    </small>
+
+                {% elif field.field_type == 'ssn' %}
+                    <input type="text" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="000-00-0000"
+                           pattern="[0-9]{3}-[0-9]{2}-[0-9]{4}"
+                           maxlength="11">
+
+                {% elif field.field_type == 'currency' %}
+                    <input type="number" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="0.00"
+                           step="0.01"
+                           min="0">
+
+                {% elif field.field_type == 'yes_no' %}
+                    <select name="field_{{ field.id }}" 
+                            class="form-select" 
+                            {% if field.is_required %}required{% endif %}>
+                        <option value="">Select an option...</option>
+                        <option value="yes" {% if field.current_value == 'yes' %}selected{% endif %}>Yes</option>
+                        <option value="no" {% if field.current_value == 'no' %}selected{% endif %}>No</option>
+                    </select>
+
+                {% elif field.field_type == 'radio' %}
+                    <select name="field_{{ field.id }}" 
+                            class="form-select" 
+                            {% if field.is_required %}required{% endif %}>
+                        <option value="">Select {{ field.field_label|lower }}...</option>
+                        {% for option in field.field_options %}
+                            <option value="{{ option }}" 
+                                    {% if field.current_value == option %}selected{% endif %}>
+                                {{ option }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                {% elif field.field_type == 'name' %}
+                    <input type="text" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="Enter full name">
+
+                {% elif field.field_type == 'ein' %}
+                    <input type="text" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="00-0000000"
+                           pattern="[0-9]{2}-[0-9]{7}"
+                           maxlength="10">
+
+                {% else %}
+                    <!-- DEBUG: FIELD IN ELSE - Name: "{{ field.field_name }}" | Label: "{{ field.field_label }}" | Type: "{{ field.field_type }}" -->
+                    <input type="text" 
+                           name="field_{{ field.id }}" 
+                           class="form-control" 
+                           {% if field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="Enter {{ field.field_label|lower }}">
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <!-- Employee Completion Section -->
+        <div class="form-section">
+            <div class="form-field">
+                <label class="field-label">
+                    Employee Confirmation <span class="required-field">*</span>
+                </label>
+                <div class="field-description">
+                    Confirm that you have accurately completed this form with the client's information
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Workflow:</strong> After you complete this form, it will be sent to the client for review and signature.
+                </div>
+                
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="employeeConfirmation" name="employee_confirmation" value="yes" required>
+                    <label class="form-check-label" for="employeeConfirmation">
+                        I confirm that all information entered is accurate and complete based on the client's provided information.
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes Section -->
+        <div class="form-section">
+            <div class="form-field">
+                <label class="field-label">Internal Notes (Optional)</label>
+                <div class="field-description">
+                    Add any notes about this form completion for internal reference
+                </div>
+                <textarea name="internal_notes" class="form-control" rows="3" 
+                          placeholder="Enter any notes about this form completion..."></textarea>
+            </div>
+        </div>
+    </form>
+
+    <!-- Action Buttons -->
+    <div class="form-actions">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <a href="{% url 'tax_client_detail' assignment.client.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Client
+                </a>
+            </div>
+            <div>
+                <button type="button" class="btn btn-outline-info me-2" onclick="saveDraft()">
+                    <i class="fas fa-save me-2"></i>Save Draft
+                </button>
+                <button type="button" class="btn btn-success" onclick="submitForm()">
+                    <i class="fas fa-paper-plane me-2"></i>Send to Client for Signature
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/1.5.3/signature_pad.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-save form data on input changes
+    const formInputs = document.querySelectorAll('#taxForm input, #taxForm select, #taxForm textarea');
+    formInputs.forEach(input => {
+        input.addEventListener('change', autoSave);
+    });
+
+    // Load any existing draft data
+    loadDraftData();
+});
+
+function autoSave() {
+    const formData = new FormData(document.getElementById('taxForm'));
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        data[key] = value;
+    }
+    
+    // Save to localStorage for draft functionality
+    localStorage.setItem('taxForm_{{ assignment.id }}', JSON.stringify(data));
+}
+
+function loadDraftData() {
+    const savedData = localStorage.getItem('taxForm_{{ assignment.id }}');
+    if (savedData) {
+        try {
+            const data = JSON.parse(savedData);
+            for (let [key, value] of Object.entries(data)) {
+                const element = document.querySelector(`[name="${key}"]`);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = value === 'yes';
+                    } else {
+                        element.value = value;
+                    }
+                }
+            }
+        } catch (e) {
+            console.log('Error loading draft data:', e);
+        }
+    }
+}
+
+function saveDraft() {
+    if (validateForm(false)) {
+        autoSave();
+        alert('Draft saved successfully! You can continue editing later.');
+    }
+}
+
+function submitForm() {
+    // Update all table data before validation
+    document.querySelectorAll('.table-field-container').forEach(container => {
+        const firstInput = container.querySelector('input, select');
+        if (firstInput) {
+            updateTableData(firstInput);
+        }
+    });
+    
+    if (validateForm(true)) {
+        // Check employee confirmation
+        const confirmation = document.getElementById('employeeConfirmation');
+        if (!confirmation.checked) {
+            alert('Please confirm that the information is accurate before sending to client.');
+            confirmation.focus();
+            return false;
+        }
+        
+        if (confirm('Send this completed form to the client for review and signature?')) {
+            // Submit the form
+            document.getElementById('taxForm').submit();
+            
+            // Clear draft data
+            localStorage.removeItem('taxForm_{{ assignment.id }}');
+        }
+    }
+}
+
+function validateForm(requireConfirmation = false) {
+    let isValid = true;
+    const requiredFields = document.querySelectorAll('#taxForm [required]');
+    
+    requiredFields.forEach(field => {
+        if (field.type === 'checkbox') {
+            if (!field.checked) {
+                field.classList.add('is-invalid');
+                isValid = false;
+            } else {
+                field.classList.remove('is-invalid');
+            }
+        } else {
+            if (!field.value.trim()) {
+                field.classList.add('is-invalid');
+                isValid = false;
+            } else {
+                field.classList.remove('is-invalid');
+            }
+        }
+    });
+    
+    if (!isValid) {
+        alert('Please fill in all required fields and confirmations before submitting.');
+        // Scroll to first invalid field
+        const firstInvalid = document.querySelector('.is-invalid');
+        if (firstInvalid) {
+            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            firstInvalid.focus();
+        }
+    }
+    
+    return isValid;
+}
+
+// Prevent form loss on page unload if there are changes
+window.addEventListener('beforeunload', function(e) {
+    const formData = new FormData(document.getElementById('taxForm'));
+    let hasData = false;
+    
+    for (let [key, value] of formData.entries()) {
+        if (value.trim()) {
+            hasData = true;
+            break;
+        }
+    }
+    
+    if (hasData) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+    }
+});
+
+// Format SSN input
+document.addEventListener('input', function(e) {
+    if (e.target.getAttribute('pattern') === '[0-9]{3}-[0-9]{2}-[0-9]{4}') {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length >= 6) {
+            value = value.substring(0, 3) + '-' + value.substring(3, 5) + '-' + value.substring(5, 9);
+        } else if (value.length >= 3) {
+            value = value.substring(0, 3) + '-' + value.substring(3);
+        }
+        e.target.value = value;
+    }
+    
+    // Auto-update hidden field for tables
+    updateTableData(e.target);
+});
+
+// Table management functions
+function addDependentRow(fieldId) {
+    const tbody = document.getElementById('tbody_' + fieldId);
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm" placeholder="First Name" onchange="updateTableData(this)"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="M.I." maxlength="1" onchange="updateTableData(this)"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="Last Name" onchange="updateTableData(this)"></td>
+        <td><input type="date" class="form-control form-control-sm" onchange="updateTableData(this)"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="000-00-0000" pattern="[0-9]{3}-[0-9]{2}-[0-9]{4}" maxlength="11" onchange="updateTableData(this)"></td>
+        <td>
+            <select class="form-select form-select-sm" onchange="updateTableData(this)">
+                <option value="">Select...</option>
+                <option value="child">Child</option>
+                <option value="spouse">Spouse</option>
+                <option value="parent">Parent</option>
+                <option value="other">Other</option>
+            </select>
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeTableRow(this)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(newRow);
+    updateTableData(newRow.querySelector('input'));
+}
+
+function addDependentCareRow(fieldId) {
+    const tbody = document.getElementById('tbody_' + fieldId);
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm" placeholder="Child's Name" onchange="updateTableData(this)"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="000-00-0000" pattern="[0-9]{3}-[0-9]{2}-[0-9]{4}" maxlength="11" onchange="updateTableData(this)"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="Daycare/Provider Name" onchange="updateTableData(this)"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="00-0000000 or 000-00-0000" onchange="updateTableData(this)"></td>
+        <td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeTableRow(this)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(newRow);
+    updateTableData(newRow.querySelector('input'));
+}
+
+function addGenericTableRow(fieldId) {
+    const tbody = document.getElementById('tbody_' + fieldId);
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm" placeholder="Item" onchange="updateTableData(this)"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="Description" onchange="updateTableData(this)"></td>
+        <td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)"></td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeTableRow(this)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(newRow);
+    updateTableData(newRow.querySelector('input'));
+}
+
+function removeTableRow(button) {
+    const row = button.closest('tr');
+    const table = button.closest('table');
+    
+    // Don't remove if it's the only row
+    if (table.querySelectorAll('tbody tr').length > 1) {
+        row.remove();
+        updateTableData(button);
+    } else {
+        // Clear the row instead
+        const inputs = row.querySelectorAll('input, select');
+        inputs.forEach(input => input.value = '');
+        updateTableData(button);
+    }
+}
+
+function updateTableData(element) {
+    const table = element.closest('table');
+    if (!table) return;
+    
+    const fieldId = table.id.replace('table_', '');
+    const hiddenInput = document.getElementById('hidden_' + fieldId);
+    if (!hiddenInput) return;
+    
+    // Check if this is an income summary table
+    const isIncomeSummary = table.querySelector('th').textContent.includes('Month');
+    
+    const rows = table.querySelectorAll('tbody tr');
+    const tableData = [];
+    let total = 0;
+    
+    rows.forEach(row => {
+        const inputs = row.querySelectorAll('input, select');
+        const rowData = [];
+        inputs.forEach(input => {
+            if (input.type !== 'button' && !input.readOnly) {
+                rowData.push(input.value);
+                
+                // Calculate total for income summary
+                if (isIncomeSummary && input.type === 'number' && input.value) {
+                    total += parseFloat(input.value) || 0;
+                }
+            }
+        });
+        
+        // Only add row if it has some data (skip for income summary since all rows are pre-populated)
+        if (isIncomeSummary || rowData.some(value => value.trim() !== '')) {
+            tableData.push(rowData);
+        }
+    });
+    
+    // Update total for income summary tables
+    if (isIncomeSummary) {
+        const totalInput = document.getElementById('total_' + fieldId);
+        if (totalInput) {
+            totalInput.value = total.toFixed(2);
+        }
+    }
+    
+    hiddenInput.value = JSON.stringify(tableData);
+}
+
+// Calculate monthly total for income summary
+function calculateMonthlyTotal() {
+    let total = 0;
+    document.querySelectorAll('.monthly-amount').forEach(input => {
+        const value = parseFloat(input.value) || 0;
+        total += value;
+    });
+    
+    const totalInput = document.getElementById('monthly-total');
+    if (totalInput) {
+        totalInput.value = total.toFixed(2);
+    }
+}
+
+// Initialize existing table data
+function initializeTableData(fieldId, existingData) {
+    if (!existingData || existingData === '') return;
+    
+    try {
+        const tableData = JSON.parse(existingData);
+        const tbody = document.getElementById('tbody_' + fieldId);
+        if (!tbody || !tableData.length) return;
+        
+        // Clear existing rows
+        tbody.innerHTML = '';
+        
+        // Add rows with data
+        tableData.forEach((rowData, index) => {
+            const table = tbody.closest('table');
+            const isDependentTable = table.querySelector('th').textContent.includes('First Name');
+            const isIncomeSummary = table.querySelector('th').textContent.includes('Month');
+            
+            if (isIncomeSummary) {
+                // For income summary, populate existing rows instead of creating new ones
+                const rows = tbody.querySelectorAll('tr');
+                if (rows[index] && index < 12) { // Only populate the 12 month rows, not the total row
+                    const inputs = rows[index].querySelectorAll('input');
+                    inputs.forEach((input, inputIndex) => {
+                        if (rowData[inputIndex] && !input.readOnly) {
+                            input.value = rowData[inputIndex];
+                        }
+                    });
+                }
+                return; // Don't create new rows for income summary
+            }
+            
+            const newRow = document.createElement('tr');
+            const isDependentCareTable = table.querySelector('th').textContent.includes('Name of Child');
+            
+            if (isDependentTable && !isDependentCareTable) {
+                // Standard dependent table (for basic dependents)
+                newRow.innerHTML = `
+                    <td><input type="text" class="form-control form-control-sm" placeholder="First Name" onchange="updateTableData(this)" value="${rowData[0] || ''}"></td>
+                    <td><input type="text" class="form-control form-control-sm" placeholder="M.I." maxlength="1" onchange="updateTableData(this)" value="${rowData[1] || ''}"></td>
+                    <td><input type="text" class="form-control form-control-sm" placeholder="Last Name" onchange="updateTableData(this)" value="${rowData[2] || ''}"></td>
+                    <td><input type="date" class="form-control form-control-sm" onchange="updateTableData(this)" value="${rowData[3] || ''}"></td>
+                    <td><input type="text" class="form-control form-control-sm" placeholder="000-00-0000" pattern="[0-9]{3}-[0-9]{2}-[0-9]{4}" maxlength="11" onchange="updateTableData(this)" value="${rowData[4] || ''}"></td>
+                    <td>
+                        <select class="form-select form-select-sm" onchange="updateTableData(this)">
+                            <option value="">Select...</option>
+                            <option value="child" ${rowData[5] === 'child' ? 'selected' : ''}>Child</option>
+                            <option value="spouse" ${rowData[5] === 'spouse' ? 'selected' : ''}>Spouse</option>
+                            <option value="parent" ${rowData[5] === 'parent' ? 'selected' : ''}>Parent</option>
+                            <option value="other" ${rowData[5] === 'other' ? 'selected' : ''}>Other</option>
+                        </select>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeTableRow(this)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+            } else if (isDependentCareTable) {
+                // Dependent care table (for childcare expenses)
+                newRow.innerHTML = `
+                    <td><input type="text" class="form-control form-control-sm" placeholder="Child's Name" onchange="updateTableData(this)" value="${rowData[0] || ''}"></td>
+                    <td><input type="text" class="form-control form-control-sm" placeholder="000-00-0000" pattern="[0-9]{3}-[0-9]{2}-[0-9]{4}" maxlength="11" onchange="updateTableData(this)" value="${rowData[1] || ''}"></td>
+                    <td><input type="text" class="form-control form-control-sm" placeholder="Daycare/Provider Name" onchange="updateTableData(this)" value="${rowData[2] || ''}"></td>
+                    <td><input type="text" class="form-control form-control-sm" placeholder="00-0000000 or 000-00-0000" onchange="updateTableData(this)" value="${rowData[3] || ''}"></td>
+                    <td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)" value="${rowData[4] || ''}"></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeTableRow(this)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+            } else {
+                newRow.innerHTML = `
+                    <td><input type="text" class="form-control form-control-sm" placeholder="Item" onchange="updateTableData(this)" value="${rowData[0] || ''}"></td>
+                    <td><input type="text" class="form-control form-control-sm" placeholder="Description" onchange="updateTableData(this)" value="${rowData[1] || ''}"></td>
+                    <td><input type="number" class="form-control form-control-sm" placeholder="0.00" step="0.01" onchange="updateTableData(this)" value="${rowData[2] || ''}"></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeTableRow(this)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+            }
+            tbody.appendChild(newRow);
+        });
+        
+        // Add empty row for new entries
+        const table = tbody.closest('table');
+        const isDependentTable = table.querySelector('th').textContent.includes('First Name');
+        const isDependentCareTable = table.querySelector('th').textContent.includes('Name of Child');
+        
+        if (isDependentCareTable) {
+            addDependentCareRow(fieldId);
+        } else if (isDependentTable) {
+            addDependentRow(fieldId);
+        } else {
+            addGenericTableRow(fieldId);
+        }
+        
+    } catch (e) {
+        console.error('Error parsing table data:', e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Hide duplicate income summary sections (keep only the first one)
+    const incomeSections = document.querySelectorAll('.income-summary-section');
+    if (incomeSections.length > 1) {
+        for (let i = 1; i < incomeSections.length; i++) {
+            incomeSections[i].style.display = 'none';
+        }
+    }
+    
+    // Initialize existing table data
+    document.querySelectorAll('.table-field-container').forEach(container => {
+        const hiddenInput = container.querySelector('input[type="hidden"]');
+        if (hiddenInput && hiddenInput.value) {
+            const fieldId = hiddenInput.id.replace('hidden_', '');
+            initializeTableData(fieldId, hiddenInput.value);
+        }
+    });
+    
+    // Initialize table event listeners
+    document.querySelectorAll('.table-field-container input, .table-field-container select').forEach(element => {
+        element.addEventListener('change', function() {
+            updateTableData(this);
+        });
+    });
+    
+    // Calculate initial monthly total if there are existing values
+    calculateMonthlyTotal();
+});
+</script>
+{% endblock %}

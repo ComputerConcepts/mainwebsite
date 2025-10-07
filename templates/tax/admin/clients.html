@@ -1,0 +1,415 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Tax Client Management{% endblock %}
+
+{% block extra_css %}
+<style>
+.client-card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.client-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.client-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 20px;
+}
+
+.search-filter-bar {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+
+.stats-card .card-body {
+    padding: 2rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.form-progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+.quick-actions {
+    position: sticky;
+    top: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Tax Client Management</h1>
+            <p class="text-muted mb-0">Manage clients and assign tax forms</p>
+        </div>
+        <div>
+            <a href="{% url 'tax_admin_dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+            <a href="{% url 'create_tax_client' %}" class="btn btn-success">
+                <i class="fas fa-user-plus me-2"></i>Add New Client
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Overview -->
+    <div class="card stats-card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3 stat-item">
+                    <div class="stat-number">{{ total_clients }}</div>
+                    <div class="stat-label">Total Clients</div>
+                </div>
+                <div class="col-md-3 stat-item">
+                    <div class="stat-number">{{ active_clients }}</div>
+                    <div class="stat-label">Active This Month</div>
+                </div>
+                <div class="col-md-3 stat-item">
+                    <div class="stat-number">{{ pending_forms }}</div>
+                    <div class="stat-label">Pending Forms</div>
+                </div>
+                <div class="col-md-3 stat-item">
+                    <div class="stat-number">{{ completed_forms }}</div>
+                    <div class="stat-label">Completed Forms</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-9">
+            <!-- Search and Filter Bar -->
+            <div class="search-filter-bar">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Search Clients</label>
+                        <input type="text" name="search" class="form-control" 
+                               placeholder="Search by name, email, or PIN..." 
+                               value="{{ request.GET.search }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <select name="status" class="form-select">
+                            <option value="">All Statuses</option>
+                            <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>Pending Forms</option>
+                            <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Date Created</label>
+                        <select name="date_range" class="form-select">
+                            <option value="">All Time</option>
+                            <option value="today" {% if request.GET.date_range == 'today' %}selected{% endif %}>Today</option>
+                            <option value="week" {% if request.GET.date_range == 'week' %}selected{% endif %}>This Week</option>
+                            <option value="month" {% if request.GET.date_range == 'month' %}selected{% endif %}>This Month</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-search me-2"></i>Filter
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Clients List -->
+            {% if clients %}
+                <div class="row">
+                    {% for client in clients %}
+                    <div class="col-md-6">
+                        <div class="card client-card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="client-avatar me-3">
+                                        {{ client.first_name.0 }}{{ client.last_name.0 }}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-0">{{ client.full_name }}</h6>
+                                        <small class="text-muted">{{ client.email }}</small>
+                                    </div>
+                                    <div>
+                                        {% if client.assignments.count > 0 %}
+                                            {% with completed=client.get_completed_assignments_count total=client.assignments.count %}
+                                                {% if completed == total %}
+                                                    <span class="status-badge badge bg-success">Completed</span>
+                                                {% elif completed > 0 %}
+                                                    <span class="status-badge badge bg-warning">In Progress</span>
+                                                {% else %}
+                                                    <span class="status-badge badge bg-info">Assigned</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% else %}
+                                            <span class="status-badge badge bg-secondary">No Forms</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- Client Info -->
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">PIN</small>
+                                        <strong class="text-primary">{{ client.access_pin }}</strong>
+                                    </div>
+                                    <div class="col-6 text-end">
+                                        <small class="text-muted d-block">Created</small>
+                                        <small>{{ client.created_at|date:"M d, Y" }}</small>
+                                    </div>
+                                </div>
+
+                                <!-- Form Progress -->
+                                {% if client.assignments.count > 0 %}
+                                    {% with completed=client.get_completed_assignments_count total=client.assignments.count %}
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <small class="text-muted">Form Progress</small>
+                                            <small class="text-muted">{{ completed }}/{{ total }}</small>
+                                        </div>
+                                        <div class="progress form-progress">
+                                            <div class="progress-bar 
+                                                 {% if completed == total %}bg-success
+                                                 {% elif completed > 0 %}bg-warning
+                                                 {% else %}bg-info{% endif %}" 
+                                                 style="width: {% widthratio completed total 100 %}%">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endwith %}
+                                {% endif %}
+
+                                <!-- Assigned Forms -->
+                                {% if client.assignments.count > 0 %}
+                                <div class="mb-3">
+                                    <small class="text-muted d-block mb-2">Assigned Forms:</small>
+                                    {% for assignment in client.assignments.all|slice:":3" %}
+                                        <span class="badge bg-light text-dark me-1 mb-1">
+                                            {{ assignment.tax_form.name }}
+                                            {% if assignment.taxformsubmission_set.first.is_completed %}
+                                                <i class="fas fa-check text-success ms-1"></i>
+                                            {% endif %}
+                                        </span>
+                                    {% endfor %}
+                                    {% if client.assignments.count > 3 %}
+                                        <span class="badge bg-light text-muted">+{{ client.assignments.count|add:"-3" }} more</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+
+                                <!-- Action Buttons -->
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'tax_client_detail' client.id %}" class="btn btn-outline-info" title="View Client & Fill Forms">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button class="btn btn-outline-primary" onclick="editClient('{{ client.id }}')" title="Edit Client">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-success" onclick="sendLogin('{{ client.id }}')" title="Send Login Info">
+                                            <i class="fas fa-envelope"></i>
+                                        </button>
+                                    </div>
+                                    <a href="{% url 'assign_tax_forms' client.id %}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-plus me-1"></i>Assign Forms
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Pagination -->
+                {% if clients.has_other_pages %}
+                <nav aria-label="Client pagination" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if clients.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date_range %}&date_range={{ request.GET.date_range }}{% endif %}">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ clients.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date_range %}&date_range={{ request.GET.date_range }}{% endif %}">Previous</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Page {{ clients.number }} of {{ clients.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if clients.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ clients.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date_range %}&date_range={{ request.GET.date_range }}{% endif %}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ clients.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.date_range %}&date_range={{ request.GET.date_range }}{% endif %}">Last</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-5">
+                    <i class="fas fa-users fa-4x text-muted mb-4"></i>
+                    <h3 class="text-muted mb-3">No Clients Found</h3>
+                    {% if request.GET.search or request.GET.status or request.GET.date_range %}
+                        <p class="text-muted mb-4">No clients match your current filters. Try adjusting your search criteria.</p>
+                        <a href="{% url 'manage_tax_clients' %}" class="btn btn-outline-secondary me-2">
+                            <i class="fas fa-times me-2"></i>Clear Filters
+                        </a>
+                    {% else %}
+                        <p class="text-muted mb-4">Get started by adding your first tax client.</p>
+                    {% endif %}
+                    <a href="{% url 'create_tax_client' %}" class="btn btn-success btn-lg">
+                        <i class="fas fa-user-plus me-2"></i>Add First Client
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar - Quick Actions -->
+        <div class="col-lg-3">
+            <div class="quick-actions">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-bolt text-warning me-2"></i>Quick Actions
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'create_tax_client' %}" class="btn btn-success btn-sm">
+                                <i class="fas fa-user-plus me-2"></i>Add New Client
+                            </a>
+                            <button class="btn btn-outline-primary btn-sm" onclick="bulkAssignForms()">
+                                <i class="fas fa-users-cog me-2"></i>Bulk Assign Forms
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="exportClients()">
+                                <i class="fas fa-download me-2"></i>Export Client List
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm" onclick="sendBulkEmails()">
+                                <i class="fas fa-envelope-bulk me-2"></i>Send Login Info
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-history text-info me-2"></i>Recent Activity
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_activity %}
+                            {% for activity in recent_activity %}
+                            <div class="mb-3 pb-2 border-bottom">
+                                <small class="text-muted d-block">{{ activity.created_at|timesince }} ago</small>
+                                <strong>{{ activity.client.full_name }}</strong>
+                                <div class="text-muted">{{ activity.description }}</div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted mb-0">No recent activity</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- No modal needed - redirects to client detail page -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// viewClient function removed - now using direct link to client detail page
+
+function editClient(clientId) {
+    // Redirect to edit client page
+    window.location.href = `/employee/tax/clients/${clientId}/edit/`;
+}
+
+function sendLogin(clientId) {
+    if (confirm('Send login information to this client?')) {
+        // In a real implementation, you would send an AJAX request
+        alert('Login information sent successfully!');
+    }
+}
+
+function bulkAssignForms() {
+    alert('Bulk form assignment functionality will be implemented');
+}
+
+function exportClients() {
+    alert('Client export functionality will be implemented');
+}
+
+function sendBulkEmails() {
+    alert('Bulk email functionality will be implemented');
+}
+
+// Auto-submit form on filter changes for better UX
+document.addEventListener('DOMContentLoaded', function() {
+    const filterSelects = document.querySelectorAll('select[name="status"], select[name="date_range"]');
+    filterSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+});
+</script>
+{% endblock %}

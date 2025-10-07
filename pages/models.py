@@ -1471,3 +1471,302 @@ class OnboardingFormField(models.Model):
     
     def __str__(self):
         return f"{self.onboarding_form.title} - {self.field_label}"
+
+
+# =============================================================================
+# TAX FORM MODELS
+# =============================================================================
+
+class TaxFormTemplate(models.Model):
+    """Predefined tax form templates (Intake Form, Schedule C, etc.)"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200, help_text="Form name (e.g., 'Tax Intake Form')")
+    form_type = models.CharField(max_length=50, choices=[
+        ('intake', 'Tax Intake Form'),
+        ('schedule_c', 'Schedule C - Business Income'),
+        ('schedule_a', 'Schedule A - Itemized Deductions'),
+        ('income_summary', 'Income Summary'),
+        ('dependent_care', 'Dependent Care Form'),
+        ('student_ack', 'Student Acknowledgment'),
+        ('photo_id', 'Photo ID and Voided Check'),
+        ('due_diligence', 'Due Diligence Questionnaire'),
+        ('refund_type', 'Refund Type Selection'),
+        ('affordable_care', 'Affordable Care Details'),
+        ('custom', 'Custom Form')
+    ], default='custom')
+    description = models.TextField(blank=True)
+    instructions = models.TextField(blank=True, help_text="Instructions for filling out the form")
+    
+    # Form settings
+    is_active = models.BooleanField(default=True)
+    requires_signature = models.BooleanField(default=True)
+    allow_multiple_submissions = models.BooleanField(default=False)
+    
+    # Metadata
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_tax_templates')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['form_type', 'name']
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_form_type_display()})"
+
+
+class TaxFormField(models.Model):
+    """Fields within tax form templates"""
+    FIELD_TYPE_CHOICES = [
+        ('text', 'Text Input'),
+        ('textarea', 'Text Area'),
+        ('email', 'Email'),
+        ('phone', 'Phone Number'),
+        ('number', 'Number'),
+        ('currency', 'Currency ($)'),
+        ('date', 'Date'),
+        ('select', 'Select Dropdown'),
+        ('radio', 'Radio Buttons'),
+        ('checkbox', 'Checkboxes'),
+        ('file', 'File Upload'),
+        ('signature', 'Digital Signature'),
+        ('ssn', 'Social Security Number'),
+        ('ein', 'Employer ID Number'),
+        ('address', 'Address Block'),
+        ('name', 'Full Name'),
+        ('section_header', 'Section Header'),
+        ('table', 'Data Table'),
+        ('yes_no', 'Yes/No Radio'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tax_form = models.ForeignKey(TaxFormTemplate, on_delete=models.CASCADE, related_name='fields')
+    
+    # Field definition
+    field_type = models.CharField(max_length=20, choices=FIELD_TYPE_CHOICES)
+    field_name = models.CharField(max_length=100, help_text="Internal field name")
+    field_label = models.CharField(max_length=300, help_text="Display label")
+    placeholder = models.CharField(max_length=300, blank=True)
+    help_text = models.TextField(blank=True)
+    
+    # Validation
+    is_required = models.BooleanField(default=False)
+    min_length = models.IntegerField(null=True, blank=True)
+    max_length = models.IntegerField(null=True, blank=True)
+    min_value = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    max_value = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    validation_regex = models.CharField(max_length=500, blank=True)
+    
+    # Options for select/radio/checkbox fields
+    field_options = models.JSONField(default=list, help_text="Options for select/radio/checkbox fields")
+    
+    # Layout and display
+    section = models.CharField(max_length=100, blank=True, help_text="Section name for grouping")
+    order = models.IntegerField(default=0, help_text="Display order within section")
+    column_width = models.CharField(max_length=20, default='full', choices=[
+        ('full', 'Full Width'),
+        ('half', 'Half Width'),
+        ('third', 'Third Width'),
+        ('quarter', 'Quarter Width')
+    ])
+    is_active = models.BooleanField(default=True)
+    
+    # Tax-specific attributes
+    tax_line_reference = models.CharField(max_length=100, blank=True, help_text="IRS form line reference")
+    is_calculated = models.BooleanField(default=False, help_text="Is this field auto-calculated?")
+    calculation_formula = models.TextField(blank=True, help_text="Formula for calculated fields")
+    
+    class Meta:
+        ordering = ['section', 'order', 'id']
+        unique_together = ['tax_form', 'field_name']
+    
+    def __str__(self):
+        return f"{self.tax_form.name} - {self.field_label}"
+
+
+class TaxClient(models.Model):
+    """Tax preparation clients"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Basic client info
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    phone = models.CharField(max_length=20, blank=True)
+    
+    # Address
+    address_line1 = models.CharField(max_length=200, blank=True)
+    address_line2 = models.CharField(max_length=200, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=50, blank=True)
+    zip_code = models.CharField(max_length=20, blank=True)
+    
+    # Tax-specific info
+    ssn = models.CharField(max_length=11, blank=True, help_text="Format: XXX-XX-XXXX")
+    date_of_birth = models.DateField(null=True, blank=True)
+    filing_status = models.CharField(max_length=20, choices=[
+        ('single', 'Single'),
+        ('married_joint', 'Married Filing Jointly'),
+        ('married_separate', 'Married Filing Separately'),
+        ('head_of_household', 'Head of Household'),
+        ('qualifying_widow', 'Qualifying Widow(er)')
+    ], blank=True)
+    
+    # Access control
+    is_active = models.BooleanField(default=True)
+    current_pin = models.CharField(max_length=10, blank=True, help_text="PIN for secure access")
+    pin_expiry = models.DateTimeField(null=True, blank=True)
+    last_login = models.DateTimeField(null=True, blank=True)
+    
+    # Notes
+    notes = models.TextField(blank=True, help_text="Internal notes about this client")
+    
+    # Metadata
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tax_clients')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['last_name', 'first_name']
+    
+    def __str__(self):
+        return f"{self.last_name}, {self.first_name} ({self.email})"
+    
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+    
+    def generate_pin(self):
+        """Generate a secure 6-digit PIN"""
+        import random
+        self.current_pin = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        self.save()
+        return self.current_pin
+    
+    def is_pin_valid(self):
+        """Check if the current PIN is still valid"""
+        if not self.current_pin or not self.pin_expiry:
+            return False
+        return timezone.now() < self.pin_expiry
+
+
+class TaxFormAssignment(models.Model):
+    """Assignment of tax forms to clients"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tax_form = models.ForeignKey(TaxFormTemplate, on_delete=models.CASCADE)
+    client = models.ForeignKey(TaxClient, on_delete=models.CASCADE)
+    
+    # Assignment details
+    assigned_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    due_date = models.DateField(null=True, blank=True)
+    custom_instructions = models.TextField(blank=True)
+    
+    # Status tracking
+    STATUS_CHOICES = [
+        ('assigned', 'Assigned'),
+        ('in_progress', 'In Progress'),
+        ('ready_for_signature', 'Ready for Client Signature'),
+        ('completed', 'Completed'),
+        ('reviewed', 'Reviewed'),
+        ('approved', 'Approved'),
+        ('needs_revision', 'Needs Revision'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='assigned')
+    
+    # Activity tracking
+    first_accessed = models.DateTimeField(null=True, blank=True)
+    last_activity = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        unique_together = ['tax_form', 'client']
+        ordering = ['-assigned_at']
+    
+    def __str__(self):
+        return f"{self.client.full_name} - {self.tax_form.name}"
+
+
+class TaxFormSubmission(models.Model):
+    """Client submissions of tax forms"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assignment = models.OneToOneField(TaxFormAssignment, on_delete=models.CASCADE)
+    
+    # Form data
+    form_data = models.JSONField(default=dict, help_text="Submitted form field values")
+    uploaded_files = models.JSONField(default=list, help_text="List of uploaded file paths")
+    
+    # Two-step workflow: Employee completion + Client signature
+    # Employee completion
+    employee_completed_at = models.DateTimeField(null=True, blank=True, help_text="When employee completed the form")
+    submitted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tax_submissions_created', help_text="Employee who filled the form")
+    internal_notes = models.TextField(blank=True, help_text="Internal notes from employee")
+    
+    # Client signature
+    client_signature_data = models.TextField(blank=True, help_text="Base64 encoded client signature image")
+    client_signed_at = models.DateTimeField(null=True, blank=True, help_text="When client signed the form")
+    is_completed = models.BooleanField(default=False, help_text="True when both employee filled and client signed")
+    
+    # Legacy signature field for backwards compatibility
+    signature_data = models.TextField(blank=True, help_text="Base64 encoded signature image (legacy)")
+    signature_file_path = models.CharField(max_length=500, blank=True)
+    
+    # Submission metadata
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    
+    # Review process
+    REVIEW_STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('under_review', 'Under Review'),
+        ('approved', 'Approved'),
+        ('needs_revision', 'Needs Revision'),
+        ('rejected', 'Rejected'),
+    ]
+    review_status = models.CharField(max_length=20, choices=REVIEW_STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tax_submissions_reviewed')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True)
+    
+    # Tax preparer notes
+    preparer_notes = models.TextField(blank=True, help_text="Internal notes for tax preparer")
+    estimated_refund = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    estimated_owed = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-submitted_at']
+    
+    def __str__(self):
+        return f"{self.assignment.client.full_name} - {self.assignment.tax_form.name} ({self.submitted_at.date()})"
+
+
+class TaxDocument(models.Model):
+    """Supporting tax documents uploaded by clients"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.ForeignKey(TaxFormSubmission, on_delete=models.CASCADE, related_name='documents')
+    
+    # Document info
+    document_type = models.CharField(max_length=50, choices=[
+        ('w2', 'W-2 Form'),
+        ('1099', '1099 Form'),
+        ('1098', '1098 Form'),
+        ('photo_id', 'Photo ID'),
+        ('voided_check', 'Voided Check'),
+        ('receipt', 'Receipt/Expense'),
+        ('bank_statement', 'Bank Statement'),
+        ('other', 'Other Document')
+    ])
+    file_name = models.CharField(max_length=300)
+    file_path = models.CharField(max_length=500)
+    file_size = models.IntegerField(help_text="File size in bytes")
+    mime_type = models.CharField(max_length=100)
+    
+    # Metadata
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    description = models.CharField(max_length=500, blank=True)
+    
+    class Meta:
+        ordering = ['document_type', '-uploaded_at']
+    
+    def __str__(self):
+        return f"{self.get_document_type_display()} - {self.file_name}"

@@ -1,0 +1,319 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}{{ client.full_name }} - Client Details - Computer Concepts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-user fa-fw me-2"></i>{{ client.full_name }}
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'tax_admin_dashboard' %}">Tax Management</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'manage_tax_clients' %}">Clients</a></li>
+                <li class="breadcrumb-item active">{{ client.full_name }}</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Client Information -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-user me-2"></i>Client Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <strong>Full Name:</strong><br>
+                            <span class="text-gray-700">{{ client.full_name }}</span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Email Address:</strong><br>
+                            <span class="text-gray-700">{{ client.email }}</span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <strong>Phone Number:</strong><br>
+                            <span class="text-gray-700">{{ client.phone|default:"Not provided" }}</span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Social Security Number:</strong><br>
+                            <span class="text-gray-700">{{ client.ssn|default:"Not provided" }}</span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <strong>Date of Birth:</strong><br>
+                            <span class="text-gray-700">{{ client.date_of_birth|date:"M j, Y"|default:"Not provided" }}</span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Created:</strong><br>
+                            <span class="text-gray-700">{{ client.created_at|date:"M j, Y g:i A" }}</span>
+                        </div>
+                    </div>
+                    {% if client.address_line1 %}
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <strong>Address:</strong><br>
+                            <span class="text-gray-700">
+                                {{ client.address_line1 }}<br>
+                                {% if client.address_line2 %}{{ client.address_line2 }}<br>{% endif %}
+                                {{ client.city }}{% if client.state %}, {{ client.state }}{% endif %} {{ client.zip_code }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if client.notes %}
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <strong>Notes:</strong><br>
+                            <span class="text-gray-700">{{ client.notes }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="col-lg-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'assign_tax_forms' client.id %}" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-plus me-2"></i>Assign Forms
+                    </a>
+                    <a href="{% url 'client_tax_forms' client.id %}" class="btn btn-info w-100 mb-2">
+                        <i class="fas fa-file-alt me-2"></i>View Forms
+                    </a>
+                    <button class="btn btn-success w-100 mb-2" onclick="shareClientPin()">
+                        <i class="fas fa-key me-2"></i>Share PIN
+                    </button>
+                    <div class="dropdown w-100">
+                        <button class="btn btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-cog me-2"></i>More Actions
+                        </button>
+                        <ul class="dropdown-menu w-100">
+                            <li><a class="dropdown-item" href="#" onclick="editClient()">
+                                <i class="fas fa-edit me-2"></i>Edit Client
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="resetPin()">
+                                <i class="fas fa-sync me-2"></i>Reset PIN
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deactivateClient()">
+                                <i class="fas fa-ban me-2"></i>Deactivate Client
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assigned Forms -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-file-alt me-2"></i>Assigned Tax Forms ({{ assignments.count }})
+                    </h6>
+                    {% if assignments.exists %}
+                    <a href="{% url 'client_tax_forms' client.id %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-eye me-1"></i>View All Forms
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if assignments.exists %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Form Name</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Assigned Date</th>
+                                        <th>Due Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for assignment in assignments %}
+                                    <tr>
+                                        <td>{{ assignment.tax_form.name }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if assignment.tax_form.form_type == 'intake' %}primary{% elif assignment.tax_form.form_type == 'schedule_c' %}success{% elif assignment.tax_form.form_type == 'income_summary' %}info{% elif assignment.tax_form.form_type == 'dependent_care' %}warning{% elif assignment.tax_form.form_type == 'student_ack' %}secondary{% elif assignment.tax_form.form_type == 'photo_id' %}dark{% elif assignment.tax_form.form_type == 'due_diligence' %}danger{% else %}light{% endif %}">
+                                                {% if assignment.tax_form.form_type == 'intake' %}Tax Intake
+                                                {% elif assignment.tax_form.form_type == 'schedule_c' %}Schedule C
+                                                {% elif assignment.tax_form.form_type == 'income_summary' %}Income Summary
+                                                {% elif assignment.tax_form.form_type == 'dependent_care' %}Dependent Care
+                                                {% elif assignment.tax_form.form_type == 'student_ack' %}Student Form
+                                                {% elif assignment.tax_form.form_type == 'photo_id' %}Photo ID
+                                                {% elif assignment.tax_form.form_type == 'due_diligence' %}Due Diligence
+                                                {% else %}{{ assignment.tax_form.form_type|title }}{% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{% if assignment.status == 'completed' %}success{% elif assignment.status == 'ready_for_signature' %}info{% elif assignment.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
+                                                {{ assignment.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ assignment.assigned_at|date:"M j, Y" }}</td>
+                                        <td>{{ assignment.due_date|date:"M j, Y"|default:"No deadline" }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                {% if assignment.status == 'ready_for_signature' %}
+                                                    <span class="btn btn-success btn-sm" title="Ready for Client Signature">
+                                                        <i class="fas fa-check-circle"></i>
+                                                    </span>
+                                                {% else %}
+                                                    <a href="{% url 'employee_fill_form' assignment.id %}" 
+                                                       class="btn btn-outline-primary" title="Fill Form">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                {% endif %}
+                                                {% if assignment.status == 'completed' %}
+                                                <button type="button" class="btn btn-outline-info" 
+                                                        onclick="viewSubmission('{{ assignment.id }}')" title="View Submission">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-file-alt fa-3x text-gray-300 mb-3"></i>
+                            <h5 class="text-gray-500">No Forms Assigned</h5>
+                            <p class="text-gray-400 mb-4">This client doesn't have any tax forms assigned yet.</p>
+                            <a href="{% url 'assign_tax_forms' client.id %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Assign First Form
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PIN Share Modal -->
+<div class="modal fade" id="pinModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Client Access PIN</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Share this PIN with {{ client.full_name }} to access their tax forms
+                </div>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h2 class="display-4 text-primary mb-0" id="clientPin">{{ client.current_pin }}</h2>
+                        <small class="text-muted">4-Digit Access PIN</small>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <p class="mb-2"><strong>Client Portal:</strong> <code>{{ request.build_absolute_uri }}/tax/</code></p>
+                    <p class="text-muted small">Client should use their email and this PIN to access forms</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="copyPinInfo()">
+                    <i class="fas fa-copy me-2"></i>Copy Info
+                </button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function shareClientPin() {
+    new bootstrap.Modal(document.getElementById('pinModal')).show();
+}
+
+function copyPinInfo() {
+    const pinText = `Tax Forms Access Information for {{ client.full_name }}:
+
+Website: {{ request.build_absolute_uri }}/tax/
+Email: {{ client.email }}
+PIN: {{ client.current_pin }}
+
+Instructions: Visit the website above and login with your email and PIN to access your tax forms.`;
+
+    navigator.clipboard.writeText(pinText).then(function() {
+        alert('Client access information copied to clipboard!');
+    });
+}
+
+function editClient() {
+    // Implement edit client functionality
+    alert('Edit client functionality coming soon!');
+}
+
+function resetPin() {
+    if (confirm('Generate a new PIN for this client? The old PIN will no longer work.')) {
+        fetch(`/employee/tax/clients/{{ client.id }}/reset-pin/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+            }
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error resetting PIN.');
+            }
+        });
+    }
+}
+
+function deactivateClient() {
+    if (confirm('Deactivate this client? They will no longer be able to access their forms.')) {
+        fetch(`/employee/tax/clients/{{ client.id }}/deactivate/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+            }
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error deactivating client.');
+            }
+        });
+    }
+}
+
+function viewSubmission(assignmentId) {
+    window.open(`/employee/tax/assignments/${assignmentId}/view/`, '_blank');
+}
+
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,464 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Assign Forms to {{ client.full_name }} - Com                                        <span class="badge bg-{% if template.form_type == 'intake' %}primary{% elif template.form_type == 'schedule_c' %}success{% elif template.form_type == 'income_summary' %}info{% elif template.form_type == 'dependent_care' %}warning{% elif template.form_type == 'student_ack' %}secondary{% elif template.form_type == 'photo_id' %}dark{% elif template.form_type == 'due_diligence' %}danger{% else %}light{% endif %}">
+                                            {% if template.form_type == 'intake' %}Tax Intake
+                                            {% elif template.form_type == 'schedule_c' %}Schedule C
+                                            {% elif template.form_type == 'income_summary' %}Income Summary
+                                            {% elif template.form_type == 'dependent_care' %}Dependent Care
+                                            {% elif template.form_type == 'student_ack' %}Student Form
+                                            {% elif template.form_type == 'photo_id' %}Photo ID
+                                            {% elif template.form_type == 'due_diligence' %}Due Diligence
+                                            {% else %}{{ template.form_type|title }}{% endif %}
+                                        </span>er Concepts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-user-edit fa-fw me-2"></i>Assign Forms to {{ client.full_name }}
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'tax_admin_dashboard' %}">Tax Management</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'manage_tax_clients' %}">Clients</a></li>
+                <li class="breadcrumb-item active">Assign Forms</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Client Information Card -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-user me-2"></i>Client Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Name:</strong> {{ client.full_name }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Email:</strong> {{ client.email }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Phone:</strong> {{ client.phone|default:"Not provided" }}
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-4">
+                            <strong>SSN:</strong> {{ client.ssn|default:"Not provided" }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Date of Birth:</strong> {{ client.date_of_birth|date:"M j, Y"|default:"Not provided" }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Created:</strong> {{ client.created_at|date:"M j, Y" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Assignment -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-file-alt me-2"></i>Available Tax Forms
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Assignment Settings -->
+                        <div class="row mb-4">
+                            <div class="col-md-6 mb-3">
+                                <label for="due_date" class="form-label">Due Date</label>
+                                <input type="date" class="form-control" id="due_date" name="due_date"
+                                       min="{{ today|date:'Y-m-d' }}">
+                                <div class="form-text">Optional deadline for form completion</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="custom_instructions" class="form-label">Custom Instructions</label>
+                                <textarea class="form-control" id="custom_instructions" name="custom_instructions" rows="2"
+                                          placeholder="Optional special instructions for this client..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Available Forms -->
+                        <div class="row">
+                            {% for template in available_templates %}
+                            <div class="col-lg-6 col-xl-4 mb-4">
+                                <div class="card h-100 form-selection-card" data-form-id="{{ template.id }}">
+                                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="form_ids" 
+                                                   value="{{ template.id }}" id="form_{{ template.id }}"
+                                                   {% if template.id in assigned_form_ids %}checked disabled{% endif %}>
+                                            <label class="form-check-label font-weight-bold" for="form_{{ template.id }}">
+                                                {{ template.name }}
+                                            </label>
+                                        </div>
+                                        {% if template.id in assigned_form_ids %}
+                                            <span class="badge bg-success">Assigned</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <p class="card-text text-muted small mb-2">{{ template.description|truncatewords:15 }}</p>
+                                        
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="badge bg-{% if template.form_type == 'intake' %}primary{% elif template.form_type == 'schedule_c' %}success{% elif template.form_type == 'income_summary' %}info{% elif template.form_type == 'dependent_care' %}warning{% elif template.form_type == 'student_ack' %}secondary{% elif template.form_type == 'photo_id' %}dark{% elif template.form_type == 'due_diligence' %}danger{% else %}light{% endif %}">
+                                                {{ template.get_form_type_display|default:template.form_type|title }}
+                                            </span>
+                                            <small class="text-muted">{{ template.fields.count }} fields</small>
+                                        </div>
+
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-{% if template.requires_signature %}signature text-success{% else %}file text-muted{% endif %} me-1"></i>
+                                            <small class="text-muted">
+                                                {% if template.requires_signature %}Requires Signature{% else %}No Signature{% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    No tax form templates are available. Please create some templates first.
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Quick Selection Tools -->
+                        {% if available_templates %}
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card border-info">
+                                    <div class="card-header bg-info text-white py-2">
+                                        <h6 class="m-0">
+                                            <i class="fas fa-magic me-2"></i>Quick Selection
+                                        </h6>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-primary" onclick="selectAll()">
+                                                <i class="fas fa-check-double me-1"></i>Select All
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" onclick="selectNone()">
+                                                <i class="fas fa-times me-1"></i>Select None
+                                            </button>
+                                            <button type="button" class="btn btn-outline-info" onclick="selectBasic()">
+                                                <i class="fas fa-star me-1"></i>Basic Package
+                                            </button>
+                                            <button type="button" class="btn btn-outline-success" onclick="selectBusiness()">
+                                                <i class="fas fa-briefcase me-1"></i>Business Package
+                                            </button>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <strong>Basic Package:</strong> Tax Intake, Photo ID & Banking
+                                                <br>
+                                                <strong>Business Package:</strong> Basic + Schedule C, Income Summary
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                            <a href="{% url 'manage_tax_clients' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Clients
+                            </a>
+                            <div>
+                                <button type="button" class="btn btn-info me-2" onclick="previewSelection()">
+                                    <i class="fas fa-eye me-2"></i>Preview Selection
+                                </button>
+                                <button type="submit" class="btn btn-primary" id="assignBtn" disabled>
+                                    <i class="fas fa-paper-plane me-2"></i>Assign Selected Forms
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Currently Assigned Forms -->
+    {% if assigned_assignments %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">
+                        <i class="fas fa-check-circle me-2"></i>Currently Assigned Forms ({{ assigned_assignments|length }})
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Form Name</th>
+                                    <th>Type</th>
+                                    <th>Assigned Date</th>
+                                    <th>Due Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for assignment in assigned_assignments %}
+                                <tr>
+                                    <td>{{ assignment.tax_form.name }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if assignment.tax_form.form_type == 'intake' %}primary{% elif assignment.tax_form.form_type == 'schedule_c' %}success{% elif assignment.tax_form.form_type == 'income_summary' %}info{% elif assignment.tax_form.form_type == 'dependent_care' %}warning{% elif assignment.tax_form.form_type == 'student_ack' %}secondary{% elif assignment.tax_form.form_type == 'photo_id' %}dark{% elif assignment.tax_form.form_type == 'due_diligence' %}danger{% else %}light{% endif %}">
+                                            {% if assignment.tax_form.form_type == 'intake' %}Tax Intake
+                                            {% elif assignment.tax_form.form_type == 'schedule_c' %}Schedule C
+                                            {% elif assignment.tax_form.form_type == 'income_summary' %}Income Summary
+                                            {% elif assignment.tax_form.form_type == 'dependent_care' %}Dependent Care
+                                            {% elif assignment.tax_form.form_type == 'student_ack' %}Student Form
+                                            {% elif assignment.tax_form.form_type == 'photo_id' %}Photo ID
+                                            {% elif assignment.tax_form.form_type == 'due_diligence' %}Due Diligence
+                                            {% else %}{{ assignment.tax_form.form_type|title }}{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>{{ assignment.assigned_at|date:"M j, Y" }}</td>
+                                    <td>{{ assignment.due_date|date:"M j, Y"|default:"No deadline" }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if assignment.status == 'completed' %}success{% elif assignment.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
+                                            {{ assignment.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-danger" 
+                                                    onclick="removeAssignment('{{ assignment.id }}', '{{ assignment.tax_form.name }}')"
+                                                    title="Remove Assignment">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Assignment Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="previewContent">
+                <!-- Preview content will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('input[name="form_ids"]:not([disabled])');
+    const assignBtn = document.getElementById('assignBtn');
+    
+    // Enable/disable assign button based on selection
+    function updateAssignButton() {
+        const checked = document.querySelectorAll('input[name="form_ids"]:checked:not([disabled])').length;
+        assignBtn.disabled = checked === 0;
+        assignBtn.textContent = checked > 0 ? `Assign ${checked} Selected Form${checked !== 1 ? 's' : ''}` : 'Assign Selected Forms';
+    }
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateAssignButton);
+    });
+    
+    // Initial check
+    updateAssignButton();
+});
+
+function selectAll() {
+    const checkboxes = document.querySelectorAll('input[name="form_ids"]:not([disabled])');
+    checkboxes.forEach(cb => cb.checked = true);
+    document.dispatchEvent(new Event('change'));
+    updateAssignButton();
+}
+
+function selectNone() {
+    const checkboxes = document.querySelectorAll('input[name="form_ids"]:not([disabled])');
+    checkboxes.forEach(cb => cb.checked = false);
+    updateAssignButton();
+}
+
+function selectBasic() {
+    selectNone();
+    const basicTypes = ['intake', 'photo_id'];
+    const checkboxes = document.querySelectorAll('input[name="form_ids"]:not([disabled])');
+    checkboxes.forEach(cb => {
+        const card = cb.closest('.form-selection-card');
+        const formType = card.querySelector('.badge').textContent.toLowerCase();
+        if (basicTypes.some(type => formType.includes(type) || 
+            (type === 'intake' && formType.includes('tax intake')) ||
+            (type === 'photo_id' && formType.includes('photo')))) {
+            cb.checked = true;
+        }
+    });
+    updateAssignButton();
+}
+
+function selectBusiness() {
+    selectBasic();
+    const businessTypes = ['schedule_c', 'income_summary'];
+    const checkboxes = document.querySelectorAll('input[name="form_ids"]:not([disabled])');
+    checkboxes.forEach(cb => {
+        const card = cb.closest('.form-selection-card');
+        const formType = card.querySelector('.badge').textContent.toLowerCase();
+        if (businessTypes.some(type => formType.includes(type) || 
+            (type === 'schedule_c' && formType.includes('schedule')) ||
+            (type === 'income_summary' && formType.includes('income')))) {
+            cb.checked = true;
+        }
+    });
+    updateAssignButton();
+}
+
+function updateAssignButton() {
+    const checked = document.querySelectorAll('input[name="form_ids"]:checked:not([disabled])').length;
+    const assignBtn = document.getElementById('assignBtn');
+    assignBtn.disabled = checked === 0;
+    
+    const icon = assignBtn.querySelector('i');
+    const text = checked > 0 ? `Assign ${checked} Selected Form${checked !== 1 ? 's' : ''}` : 'Assign Selected Forms';
+    assignBtn.innerHTML = `<i class="fas fa-paper-plane me-2"></i>${text}`;
+}
+
+function previewSelection() {
+    const selected = [];
+    const checkboxes = document.querySelectorAll('input[name="form_ids"]:checked:not([disabled])');
+    
+    checkboxes.forEach(cb => {
+        const card = cb.closest('.form-selection-card');
+        const name = card.querySelector('label').textContent.trim();
+        const type = card.querySelector('.badge').textContent.trim();
+        const fields = card.querySelector('small').textContent.trim();
+        selected.push({name, type, fields});
+    });
+    
+    let content = '<h6>Forms to be assigned:</h6>';
+    if (selected.length > 0) {
+        content += '<ul class="list-group">';
+        selected.forEach(form => {
+            content += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${form.name}</strong>
+                    <br><small class="text-muted">${form.type} • ${form.fields}</small>
+                </div>
+                <span class="badge bg-primary">Selected</span>
+            </li>`;
+        });
+        content += '</ul>';
+        
+        const dueDate = document.getElementById('due_date').value;
+        const instructions = document.getElementById('custom_instructions').value;
+        
+        if (dueDate || instructions) {
+            content += '<hr><h6>Assignment Details:</h6>';
+            if (dueDate) {
+                content += `<p><strong>Due Date:</strong> ${new Date(dueDate).toLocaleDateString()}</p>`;
+            }
+            if (instructions) {
+                content += `<p><strong>Instructions:</strong> ${instructions}</p>`;
+            }
+        }
+    } else {
+        content += '<p class="text-muted">No forms selected.</p>';
+    }
+    
+    document.getElementById('previewContent').innerHTML = content;
+    new bootstrap.Modal(document.getElementById('previewModal')).show();
+}
+
+function removeAssignment(assignmentId, formName) {
+    if (confirm(`Are you sure you want to remove the assignment for "${formName}"?`)) {
+        fetch(`/employee/tax/assignments/${assignmentId}/remove/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error removing assignment.');
+            }
+        });
+    }
+}
+
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+</script>
+
+<style>
+.form-selection-card {
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.form-selection-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.form-selection-card input[type="checkbox"]:checked ~ * {
+    opacity: 0.8;
+}
+
+.form-selection-card input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+}
+
+.form-selection-card input[type="checkbox"]:disabled ~ * {
+    opacity: 0.6;
+}
+</style>
+{% endblock %}

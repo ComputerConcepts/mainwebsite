@@ -1,0 +1,640 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Create Tax Form Template{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-builder {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 2rem;
+}
+
+.field-preview {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: white;
+}
+
+.field-controls {
+    background: #e9ecef;
+    padding: 0.5rem;
+    border-radius: 5px;
+    margin-top: 0.5rem;
+}
+
+.field-type-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.field-type-card {
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.field-type-card:hover {
+    border-color: #007bff;
+    transform: translateY(-2px);
+}
+
+.field-type-card.active {
+    border-color: #007bff;
+    background: #e7f3ff;
+}
+
+.section-divider {
+    border-top: 2px solid #007bff;
+    margin: 2rem 0;
+    position: relative;
+}
+
+.section-divider::after {
+    content: attr(data-section);
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: white;
+    padding: 0 10px;
+    color: #007bff;
+    font-weight: bold;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Create Tax Form Template</h1>
+            <p class="text-muted mb-0">Design a new tax form template for client use</p>
+        </div>
+        <div>
+            <a href="{% url 'tax_form_templates' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-2"></i>Back to Templates
+            </a>
+            <button type="button" class="btn btn-info me-2" onclick="previewForm()">
+                <i class="fas fa-eye me-2"></i>Preview Form
+            </button>
+        </div>
+    </div>
+
+    <form method="post" id="templateForm">
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- Form Settings -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cog me-2"></i>Template Settings
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="id_name" class="form-label">Template Name *</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="text-danger small">{{ form.name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_form_type" class="form-label">Form Type *</label>
+                            {{ form.form_type }}
+                            {% if form.form_type.errors %}
+                                <div class="text-danger small">{{ form.form_type.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_description" class="form-label">Description</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="text-danger small">{{ form.description.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_instructions" class="form-label">Instructions for Clients</label>
+                            {{ form.instructions }}
+                            {% if form.instructions.errors %}
+                                <div class="text-danger small">{{ form.instructions.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.requires_signature }}
+                                <label for="id_requires_signature" class="form-check-label">
+                                    Requires Digital Signature
+                                </label>
+                            </div>
+                            {% if form.requires_signature.errors %}
+                                <div class="text-danger small">{{ form.requires_signature.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Field Types -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-plus-circle me-2"></i>Add Form Fields
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="field-type-selector">
+                            <div class="field-type-card" onclick="addField('text')">
+                                <i class="fas fa-font fa-2x mb-2 text-primary"></i>
+                                <div>Text Field</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('name')">
+                                <i class="fas fa-user fa-2x mb-2 text-success"></i>
+                                <div>Name Field</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('email')">
+                                <i class="fas fa-envelope fa-2x mb-2 text-info"></i>
+                                <div>Email Field</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('phone')">
+                                <i class="fas fa-phone fa-2x mb-2 text-warning"></i>
+                                <div>Phone Field</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('ssn')">
+                                <i class="fas fa-id-card fa-2x mb-2 text-danger"></i>
+                                <div>SSN Field</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('date')">
+                                <i class="fas fa-calendar fa-2x mb-2 text-secondary"></i>
+                                <div>Date Field</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('currency')">
+                                <i class="fas fa-dollar-sign fa-2x mb-2 text-success"></i>
+                                <div>Currency Field</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('textarea')">
+                                <i class="fas fa-align-left fa-2x mb-2 text-info"></i>
+                                <div>Text Area</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('yes_no')">
+                                <i class="fas fa-toggle-on fa-2x mb-2 text-primary"></i>
+                                <div>Yes/No</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('radio')">
+                                <i class="fas fa-dot-circle fa-2x mb-2 text-warning"></i>
+                                <div>Radio Options</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('checkbox')">
+                                <i class="fas fa-check-square fa-2x mb-2 text-success"></i>
+                                <div>Checkboxes</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('file')">
+                                <i class="fas fa-file-upload fa-2x mb-2 text-danger"></i>
+                                <div>File Upload</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('signature')">
+                                <i class="fas fa-signature fa-2x mb-2 text-dark"></i>
+                                <div>Signature Pad</div>
+                            </div>
+                            <div class="field-type-card" onclick="addField('section_header')">
+                                <i class="fas fa-heading fa-2x mb-2 text-secondary"></i>
+                                <div>Section Header</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Builder -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-edit me-2"></i>Form Fields
+                        </h5>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="clearAllFields()">
+                                <i class="fas fa-trash me-1"></i>Clear All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="loadTemplate()">
+                                <i class="fas fa-copy me-1"></i>Load Template
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body form-builder">
+                        <div id="formFields">
+                            <div class="text-center text-muted py-5" id="emptyState">
+                                <i class="fas fa-mouse-pointer fa-3x mb-3"></i>
+                                <h5>Start Building Your Form</h5>
+                                <p>Click on field types from the left sidebar to add them to your form</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-outline-secondary" onclick="saveDraft()">
+                        <i class="fas fa-save me-2"></i>Save as Draft
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-info me-2" onclick="previewForm()">
+                            <i class="fas fa-eye me-2"></i>Preview Form
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-check me-2"></i>Create Template
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Field Configuration Modal -->
+<div class="modal fade" id="fieldConfigModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configure Field</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="fieldConfigForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Field Label *</label>
+                                <input type="text" class="form-control" id="fieldLabel" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Field Name *</label>
+                                <input type="text" class="form-control" id="fieldName" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Section</label>
+                                <input type="text" class="form-control" id="fieldSection" placeholder="e.g., Personal Information">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="fieldRequired">
+                                    <label class="form-check-label" for="fieldRequired">
+                                        Required Field
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Help Text</label>
+                        <textarea class="form-control" id="fieldHelp" rows="2" placeholder="Additional instructions for this field"></textarea>
+                    </div>
+                    <div class="mb-3" id="fieldOptionsContainer" style="display: none;">
+                        <label class="form-label">Options (one per line)</label>
+                        <textarea class="form-control" id="fieldOptions" rows="4" placeholder="Option 1&#10;Option 2&#10;Option 3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveFieldConfig()">Save Field</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Form Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Form Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="previewContent" style="max-height: 80vh; overflow-y: auto;">
+                <!-- Preview will be generated here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let fieldCounter = 0;
+let currentFieldType = '';
+let editingFieldIndex = -1;
+let formFieldsData = [];
+
+function addField(fieldType) {
+    currentFieldType = fieldType;
+    editingFieldIndex = -1;
+    
+    // Show/hide options container based on field type
+    const optionsContainer = document.getElementById('fieldOptionsContainer');
+    if (fieldType === 'radio' || fieldType === 'checkbox') {
+        optionsContainer.style.display = 'block';
+    } else {
+        optionsContainer.style.display = 'none';
+    }
+    
+    // Clear previous values
+    document.getElementById('fieldLabel').value = '';
+    document.getElementById('fieldName').value = '';
+    document.getElementById('fieldSection').value = '';
+    document.getElementById('fieldRequired').checked = false;
+    document.getElementById('fieldHelp').value = '';
+    document.getElementById('fieldOptions').value = '';
+    
+    $('#fieldConfigModal').modal('show');
+}
+
+function saveFieldConfig() {
+    const label = document.getElementById('fieldLabel').value;
+    const name = document.getElementById('fieldName').value;
+    const section = document.getElementById('fieldSection').value;
+    const required = document.getElementById('fieldRequired').checked;
+    const help = document.getElementById('fieldHelp').value;
+    const options = document.getElementById('fieldOptions').value.split('\n').filter(opt => opt.trim());
+    
+    if (!label || !name) {
+        alert('Label and Name are required');
+        return;
+    }
+    
+    const fieldData = {
+        type: currentFieldType,
+        label: label,
+        name: name,
+        section: section,
+        required: required,
+        help: help,
+        options: options
+    };
+    
+    if (editingFieldIndex >= 0) {
+        formFieldsData[editingFieldIndex] = fieldData;
+    } else {
+        formFieldsData.push(fieldData);
+    }
+    
+    renderFormFields();
+    $('#fieldConfigModal').modal('hide');
+}
+
+function renderFormFields() {
+    const container = document.getElementById('formFields');
+    const emptyState = document.getElementById('emptyState');
+    
+    if (formFieldsData.length === 0) {
+        emptyState.style.display = 'block';
+        return;
+    }
+    
+    emptyState.style.display = 'none';
+    
+    let html = '';
+    let currentSection = '';
+    
+    formFieldsData.forEach((field, index) => {
+        // Add section divider if needed
+        if (field.section && field.section !== currentSection) {
+            currentSection = field.section;
+            html += `<div class="section-divider" data-section="${field.section}"></div>`;
+        }
+        
+        html += `<div class="field-preview" data-index="${index}">`;
+        html += `<div class="d-flex justify-content-between align-items-start mb-2">`;
+        html += `<strong>${field.label} ${field.required ? '<span class="text-danger">*</span>' : ''}</strong>`;
+        html += `<span class="badge bg-secondary">${field.type}</span>`;
+        html += `</div>`;
+        
+        // Render field based on type
+        html += renderFieldPreview(field);
+        
+        if (field.help) {
+            html += `<small class="text-muted d-block mt-1">${field.help}</small>`;
+        }
+        
+        html += `<div class="field-controls">`;
+        html += `<button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="editField(${index})">Edit</button>`;
+        html += `<button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="moveField(${index}, -1)">↑</button>`;
+        html += `<button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="moveField(${index}, 1)">↓</button>`;
+        html += `<button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteField(${index})">Delete</button>`;
+        html += `</div>`;
+        html += `</div>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+function renderFieldPreview(field) {
+    let html = '';
+    
+    switch (field.type) {
+        case 'text':
+        case 'name':
+        case 'email':
+        case 'phone':
+            html = `<input type="text" class="form-control" placeholder="${field.label}" disabled>`;
+            break;
+        case 'ssn':
+            html = `<input type="text" class="form-control" placeholder="XXX-XX-XXXX" disabled>`;
+            break;
+        case 'date':
+            html = `<input type="date" class="form-control" disabled>`;
+            break;
+        case 'currency':
+            html = `<div class="input-group"><span class="input-group-text">$</span><input type="number" class="form-control" disabled></div>`;
+            break;
+        case 'textarea':
+            html = `<textarea class="form-control" rows="3" placeholder="${field.label}" disabled></textarea>`;
+            break;
+        case 'yes_no':
+            html = `<div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" disabled>
+                        <label class="form-check-label">Yes</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" disabled>
+                        <label class="form-check-label">No</label>
+                    </div>`;
+            break;
+        case 'radio':
+            field.options.forEach(option => {
+                html += `<div class="form-check">
+                            <input class="form-check-input" type="radio" disabled>
+                            <label class="form-check-label">${option}</label>
+                        </div>`;
+            });
+            break;
+        case 'checkbox':
+            field.options.forEach(option => {
+                html += `<div class="form-check">
+                            <input class="form-check-input" type="checkbox" disabled>
+                            <label class="form-check-label">${option}</label>
+                        </div>`;
+            });
+            break;
+        case 'file':
+            html = `<input type="file" class="form-control" disabled>`;
+            break;
+        case 'signature':
+            html = `<div class="border rounded p-3 text-center bg-light">
+                        <i class="fas fa-signature fa-2x text-muted"></i>
+                        <div>Signature Pad Area</div>
+                    </div>`;
+            break;
+        case 'section_header':
+            html = `<h4 class="text-primary border-bottom pb-2">${field.label}</h4>`;
+            break;
+        default:
+            html = `<input type="text" class="form-control" placeholder="${field.label}" disabled>`;
+    }
+    
+    return html;
+}
+
+function editField(index) {
+    const field = formFieldsData[index];
+    editingFieldIndex = index;
+    currentFieldType = field.type;
+    
+    document.getElementById('fieldLabel').value = field.label;
+    document.getElementById('fieldName').value = field.name;
+    document.getElementById('fieldSection').value = field.section;
+    document.getElementById('fieldRequired').checked = field.required;
+    document.getElementById('fieldHelp').value = field.help;
+    document.getElementById('fieldOptions').value = field.options.join('\n');
+    
+    // Show/hide options container
+    const optionsContainer = document.getElementById('fieldOptionsContainer');
+    if (field.type === 'radio' || field.type === 'checkbox') {
+        optionsContainer.style.display = 'block';
+    } else {
+        optionsContainer.style.display = 'none';
+    }
+    
+    $('#fieldConfigModal').modal('show');
+}
+
+function deleteField(index) {
+    if (confirm('Are you sure you want to delete this field?')) {
+        formFieldsData.splice(index, 1);
+        renderFormFields();
+    }
+}
+
+function moveField(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex >= 0 && newIndex < formFieldsData.length) {
+        const field = formFieldsData.splice(index, 1)[0];
+        formFieldsData.splice(newIndex, 0, field);
+        renderFormFields();
+    }
+}
+
+function clearAllFields() {
+    if (confirm('Are you sure you want to clear all fields?')) {
+        formFieldsData = [];
+        renderFormFields();
+    }
+}
+
+function previewForm() {
+    // Generate form preview
+    const formName = document.getElementById('id_name').value || 'Untitled Form';
+    const formDescription = document.getElementById('id_description').value || '';
+    const formInstructions = document.getElementById('id_instructions').value || '';
+    
+    let html = `
+        <div class="text-center mb-4">
+            <h2>${formName}</h2>
+            ${formDescription ? `<p class="text-muted">${formDescription}</p>` : ''}
+            ${formInstructions ? `<div class="alert alert-info">${formInstructions}</div>` : ''}
+        </div>
+    `;
+    
+    let currentSection = '';
+    formFieldsData.forEach(field => {
+        if (field.section && field.section !== currentSection) {
+            currentSection = field.section;
+            html += `<h4 class="text-primary border-bottom pb-2 mt-4">${field.section}</h4>`;
+        }
+        
+        html += `<div class="mb-3">`;
+        html += `<label class="form-label">${field.label} ${field.required ? '<span class="text-danger">*</span>' : ''}</label>`;
+        html += renderFieldPreview(field);
+        if (field.help) {
+            html += `<small class="form-text text-muted">${field.help}</small>`;
+        }
+        html += `</div>`;
+    });
+    
+    document.getElementById('previewContent').innerHTML = html;
+    $('#previewModal').modal('show');
+}
+
+function saveDraft() {
+    alert('Draft saving functionality will be implemented');
+}
+
+function loadTemplate() {
+    alert('Template loading functionality will be implemented');
+}
+
+// Generate field name from label
+document.addEventListener('DOMContentLoaded', function() {
+    const labelInput = document.getElementById('fieldLabel');
+    const nameInput = document.getElementById('fieldName');
+    
+    labelInput.addEventListener('input', function() {
+        if (!nameInput.value) {
+            const generatedName = this.value
+                .toLowerCase()
+                .replace(/[^a-z0-9\s]/g, '')
+                .replace(/\s+/g, '_');
+            nameInput.value = generatedName;
+        }
+    });
+});
+
+// Form submission
+document.getElementById('templateForm').addEventListener('submit', function(e) {
+    if (formFieldsData.length === 0) {
+        e.preventDefault();
+        alert('Please add at least one field to your form template');
+        return;
+    }
+    
+    // Add fields data as hidden input
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = 'fields_data';
+    hiddenInput.value = JSON.stringify(formFieldsData);
+    this.appendChild(hiddenInput);
+});
+</script>
+{% endblock %}
