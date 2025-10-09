@@ -154,6 +154,11 @@
             border-radius: 8px;
             cursor: crosshair;
             background: white;
+            width: 100%;
+            height: 200px;
+            max-width: 600px;
+            display: block;
+            margin: 0 auto;
         }
         
         .signature-controls {
@@ -573,7 +578,7 @@
                                             <p class="text-muted mb-0">Please sign below</p>
                                         </div>
                                         
-                                        <canvas id="signatureCanvas" width="600" height="200"></canvas>
+                                        <canvas id="signatureCanvas"></canvas>
                                         
                                         <div class="signature-controls">
                                             <button type="button" class="signature-btn" id="undoSignature">
@@ -634,11 +639,16 @@
             }
             
             setupCanvas() {
-                // Set canvas resolution
+                // Set canvas resolution based on CSS size
                 const rect = this.canvas.getBoundingClientRect();
-                this.canvas.width = rect.width * 2;
-                this.canvas.height = rect.height * 2;
-                this.ctx.scale(2, 2);
+                const dpr = window.devicePixelRatio || 1;
+                
+                // Set the actual canvas size in pixels (for retina displays)
+                this.canvas.width = rect.width * dpr;
+                this.canvas.height = rect.height * dpr;
+                
+                // Scale the drawing context so everything draws at the correct size
+                this.ctx.scale(dpr, dpr);
                 
                 // Set drawing style
                 this.ctx.strokeStyle = '#2c3e50';
@@ -733,7 +743,8 @@
             }
             
             clear() {
-                this.ctx.clearRect(0, 0, this.canvas.width / 2, this.canvas.height / 2);
+                const rect = this.canvas.getBoundingClientRect();
+                this.ctx.clearRect(0, 0, rect.width, rect.height);
                 this.strokes = [];
                 this.currentStroke = [];
                 this.updateSignatureData();
@@ -750,7 +761,8 @@
             }
             
             redraw() {
-                this.ctx.clearRect(0, 0, this.canvas.width / 2, this.canvas.height / 2);
+                const rect = this.canvas.getBoundingClientRect();
+                this.ctx.clearRect(0, 0, rect.width, rect.height);
                 
                 for (const stroke of this.strokes) {
                     if (stroke.length > 0) {
@@ -801,6 +813,17 @@
             const canvas = document.getElementById('signatureCanvas');
             if (canvas) {
                 const signaturePad = new TaxSignaturePad(canvas);
+                
+                // Handle window resize to maintain canvas responsiveness
+                window.addEventListener('resize', () => {
+                    // Save current strokes
+                    const savedStrokes = [...signaturePad.strokes];
+                    // Reinitialize canvas with new dimensions
+                    signaturePad.setupCanvas();
+                    // Restore strokes
+                    signaturePad.strokes = savedStrokes;
+                    signaturePad.redraw();
+                });
                 
                 // Bind control buttons
                 document.getElementById('clearSignature').addEventListener('click', () => {
