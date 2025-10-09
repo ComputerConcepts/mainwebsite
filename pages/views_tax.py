@@ -32,7 +32,7 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from io import BytesIO
 
 from .models import (
-    TaxFormTemplate, TaxFormField, TaxClient, TaxFormAssignment, 
+    TaxFormTemplate, TaxFormField, TaxClient, TaxClientWaiver, TaxFormAssignment, 
     TaxFormSubmission, TaxDocument
 )
 
@@ -48,6 +48,48 @@ def is_tax_staff(user):
 def is_employee(user):
     """Check if user is an employee (for accessing admin features)"""
     return user.is_authenticated and (user.is_staff or hasattr(user, 'employee'))
+
+def send_client_welcome_email(client):
+    """Send welcome email to newly created tax client"""
+    from django.contrib.sites.models import Site
+    from django.core.mail import EmailMultiAlternatives
+    
+    try:
+        # Get current site domain
+        current_site = Site.objects.get_current()
+        domain = getattr(settings, 'SITE_DOMAIN', current_site.domain)
+        protocol = 'https' if getattr(settings, 'USE_HTTPS', False) else 'http'
+        site_url = f"{protocol}://{domain}"
+        
+        # Email context
+        context = {
+            'client': client,
+            'site_url': site_url,
+            'domain': domain,
+        }
+        
+        # Render email templates
+        subject = f"Welcome to One Computer Concepts Tax Preparation - Your PIN: {client.current_pin}"
+        html_content = render_to_string('email/client_welcome.html', context)
+        text_content = render_to_string('email/client_welcome.txt', context)
+        
+        # Create and send email
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[client.email],
+            reply_to=[settings.DEFAULT_FROM_EMAIL]
+        )
+        email.attach_alternative(html_content, "text/html")
+        email.send()
+        
+        return True
+        
+    except Exception as e:
+        # Log the error (you might want to use proper logging here)
+        print(f"Failed to send welcome email to {client.email}: {str(e)}")
+        raise e
 
 
 def send_form_completion_email(assignment, completed_by):
@@ -321,12 +363,28 @@ def create_client(request):
                 created_by=request.user
             )
             
+            # Send welcome email to the new client
+            email_sent = False
+            try:
+                send_client_welcome_email(client)
+                email_sent = True
+            except Exception as email_error:
+                # Log the error but don't fail the client creation
+                messages.warning(request, f"Client created successfully, but welcome email failed to send: {str(email_error)}")
+            
             action = request.POST.get('action', 'save')
             if action == 'save_and_assign':
-                messages.success(request, f"Client '{client.full_name}' created successfully! PIN: {pin}")
-                return redirect('assign_tax_forms', client_id=client.id)
+                success_msg = f"Client '{client.full_name}' created successfully! PIN: {pin}."
+                if email_sent:
+                    success_msg += f" Welcome email sent to {client.email}."
+                success_msg += " Please complete the waiver next."
+                messages.success(request, success_msg)
+                return redirect('client_waiver', client_id=client.id)
             else:
-                messages.success(request, f"Client '{client.full_name}' created successfully! PIN: {pin}")
+                success_msg = f"Client '{client.full_name}' created successfully! PIN: {pin}."
+                if email_sent:
+                    success_msg += f" Welcome email sent to {client.email}."
+                messages.success(request, success_msg)
                 return redirect('manage_tax_clients')
             
         except Exception as e:
@@ -344,9 +402,125 @@ def create_client(request):
 
 @login_required
 @user_passes_test(is_tax_staff)
+def client_waiver(request, client_id):
+    """View client waiver status (read-only for employees)"""
+    from django.utils import timezone
+    
+    client = get_object_or_404(TaxClient, id=client_id)
+    
+    # Get or create waiver record
+    waiver, created = TaxClientWaiver.objects.get_or_create(
+        client=client,
+        defaults={'waiver_version': '1.0'}
+    )
+    
+    # Handle only employee notes and witnessing (no client signature)
+    if request.method == 'POST':
+        try:
+            # Only allow employee to add notes and witness (if client already signed)
+            if waiver.client_signed:
+                # Employee witness
+                if request.POST.get('employee_witness') == 'on':
+                    waiver.employee_witnessed = True
+                    waiver.witnessed_by = request.user
+                    waiver.witnessed_at = timezone.now()
+                
+                # Notes
+                waiver.notes = request.POST.get('notes', '')
+                waiver.save()
+                
+                messages.success(request, f"Waiver witness information updated for {client.full_name}.")
+            else:
+                messages.error(request, "Client must sign the waiver first before employee can witness it.")
+                
+        except Exception as e:
+            messages.error(request, f"Error updating waiver: {str(e)}")
+        
+        return redirect('client_waiver', client_id=client.id)
+    
+    # Build client login URL for instructions
+    from django.contrib.sites.models import Site
+    current_site = Site.objects.get_current()
+    domain = getattr(settings, 'SITE_DOMAIN', current_site.domain)
+    protocol = 'https' if getattr(settings, 'USE_HTTPS', False) else 'http'
+    client_waiver_url = f"{protocol}://{domain}/tax/waiver/"
+    
+    context = {
+        'client': client,
+        'waiver': waiver,
+        'is_new_waiver': created,
+        'client_waiver_url': client_waiver_url,
+        'is_employee_view': True,
+    }
+    
+    return render(request, 'tax/admin/client_waiver_status.html', context)
+
+
+def tax_client_waiver(request):
+    """Client-side waiver signing (requires PIN authentication)"""
+    from django.utils import timezone
+    
+    # Check if client is authenticated via session
+    client_id = request.session.get('tax_client_id')
+    if not client_id:
+        messages.error(request, "Please log in with your PIN to access the waiver.")
+        return redirect('tax_client_login')
+    
+    client = get_object_or_404(TaxClient, id=client_id)
+    
+    # Get or create waiver record
+    waiver, created = TaxClientWaiver.objects.get_or_create(
+        client=client,
+        defaults={'waiver_version': '1.0'}
+    )
+    
+    if request.method == 'POST':
+        try:
+            # Update consent fields (client can modify these)
+            waiver.consent_data_processing = request.POST.get('consent_data_processing') == 'on'
+            waiver.consent_document_storage = request.POST.get('consent_document_storage') == 'on'
+            waiver.consent_electronic_delivery = request.POST.get('consent_electronic_delivery') == 'on'
+            waiver.consent_third_party_disclosure = request.POST.get('consent_third_party_disclosure') == 'on'
+            
+            # Handle client signature
+            signature_data = request.POST.get('signature_data', '')
+            if signature_data:
+                waiver.client_signature_data = signature_data
+                waiver.client_signed = True
+                waiver.client_signed_at = timezone.now()
+                waiver.client_ip_address = request.META.get('REMOTE_ADDR')
+            
+            waiver.save()
+            
+            if waiver.is_completed:
+                messages.success(request, "Waiver completed successfully! Your tax preparer can now assign forms to you.")
+                return redirect('tax_client_dashboard')
+            else:
+                messages.warning(request, f"Waiver saved. Status: {waiver.completion_status}")
+                
+        except Exception as e:
+            messages.error(request, f"Error saving waiver: {str(e)}")
+    
+    context = {
+        'client': client,
+        'waiver': waiver,
+        'is_new_waiver': created,
+        'is_client_view': True,
+    }
+    
+    return render(request, 'tax/client/waiver.html', context)
+
+
+@login_required
+@user_passes_test(is_tax_staff)
 def assign_forms(request, client_id):
     """Assign tax forms to a client"""
     client = get_object_or_404(TaxClient, id=client_id)
+    
+    # Check if client has completed waiver before allowing form assignment
+    if not client.can_be_assigned_forms():
+        messages.error(request, f"Please complete the waiver for {client.full_name} before assigning tax forms.")
+        return redirect('client_waiver', client_id=client.id)
     
     if request.method == 'POST':
         form_ids = request.POST.getlist('form_ids')
@@ -870,6 +1044,17 @@ def tax_client_dashboard(request):
         messages.error(request, "Session expired. Please log in again.")
         return redirect('tax_client_login')
     
+    # Get client's waiver status
+    try:
+        waiver = TaxClientWaiver.objects.get(client=client)
+    except TaxClientWaiver.DoesNotExist:
+        waiver = None
+    
+    # If waiver doesn't exist or isn't completed, redirect to waiver page
+    if not waiver or not waiver.is_completed:
+        messages.info(request, "Please complete your waiver before accessing tax forms.")
+        return redirect('tax_client_waiver')
+    
     # Get client's form assignments
     assignments = TaxFormAssignment.objects.filter(
         client=client
@@ -916,6 +1101,7 @@ def tax_client_dashboard(request):
     
     context = {
         'client': client,
+        'waiver': waiver,
         'pending_assignments': pending_assignments,
         'ready_for_signature': ready_for_signature,
         'completed_assignments': completed_assignments,
@@ -937,6 +1123,16 @@ def tax_form_fill(request, assignment_id):
     except TaxClient.DoesNotExist:
         messages.error(request, "Session expired. Please log in again.")
         return redirect('tax_client_login')
+    
+    # Check if client has completed waiver
+    try:
+        waiver = TaxClientWaiver.objects.get(client=client)
+        if not waiver.is_completed:
+            messages.error(request, "Please complete your waiver before accessing tax forms.")
+            return redirect('tax_client_waiver')
+    except TaxClientWaiver.DoesNotExist:
+        messages.error(request, "Please complete your waiver before accessing tax forms.")
+        return redirect('tax_client_waiver')
     
     # Get assignment
     assignment = get_object_or_404(
@@ -1095,6 +1291,16 @@ def tax_client_review_form(request, submission_id):
         messages.error(request, "Session expired. Please log in again.")
         return redirect('tax_client_login')
     
+    # Check if client has completed waiver
+    try:
+        waiver = TaxClientWaiver.objects.get(client=client)
+        if not waiver.is_completed:
+            messages.error(request, "Please complete your waiver before accessing tax forms.")
+            return redirect('tax_client_waiver')
+    except TaxClientWaiver.DoesNotExist:
+        messages.error(request, "Please complete your waiver before accessing tax forms.")
+        return redirect('tax_client_waiver')
+    
     # Get submission
     submission = get_object_or_404(
         TaxFormSubmission,
@@ -1145,3 +1351,62 @@ def tax_client_review_form(request, submission_id):
     }
     
     return render(request, 'tax/client/review_form.html', context)
+
+
+@login_required
+def send_client_reminder(request, client_id):
+    """Send reminder email to client about pending tax forms"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        client = TaxClient.objects.get(id=client_id, is_active=True)
+        
+        # Send the welcome email again as a reminder
+        send_client_welcome_email(client)
+        
+        return JsonResponse({'success': True, 'message': 'Reminder email sent successfully'})
+        
+    except TaxClient.DoesNotExist:
+        return JsonResponse({'error': 'Client not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required  
+def send_login_help(request, client_id):
+    """Send login assistance email to client"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        client = TaxClient.objects.get(id=client_id, is_active=True)
+        
+        # Send the welcome email as login help
+        send_client_welcome_email(client)
+        
+        return JsonResponse({'success': True, 'message': 'Login assistance email sent successfully'})
+        
+    except TaxClient.DoesNotExist:
+        return JsonResponse({'error': 'Client not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def deactivate_client(request, client_id):
+    """Deactivate a client account"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        client = TaxClient.objects.get(id=client_id)
+        client.is_active = False
+        client.save()
+        
+        return JsonResponse({'success': True, 'message': 'Client deactivated successfully'})
+        
+    except TaxClient.DoesNotExist:
+        return JsonResponse({'error': 'Client not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

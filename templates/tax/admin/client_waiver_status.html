@@ -1,0 +1,304 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Waiver Status - {{ client.full_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .waiver-header {
+        background: linear-gradient(135deg, #3498db 0%, #2c3e50 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-radius: 10px;
+    }
+    
+    .waiver-content {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .status-section {
+        background: #f8f9fa;
+        border-left: 4px solid #3498db;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+        border-radius: 0 8px 8px 0;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .status-completed {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-pending {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-signed {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .client-instructions {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        text-align: center;
+        margin: 2rem 0;
+    }
+    
+    .btn-client-link {
+        background: white;
+        color: #28a745;
+        border: 2px solid white;
+        padding: 12px 30px;
+        font-weight: 600;
+        border-radius: 25px;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-client-link:hover {
+        background: #28a745;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+    }
+    
+    .signature-display {
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        background: #f8f9fa;
+        margin: 1rem 0;
+    }
+    
+    .signature-image {
+        max-width: 100%;
+        height: auto;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    
+    .witness-section {
+        background: #e9ecef;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 2rem 0;
+    }
+    
+    .readonly-note {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        padding: 1rem;
+        border-radius: 8px;
+        color: #856404;
+        margin: 1rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Header -->
+    <div class="waiver-header text-center">
+        <h1 class="mb-2">
+            <i class="fas fa-file-contract me-3"></i>
+            Client Waiver Status
+        </h1>
+        <p class="lead mb-0">{{ client.full_name }}</p>
+        <small class="opacity-75">Client ID: {{ client.id }}</small>
+    </div>
+
+    <!-- Status Display -->
+    <div class="waiver-content">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3><i class="fas fa-info-circle text-primary me-2"></i>Current Status</h3>
+            {% if waiver.is_completed %}
+                <span class="status-badge status-completed">
+                    <i class="fas fa-check-circle me-1"></i>Completed & Ready
+                </span>
+            {% elif waiver.client_signed %}
+                <span class="status-badge status-signed">
+                    <i class="fas fa-pen-alt me-1"></i>Signed (Awaiting Witness)
+                </span>
+            {% else %}
+                <span class="status-badge status-pending">
+                    <i class="fas fa-clock me-1"></i>Pending Client Signature
+                </span>
+            {% endif %}
+        </div>
+        
+        <div class="readonly-note">
+            <i class="fas fa-lock me-2"></i>
+            <strong>Employee View:</strong> This is a read-only view. Only clients can sign their own waivers for legal compliance.
+        </div>
+        
+        {% if waiver.client_signed %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong>Client Signed:</strong> {{ waiver.client_signed_at|date:"M d, Y g:i A" }}
+            <br><small class="text-muted">IP Address: {{ waiver.client_ip_address|default:"Not recorded" }}</small>
+        </div>
+        {% endif %}
+        
+        {% if waiver.witnessed_by %}
+        <div class="alert alert-info">
+            <i class="fas fa-eye me-2"></i>
+            <strong>Witnessed by:</strong> {{ waiver.witnessed_by.get_full_name|default:waiver.witnessed_by.username }}
+            <br><small class="text-muted">{{ waiver.witnessed_at|date:"M d, Y g:i A" }}</small>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if not waiver.client_signed %}
+    <!-- Client Instructions -->
+    <div class="client-instructions">
+        <h3><i class="fas fa-user-check me-2"></i>Client Must Sign Waiver</h3>
+        <p class="mb-4">The client needs to sign their waiver before you can assign tax forms. Direct them to:</p>
+        
+        <div class="mb-3">
+            <strong>Client Login URL:</strong><br>
+            <code>{{ client_waiver_url }}</code>
+        </div>
+        
+        <p class="mb-4">
+            <strong>Client Credentials:</strong><br>
+            Email: {{ client.email }}<br>
+            PIN: {{ client.current_pin }}
+        </p>
+        
+        <a href="{{ client_waiver_url }}" target="_blank" class="btn-client-link">
+            <i class="fas fa-external-link-alt me-2"></i>Open Client Waiver Page
+        </a>
+        
+        <div class="mt-3">
+            <small class="opacity-75">Send this link to your client or have them log in at your main website</small>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Consent Status -->
+    <div class="waiver-content">
+        <h3><i class="fas fa-clipboard-check text-primary me-2"></i>Consent Status</h3>
+        <div class="status-section">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <i class="fas fa-{% if waiver.consent_data_processing %}check-circle text-success{% else %}times-circle text-danger{% endif %} me-2"></i>
+                        <strong>Data Processing:</strong> 
+                        {% if waiver.consent_data_processing %}Granted{% else %}Not granted{% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <i class="fas fa-{% if waiver.consent_document_storage %}check-circle text-success{% else %}times-circle text-danger{% endif %} me-2"></i>
+                        <strong>Document Storage:</strong> 
+                        {% if waiver.consent_document_storage %}Granted{% else %}Not granted{% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <i class="fas fa-{% if waiver.consent_electronic_delivery %}check-circle text-success{% else %}times-circle text-danger{% endif %} me-2"></i>
+                        <strong>Electronic Delivery:</strong> 
+                        {% if waiver.consent_electronic_delivery %}Granted{% else %}Not granted{% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <i class="fas fa-{% if waiver.consent_third_party_disclosure %}check-circle text-success{% else %}times-circle text-danger{% endif %} me-2"></i>
+                        <strong>Third-Party Communication:</strong> 
+                        {% if waiver.consent_third_party_disclosure %}Granted{% else %}Not granted{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if waiver.client_signed %}
+    <!-- Signature Display -->
+    <div class="waiver-content">
+        <h3><i class="fas fa-signature text-primary me-2"></i>Client Signature</h3>
+        {% if waiver.client_signature_data %}
+        <div class="signature-display">
+            <img src="{{ waiver.client_signature_data }}" alt="Client Signature" class="signature-image">
+            <div class="mt-2">
+                <small class="text-muted">
+                    Signed: {{ waiver.client_signed_at|date:"M d, Y g:i A" }}
+                    {% if waiver.client_ip_address %}| IP: {{ waiver.client_ip_address }}{% endif %}
+                </small>
+            </div>
+        </div>
+        {% else %}
+        <div class="signature-display">
+            <p class="text-muted mb-0">Signature data not available</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Employee Witness Section -->
+    <div class="waiver-content">
+        <h3><i class="fas fa-user-tie text-primary me-2"></i>Employee Witness</h3>
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="witness-section">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="employee_witness" id="employee_witness" 
+                           {% if waiver.employee_witnessed %}checked disabled{% endif %}>
+                    <label class="form-check-label" for="employee_witness">
+                        <strong>I witnessed the client's signature</strong><br>
+                        <small class="text-muted">
+                            {% if waiver.employee_witnessed %}
+                                Witnessed by {{ waiver.witnessed_by.get_full_name|default:waiver.witnessed_by.username }} 
+                                on {{ waiver.witnessed_at|date:"M d, Y g:i A" }}
+                            {% else %}
+                                Confirm that you witnessed the client signing this waiver
+                            {% endif %}
+                        </small>
+                    </label>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Employee Notes</label>
+                    <textarea class="form-control" name="notes" id="notes" rows="3" 
+                              placeholder="Any additional notes about this waiver signing...">{{ waiver.notes }}</textarea>
+                </div>
+                
+                {% if not waiver.employee_witnessed %}
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>Update Witness Information
+                </button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    <div class="waiver-content text-center">
+        {% if waiver.is_completed %}
+        <a href="{% url 'assign_tax_forms' client.id %}" class="btn btn-success btn-lg me-3">
+            <i class="fas fa-file-alt me-2"></i>Assign Tax Forms
+        </a>
+        {% endif %}
+        
+        <a href="{% url 'tax_client_detail' client.id %}" class="btn btn-secondary btn-lg">
+            <i class="fas fa-arrow-left me-2"></i>Back to Client Details
+        </a>
+    </div>
+</div>
+{% endblock %}

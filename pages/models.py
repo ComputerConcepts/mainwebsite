@@ -1647,6 +1647,72 @@ class TaxClient(models.Model):
         if not self.current_pin or not self.pin_expiry:
             return False
         return timezone.now() < self.pin_expiry
+    
+    def has_completed_waiver(self):
+        """Check if client has completed the waiver"""
+        try:
+            return self.waiver.is_completed
+        except TaxClientWaiver.DoesNotExist:
+            return False
+    
+    def can_be_assigned_forms(self):
+        """Check if client can be assigned tax forms"""
+        return self.has_completed_waiver()
+
+
+class TaxClientWaiver(models.Model):
+    """Waiver and consent forms for tax clients"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    client = models.OneToOneField(TaxClient, on_delete=models.CASCADE, related_name='waiver')
+    
+    # Waiver content tracking
+    waiver_version = models.CharField(max_length=20, default='1.0', help_text="Version of waiver terms")
+    
+    # Client consent tracking
+    client_signed = models.BooleanField(default=False)
+    client_signature_data = models.TextField(blank=True, help_text="Base64 signature image data")
+    client_signed_at = models.DateTimeField(null=True, blank=True)
+    client_ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    # Employee tracking
+    employee_witnessed = models.BooleanField(default=False)
+    witnessed_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='witnessed_waivers')
+    witnessed_at = models.DateTimeField(null=True, blank=True)
+    
+    # Additional consent fields
+    consent_data_processing = models.BooleanField(default=False, help_text="Consent to process tax data")
+    consent_document_storage = models.BooleanField(default=False, help_text="Consent to store documents")
+    consent_electronic_delivery = models.BooleanField(default=False, help_text="Consent to electronic document delivery")
+    consent_third_party_disclosure = models.BooleanField(default=False, help_text="Consent for IRS/state communications")
+    
+    # Notes and tracking
+    notes = models.TextField(blank=True, help_text="Additional notes about waiver")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Waiver for {self.client.full_name}"
+    
+    @property
+    def is_completed(self):
+        """Check if waiver is fully completed"""
+        return (self.client_signed and 
+                self.consent_data_processing and 
+                self.consent_document_storage and 
+                self.consent_electronic_delivery)
+    
+    @property
+    def completion_status(self):
+        """Get human-readable completion status"""
+        if self.is_completed:
+            return "Completed"
+        elif self.client_signed:
+            return "Signed but missing consents"
+        else:
+            return "Pending signature"
 
 
 class TaxFormAssignment(models.Model):

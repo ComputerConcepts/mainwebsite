@@ -1,0 +1,71 @@
+ONE COMPUTER CONCEPTS - PROFESSIONAL TAX PREPARATION
+============================================================
+
+Welcome, {{ client.first_name }}!
+
+Your tax preparation account has been successfully created. We're excited to help you with your tax needs this year.
+
+YOUR SECURE ACCESS PIN
+=======================
+{{ client.current_pin }}
+
+Keep this PIN safe - you'll need it to access your tax forms and documents.
+
+LOGIN TO YOUR ACCOUNT
+=====================
+Access your tax account at: {{ site_url }}/tax/login/
+Use your email: {{ client.email }}
+Use your PIN: {{ client.current_pin }}
+
+Bookmark this login page for easy access throughout the tax season.
+
+YOUR ACCOUNT DETAILS
+=====================
+Name: {{ client.full_name }}
+Email: {{ client.email }}
+{% if client.phone %}Phone: {{ client.phone }}{% endif %}
+Account Created: {{ client.created_at|date:"F d, Y g:i A" }}
+Tax Preparer: {{ client.created_by.get_full_name|default:client.created_by.username }}
+
+WHAT HAPPENS NEXT?
+==================
+
+1. ACCESS YOUR ACCOUNT
+   Login at: {{ site_url }}/tax/login/
+   Use your email ({{ client.email }}) and PIN ({{ client.current_pin }})
+   Bookmark this page for easy access throughout the process.
+
+2. COMPLETE YOUR WAIVER
+   Your tax preparer will guide you through completing a required waiver and consent form. This ensures we can legally prepare your taxes and communicate with relevant authorities on your behalf.
+
+3. RECEIVE YOUR TAX FORMS
+   Once your waiver is complete, we'll assign the appropriate tax forms based on your situation. You'll receive an email notification when your forms are ready.
+
+4. FILL OUT YOUR FORMS
+   You can complete your tax forms online using your secure PIN. The forms will be saved automatically as you work.
+
+5. REVIEW & SUBMIT
+   Your tax preparer will review your completed forms and handle the filing process. We'll keep you informed every step of the way.
+
+IMPORTANT INFORMATION
+=====================
+• Keep your PIN secure - Never share it with anyone except your tax preparer
+• Check your email regularly - We'll send updates about your tax preparation progress
+• Have your documents ready - W-2s, 1099s, receipts, and other tax documents
+• Contact us with questions - We're here to help throughout the process
+
+NEED HELP? CONTACT US
+=====================
+Email: support@onecomputerconcepts.com
+Phone: (555) 123-4567
+Website: onecomputerconcepts.com
+
+Our tax preparation team is ready to assist you with any questions or concerns.
+
+============================================================
+One Computer Concepts
+Professional Tax Preparation & Business Services
+
+This email was sent because a tax preparation account was created for {{ client.email }}.
+
+© {{ "now"|date:"Y" }} One Computer Concepts. All rights reserved.

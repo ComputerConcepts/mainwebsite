@@ -160,29 +160,27 @@
                         <!-- Auto-Generated PIN -->
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Access PIN</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control" id="access_pin" name="access_pin" 
-                                           value="{{ auto_pin|default:'' }}" readonly 
-                                           placeholder="Will be auto-generated">
-                                    <button type="button" class="btn btn-outline-secondary" id="generatePinBtn">
-                                        <i class="fas fa-sync-alt me-1"></i>Generate PIN
-                                    </button>
+                                <label class="form-label">Access PIN Security</label>
+                                <div class="alert alert-success p-3">
+                                    <i class="fas fa-shield-check me-2"></i>
+                                    <strong>Secure PIN Generated</strong><br>
+                                    <small class="text-muted">A secure 4-digit PIN will be automatically created and sent directly to the client via email.</small>
                                 </div>
+                                <input type="hidden" id="access_pin" name="access_pin" value="{{ auto_pin|default:'' }}">
                                 <div class="form-text">
                                     <i class="fas fa-info-circle me-1"></i>
-                                    A secure 4-digit PIN will be automatically generated for client access.
+                                    PIN is encrypted and only visible to the client for security compliance.
                                 </div>
                                 {% if form.access_pin.errors %}
                                     <div class="text-danger small">{{ form.access_pin.errors.0 }}</div>
                                 {% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">PIN Security</label>
-                                <div class="alert alert-info py-2 small mb-0">
-                                    <i class="fas fa-shield-alt me-1"></i>
-                                    PIN will be automatically generated using cryptographically secure random numbers.
-                                    <br><span class="text-muted">The client will receive their PIN via secure communication.</span>
+                                <label class="form-label">Security Notice</label>
+                                <div class="alert alert-warning py-2 small mb-0">
+                                    <i class="fas fa-lock me-1"></i>
+                                    <strong>PIN Privacy:</strong> For security compliance, PINs are not visible to staff members.
+                                    <br><span class="text-muted">Client will receive their PIN directly via email upon creation.</span>
                                 </div>
                             </div>
                         </div>
@@ -256,35 +254,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Auto-generate PIN on page load
+    // Auto-generate secure PIN on page load (hidden from employee)
     generateSecurePin();
     
-    // PIN generation button
-    const generatePinBtn = document.getElementById('generatePinBtn');
-    if (generatePinBtn) {
-        generatePinBtn.addEventListener('click', function() {
-            generateSecurePin();
-        });
-    }
-    
     function generateSecurePin() {
-        // Generate cryptographically secure 4-digit PIN
+        // Generate cryptographically secure 4-digit PIN (not visible to employee)
         const pin = Math.floor(1000 + Math.random() * 9000).toString();
         const pinInput = document.getElementById('access_pin');
         if (pinInput) {
             pinInput.value = pin;
-            // Add visual feedback
-            pinInput.classList.add('is-valid');
-            
-            // Animate the generate button
-            const btn = document.getElementById('generatePinBtn');
-            if (btn) {
-                const icon = btn.querySelector('i');
-                icon.classList.add('fa-spin');
-                setTimeout(() => {
-                    icon.classList.remove('fa-spin');
-                }, 500);
-            }
         }
     }
 

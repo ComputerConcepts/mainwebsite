@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to One Computer Concepts Tax Preparation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            line-height: 1.6;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .email-header {
+            background: linear-gradient(135deg, #3498db 0%, #2c3e50 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+        .email-header p {
+            margin: 0.5rem 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        .email-body {
+            padding: 2rem;
+        }
+        .welcome-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .welcome-section h2 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+        .pin-section {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            text-align: center;
+            margin: 2rem 0;
+        }
+        .pin-section h3 {
+            margin: 0 0 1rem 0;
+            font-size: 1.3rem;
+        }
+        .pin-display {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 2rem;
+            font-weight: bold;
+            letter-spacing: 3px;
+            margin: 1rem 0;
+        }
+        .pin-note {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin: 0;
+        }
+        .next-steps {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 10px;
+            border-left: 4px solid #3498db;
+            margin: 2rem 0;
+        }
+        .next-steps h3 {
+            color: #3498db;
+            margin-top: 0;
+        }
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin: 1rem 0;
+            padding: 0.5rem 0;
+        }
+        .step-number {
+            background: #3498db;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            margin-right: 1rem;
+            flex-shrink: 0;
+        }
+        .step-content {
+            flex: 1;
+        }
+        .step-content strong {
+            color: #2c3e50;
+        }
+        .contact-section {
+            background: #e9ecef;
+            padding: 1.5rem;
+            border-radius: 10px;
+            text-align: center;
+            margin: 2rem 0;
+        }
+        .contact-section h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .contact-info {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #495057;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 1rem 0;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #2980b9;
+            color: white;
+        }
+        .email-footer {
+            background: #2c3e50;
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .email-footer p {
+            margin: 0.5rem 0;
+            opacity: 0.8;
+        }
+        .company-logo {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        @media (max-width: 600px) {
+            .email-body {
+                padding: 1rem;
+            }
+            .contact-info {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="email-header">
+            <div class="company-logo">
+                💼
+            </div>
+            <h1>One Computer Concepts</h1>
+            <p>Professional Tax Preparation Services</p>
+        </div>
+
+        <!-- Body -->
+        <div class="email-body">
+            <!-- Welcome Section -->
+            <div class="welcome-section">
+                <h2>Welcome, {{ client.first_name }}!</h2>
+                <p>Your tax preparation account has been successfully created. We're excited to help you with your tax needs this year.</p>
+            </div>
+
+            <!-- PIN Section -->
+            <div class="pin-section">
+                <h3>🔐 Your Secure Access PIN</h3>
+                <div class="pin-display">{{ client.current_pin }}</div>
+                <p class="pin-note">Keep this PIN safe - you'll need it to access your tax forms and documents.</p>
+                
+                <!-- Login Button -->
+                <div style="margin-top: 2rem;">
+                    <a href="{{ site_url }}/tax/login/" class="btn" target="_blank" 
+                       style="background: rgba(255, 255, 255, 0.2); color: white; border: 2px solid white; padding: 15px 30px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">
+                        🔑 Login to Your Tax Account
+                    </a>
+                </div>
+                <p style="font-size: 0.85rem; opacity: 0.8; margin-top: 1rem;">
+                    Use your email address and the PIN above to access your tax forms
+                </p>
+            </div>
+
+            <!-- Account Details -->
+            <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin: 2rem 0;">
+                <h3 style="color: #2c3e50; margin-top: 0;">📋 Your Account Details</h3>
+                <div style="display: grid; gap: 0.5rem;">
+                    <div><strong>Name:</strong> {{ client.full_name }}</div>
+                    <div><strong>Email:</strong> {{ client.email }}</div>
+                    {% if client.phone %}<div><strong>Phone:</strong> {{ client.phone }}</div>{% endif %}
+                    <div><strong>Account Created:</strong> {{ client.created_at|date:"F d, Y g:i A" }}</div>
+                    <div><strong>Tax Preparer:</strong> {{ client.created_by.get_full_name|default:client.created_by.username }}</div>
+                </div>
+            </div>
+
+            <!-- Next Steps -->
+            <div class="next-steps">
+                <h3>📝 What Happens Next?</h3>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <strong>Access Your Account</strong><br>
+                        <a href="{{ site_url }}/tax/login/" target="_blank" style="color: #3498db; text-decoration: none; font-weight: 600;">Click here to login</a> using your email ({{ client.email }}) and PIN ({{ client.current_pin }}). Bookmark this page for easy access.
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <strong>Complete Your Waiver</strong><br>
+                        Your tax preparer will guide you through completing a required waiver and consent form. This ensures we can legally prepare your taxes and communicate with relevant authorities on your behalf.
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <strong>Receive Your Tax Forms</strong><br>
+                        Once your waiver is complete, we'll assign the appropriate tax forms based on your situation. You'll receive an email notification when your forms are ready.
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <strong>Fill Out Your Forms</strong><br>
+                        You can complete your tax forms online using your secure PIN. The forms will be saved automatically as you work.
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <strong>Review & Submit</strong><br>
+                        Your tax preparer will review your completed forms and handle the filing process. We'll keep you informed every step of the way.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Important Information -->
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 1.5rem; border-radius: 10px; margin: 2rem 0;">
+                <h3 style="color: #856404; margin-top: 0;">⚠️ Important Information</h3>
+                <ul style="color: #856404; margin: 0; padding-left: 1.5rem;">
+                    <li><strong>Keep your PIN secure</strong> - Never share it with anyone except your tax preparer</li>
+                    <li><strong>Check your email regularly</strong> - We'll send updates about your tax preparation progress</li>
+                    <li><strong>Have your documents ready</strong> - W-2s, 1099s, receipts, and other tax documents</li>
+                    <li><strong>Contact us with questions</strong> - We're here to help throughout the process</li>
+                </ul>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="contact-section">
+                <h3>📞 Need Help? Contact Us</h3>
+                <p>Our tax preparation team is ready to assist you with any questions or concerns.</p>
+                <div class="contact-info">
+                    <div class="contact-item">
+                        <span>📧</span>
+                        <span>support@onecomputerconcepts.com</span>
+                    </div>
+                    <div class="contact-item">
+                        <span>📞</span>
+                        <span>(555) 123-4567</span>
+                    </div>
+                    <div class="contact-item">
+                        <span>🌐</span>
+                        <span>onecomputerconcepts.com</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="email-footer">
+            <p><strong>One Computer Concepts</strong></p>
+            <p>Professional Tax Preparation & Business Services</p>
+            <p>This email was sent because a tax preparation account was created for {{ client.email }}.</p>
+            <p style="font-size: 0.8rem; margin-top: 1rem;">
+                © {{ "now"|date:"Y" }} One Computer Concepts. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

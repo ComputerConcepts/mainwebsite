@@ -239,6 +239,16 @@
                 
                 <h1>Welcome, {{ client.first_name }}!</h1>
                 <p>Complete your tax forms securely below</p>
+                
+                <!-- Waiver Completion Confirmation -->
+                {% if waiver and waiver.is_completed %}
+                <div class="mt-3">
+                    <small class="text-white-50">
+                        <i class="fas fa-shield-check me-1"></i>
+                        Waiver completed {{ waiver.signed_at|date:"M j, Y" }} - You're all set to proceed with tax forms
+                    </small>
+                </div>
+                {% endif %}
             </div>
             
             <!-- Statistics -->
