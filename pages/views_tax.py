@@ -22,6 +22,15 @@ import os
 import logging
 from datetime import datetime, timedelta
 
+# PDF generation imports
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+from io import BytesIO
+
 from .models import (
     TaxFormTemplate, TaxFormField, TaxClient, TaxFormAssignment, 
     TaxFormSubmission, TaxDocument
@@ -515,6 +524,275 @@ def employee_fill_form(request, assignment_id):
     }
     
     return render(request, 'tax/admin/employee_fill_form.html', context)
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+def view_tax_assignment(request, assignment_id):
+    """View a tax assignment and its submission details (read-only for employees)"""
+    assignment = get_object_or_404(TaxFormAssignment, id=assignment_id)
+    
+    # Get the submission if it exists
+    try:
+        submission = TaxFormSubmission.objects.get(assignment=assignment)
+    except TaxFormSubmission.DoesNotExist:
+        submission = None
+    
+    # Get form fields with their submitted values
+    form_fields = []
+    existing_values = submission.form_data if submission and submission.form_data else {}
+    
+    for field in assignment.tax_form.fields.filter(is_active=True).order_by('section', 'order', 'id'):
+        field_data = {
+            'id': field.id,
+            'field_name': field.field_name,
+            'field_label': field.field_label,
+            'field_type': field.field_type,
+            'is_required': field.is_required,
+            'help_text': field.help_text,
+            'section': field.section,
+            'current_value': existing_values.get(field.field_name, ''),
+        }
+        form_fields.append(field_data)
+    
+    context = {
+        'assignment': assignment,
+        'client': assignment.client,
+        'tax_form': assignment.tax_form,
+        'form_fields': form_fields,
+        'submission': submission,
+        'is_read_only': True,
+    }
+    
+    return render(request, 'tax/admin/view_assignment.html', context)
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+def export_tax_assignment_pdf(request, assignment_id):
+    """Export tax assignment as PDF"""
+    assignment = get_object_or_404(TaxFormAssignment, id=assignment_id)
+    
+    # Get the submission if it exists
+    try:
+        submission = TaxFormSubmission.objects.get(assignment=assignment)
+    except TaxFormSubmission.DoesNotExist:
+        submission = None
+    
+    # Create PDF response
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="tax_assignment_{assignment.client.last_name}_{assignment.tax_form.name.replace(" ", "_")}.pdf"'
+    
+    # Create PDF document
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    
+    # Container for the 'Flowable' objects
+    elements = []
+    
+    # Define styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, spaceAfter=30, alignment=TA_CENTER)
+    header_style = ParagraphStyle('CustomHeader', parent=styles['Heading2'], fontSize=14, spaceAfter=12, textColor=colors.darkblue)
+    normal_style = styles['Normal']
+    
+    # Title
+    title = Paragraph(f"Tax Form: {assignment.tax_form.name}", title_style)
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+    
+    # Client Information Header
+    client_info = [
+        ['Client Information', ''],
+        ['Name:', f"{assignment.client.full_name}"],
+        ['Email:', assignment.client.email],
+        ['Phone:', assignment.client.phone or 'Not provided'],
+        ['Status:', assignment.get_status_display()],
+    ]
+    
+    if submission:
+        if submission.employee_completed_at:
+            client_info.append(['Completed by:', submission.submitted_by.get_full_name() or submission.submitted_by.username])
+            client_info.append(['Employee Completion:', submission.employee_completed_at.strftime('%B %d, %Y at %I:%M %p')])
+        if submission.client_signed_at:
+            client_info.append(['Client Signed:', submission.client_signed_at.strftime('%B %d, %Y at %I:%M %p')])
+            if submission.is_completed:
+                client_info.append(['Final Completion:', submission.client_signed_at.strftime('%B %d, %Y at %I:%M %p')])
+    
+    client_table = Table(client_info, colWidths=[2*inch, 4*inch])
+    client_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (1, 0), colors.lightblue),
+        ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(client_table)
+    elements.append(Spacer(1, 20))
+    
+    # Form Fields
+    form_fields = []
+    existing_values = submission.form_data if submission and submission.form_data else {}
+    
+    for field in assignment.tax_form.fields.filter(is_active=True).order_by('section', 'order', 'id'):
+        field_data = {
+            'field_name': field.field_name,
+            'field_label': field.field_label,
+            'field_type': field.field_type,
+            'section': field.section,
+            'current_value': existing_values.get(field.field_name, ''),
+        }
+        form_fields.append(field_data)
+    
+    # Group fields by section
+    sections = {}
+    for field in form_fields:
+        section = field['section'] or 'General'
+        if section not in sections:
+            sections[section] = []
+        sections[section].append(field)
+    
+    # Add form data by section
+    for section_name, section_fields in sections.items():
+        # Section header
+        section_header = Paragraph(section_name, header_style)
+        elements.append(section_header)
+        
+        # Special handling for Monthly Income
+        if section_name == "Monthly Income":
+            monthly_data = [['Month', 'Service', 'Amount Made']]
+            total_amount = 0
+            
+            # Process monthly income fields
+            for field in section_fields:
+                if '- service' in field['field_name']:
+                    month = field['field_name'].replace('_service', '').replace('_', ' ').title()
+                    service = field['current_value'] or '—'
+                    
+                    # Find corresponding amount field
+                    amount_field_name = field['field_name'].replace('_service', '_amount')
+                    amount = '—'
+                    for f in section_fields:
+                        if f['field_name'] == amount_field_name:
+                            if f['current_value']:
+                                amount = f'${f["current_value"]}'
+                                try:
+                                    total_amount += float(f['current_value'])
+                                except ValueError:
+                                    pass
+                            break
+                    
+                    monthly_data.append([month, service, amount])
+            
+            # Add total row
+            monthly_data.append(['TOTAL', '', f'${total_amount:.2f}'])
+            
+            monthly_table = Table(monthly_data, colWidths=[1.5*inch, 2.5*inch, 1.5*inch])
+            monthly_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (2, 0), (2, -1), 'RIGHT'),  # Right align amounts
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('BACKGROUND', (0, 1), (-1, -2), colors.white),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),  # Total row
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            elements.append(monthly_table)
+            
+        # Special handling for Dependent Care
+        elif "Dependent" in section_name and "Standard" in section_name:
+            dependent_data = [['#', 'Child Name', 'SSN', 'Daycare/Provider', 'FEIN', 'Amount Paid']]
+            
+            for i in range(1, 5):  # Up to 4 dependents
+                name_field = f'dependent_{i}_name'
+                name = next((f['current_value'] for f in section_fields if f['field_name'] == name_field), '')
+                
+                if name:  # Only show if name is provided
+                    ssn = next((f['current_value'] for f in section_fields if f['field_name'] == f'dependent_{i}_ssn'), '—')
+                    daycare = next((f['current_value'] for f in section_fields if f['field_name'] == f'dependent_{i}_daycare_name'), '—')
+                    fein = next((f['current_value'] for f in section_fields if f['field_name'] == f'dependent_{i}_fein'), '—')
+                    amount = next((f['current_value'] for f in section_fields if f['field_name'] == f'dependent_{i}_amount'), '—')
+                    if amount and amount != '—':
+                        amount = f'${amount}'
+                    
+                    dependent_data.append([str(i), name, ssn, daycare, fein, amount])
+            
+            if len(dependent_data) > 1:  # Only create table if there are dependents
+                dependent_table = Table(dependent_data, colWidths=[0.3*inch, 1.5*inch, 1.2*inch, 1.5*inch, 1*inch, 0.8*inch])
+                dependent_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),  # Right align amounts
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                elements.append(dependent_table)
+            else:
+                elements.append(Paragraph("No dependent care information provided.", normal_style))
+                
+        else:
+            # Regular fields display
+            field_data = []
+            for field in section_fields:
+                if field['field_type'] != 'section_header':
+                    value = field['current_value'] or 'Not provided'
+                    if field['field_type'] == 'signature':
+                        value = 'Signature captured' if field['current_value'] else 'Signature pending'
+                    elif field['field_type'] == 'currency' and field['current_value']:
+                        value = f"${field['current_value']}"
+                    
+                    field_data.append([field['field_label'], value])
+            
+            if field_data:
+                field_table = Table(field_data, colWidths=[2.5*inch, 3.5*inch])
+                field_table.setStyle(TableStyle([
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+                ]))
+                elements.append(field_table)
+        
+        elements.append(Spacer(1, 15))
+    
+    # Internal Notes
+    if submission and submission.internal_notes:
+        notes_header = Paragraph("Internal Notes", header_style)
+        elements.append(notes_header)
+        notes_content = Paragraph(submission.internal_notes.replace('\n', '<br/>'), normal_style)
+        elements.append(notes_content)
+        elements.append(Spacer(1, 15))
+    
+    # Footer
+    footer_text = f"Generated on {timezone.now().strftime('%B %d, %Y at %I:%M %p')} | Computer Concepts Tax Preparation"
+    footer = Paragraph(footer_text, ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=colors.grey))
+    elements.append(Spacer(1, 20))
+    elements.append(footer)
+    
+    # Build PDF
+    doc.build(elements)
+    
+    # Get the value of the BytesIO buffer and write it to the response
+    pdf = buffer.getvalue()
+    buffer.close()
+    response.write(pdf)
+    
+    return response
 
 
 # =============================================================================

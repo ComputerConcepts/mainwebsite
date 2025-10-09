@@ -1,0 +1,299 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}{{ tax_form.name }} - View Assignment{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        border-left: 4px solid #007bff;
+    }
+    .form-field {
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #e3e6f0;
+    }
+    .field-label {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+    .field-value {
+        color: #212529;
+        background: #f8f9fa;
+        padding: 0.75rem;
+        border-radius: 4px;
+        border: 1px solid #e9ecef;
+    }
+    .empty-value {
+        color: #6c757d;
+        font-style: italic;
+    }
+    .signature-field {
+        background: #fff3cd;
+        border: 1px solid #ffeeba;
+        padding: 1rem;
+        border-radius: 6px;
+        margin: 0.5rem 0;
+    }
+    .monthly-income-table, .dependent-care-table {
+        width: 100%;
+        margin: 1rem 0;
+    }
+    .monthly-income-table th, .monthly-income-table td,
+    .dependent-care-table th, .dependent-care-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-top: 1px solid #dee2e6;
+    }
+    .monthly-income-table th, .dependent-care-table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .currency-value {
+        text-align: right;
+        font-family: 'Courier New', monospace;
+    }
+    .total-row {
+        background-color: #e3f2fd;
+        font-weight: bold;
+    }
+    .assignment-info-card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-file-alt text-primary me-2"></i>
+                        {{ tax_form.name }}
+                    </h2>
+                    <p class="text-muted mb-0">
+                        Client: <strong>{{ client.full_name }}</strong>
+                        {% if client.email %} - {{ client.email }}{% endif %}
+                    </p>
+                </div>
+                <div>
+                    <span class="badge bg-{% if assignment.status == 'completed' %}success{% elif assignment.status == 'ready_for_signature' %}warning{% elif assignment.status == 'in_progress' %}info{% else %}secondary{% endif %} me-2">
+                        {{ assignment.get_status_display }}
+                    </span>
+                    <a href="{% url 'tax_client_detail' client_id=client.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Client
+                    </a>
+                    <a href="{% url 'export_tax_assignment_pdf' assignment_id=assignment.id %}" class="btn btn-outline-danger ms-2" target="_blank">
+                        <i class="fas fa-file-pdf me-1"></i> Download PDF
+                    </a>
+                    {% if assignment.status == 'assigned' or assignment.status == 'in_progress' %}
+                        <a href="{% url 'employee_fill_form' assignment_id=assignment.id %}" class="btn btn-primary ms-2">
+                            <i class="fas fa-edit me-1"></i> Fill Form
+                        </a>
+                    {% elif assignment.status == 'ready_for_signature' %}
+                        <a href="{% url 'employee_fill_form' assignment_id=assignment.id %}" class="btn btn-warning ms-2">
+                            <i class="fas fa-edit me-1"></i> Edit Form
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Assignment Information Card -->
+            <div class="card assignment-info-card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-3">Assignment Details</h6>
+                            <p class="mb-2">
+                                <i class="fas fa-calendar me-2 text-primary"></i>
+                                <strong>Created:</strong> {{ assignment.created_at|date:"M d, Y \a\t g:i A" }}
+                            </p>
+                            {% if assignment.due_date %}
+                                <p class="mb-2">
+                                    <i class="fas fa-clock me-2 text-warning"></i>
+                                    <strong>Due:</strong> {{ assignment.due_date|date:"M d, Y \a\t g:i A" }}
+                                </p>
+                            {% endif %}
+                            {% if assignment.last_activity %}
+                                <p class="mb-2">
+                                    <i class="fas fa-history me-2 text-info"></i>
+                                    <strong>Last Activity:</strong> {{ assignment.last_activity|date:"M d, Y \a\t g:i A" }}
+                                </p>
+                            {% endif %}
+                        </div>
+                        {% if submission %}
+                            <div class="col-md-6">
+                                <h6 class="text-muted mb-3">Submission Details</h6>
+                                {% if submission.employee_completed_at %}
+                                    <p class="mb-2">
+                                        <i class="fas fa-user-check me-2 text-success"></i>
+                                        <strong>Completed by:</strong> {{ submission.submitted_by.get_full_name|default:submission.submitted_by.username }}
+                                    </p>
+                                    <p class="mb-2">
+                                        <i class="fas fa-check-circle me-2 text-success"></i>
+                                        <strong>Employee Completion:</strong> {{ submission.employee_completed_at|date:"M d, Y \a\t g:i A" }}
+                                    </p>
+                                {% endif %}
+                                {% if submission.client_signed_at %}
+                                    <p class="mb-2">
+                                        <i class="fas fa-signature me-2 text-primary"></i>
+                                        <strong>Client Signed:</strong> {{ submission.client_signed_at|date:"M d, Y \a\t g:i A" }}
+                                    </p>
+                                {% endif %}
+                                {% if submission.is_completed and submission.client_signed_at %}
+                                    <p class="mb-2">
+                                        <i class="fas fa-flag-checkered me-2 text-success"></i>
+                                        <strong>Final Completion:</strong> {{ submission.client_signed_at|date:"M d, Y \a\t g:i A" }}
+                                    </p>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% if submission and submission.internal_notes %}
+                        <hr>
+                        <div>
+                            <h6 class="text-muted mb-2">Internal Notes</h6>
+                            <div class="field-value">{{ submission.internal_notes|linebreaks }}</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if not submission %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    This assignment has not been completed yet.
+                </div>
+            {% endif %}
+
+            <!-- Form Data Card -->
+            <div class="card assignment-info-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list text-primary me-2"></i>
+                        Form Data
+                    </h5>
+                    {% if tax_form.description %}
+                        <p class="text-muted mb-0 mt-2">{{ tax_form.description }}</p>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% regroup form_fields by section as sections %}
+                    {% for section in sections %}
+                        {% if section.grouper %}
+                            <div class="form-section">
+                                <h5 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-folder-open me-2"></i>
+                                    {{ section.grouper }}
+                                </h5>
+                                
+                                <!-- Special handling for Monthly Income Summary -->
+                                {% if section.grouper == "Monthly Income" %}
+                                    {% include 'tax/admin/partials/monthly_income_table_readonly.html' with fields=section.list %}
+                                
+                                <!-- Special handling for Dependent Care -->
+                                {% elif "Dependent" in section.grouper and "Standard" in section.grouper %}
+                                    {% include 'tax/admin/partials/dependent_care_table_readonly.html' with fields=section.list %}
+                                
+                                <!-- Regular field display -->
+                                {% else %}
+                                    {% for field in section.list %}
+                                        {% if field.field_type != 'section_header' %}
+                                            <div class="form-field">
+                                                <div class="field-label">
+                                                    {{ field.field_label }}
+                                                    {% if field.is_required %}<span class="text-danger">*</span>{% endif %}
+                                                </div>
+                                                <div class="field-value {% if not field.current_value %}empty-value{% endif %}">
+                                                    {% if field.field_type == 'signature' or field.field_type == 'electronic_signature' %}
+                                                        <div class="signature-field">
+                                                            {% if field.current_value %}
+                                                                <i class="fas fa-signature text-success me-2"></i>Signature captured
+                                                            {% else %}
+                                                                <i class="fas fa-pen text-muted me-2"></i>Signature pending
+                                                            {% endif %}
+                                                        </div>
+                                                    {% elif field.current_value %}
+                                                        {% if field.field_type == 'currency' %}
+                                                            <span class="currency-value">${{ field.current_value }}</span>
+                                                        {% elif field.field_type == 'textarea' %}
+                                                            {{ field.current_value|linebreaks }}
+                                                        {% else %}
+                                                            {{ field.current_value }}
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <em>No data provided</em>
+                                                    {% endif %}
+                                                </div>
+                                                {% if field.help_text %}
+                                                    <small class="text-muted">{{ field.help_text }}</small>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <!-- Fields without section -->
+                            {% for field in section.list %}
+                                {% if field.field_type != 'section_header' %}
+                                    <div class="form-field">
+                                        <div class="field-label">
+                                            {{ field.field_label }}
+                                            {% if field.is_required %}<span class="text-danger">*</span>{% endif %}
+                                        </div>
+                                        <div class="field-value {% if not field.current_value %}empty-value{% endif %}">
+                                            {% if field.field_type == 'signature' or field.field_type == 'electronic_signature' %}
+                                                <div class="signature-field">
+                                                    {% if field.current_value %}
+                                                        <i class="fas fa-signature text-success me-2"></i>Signature captured
+                                                    {% else %}
+                                                        <i class="fas fa-pen text-muted me-2"></i>Signature pending
+                                                    {% endif %}
+                                                </div>
+                                            {% elif field.current_value %}
+                                                {% if field.field_type == 'currency' %}
+                                                    <span class="currency-value">${{ field.current_value }}</span>
+                                                {% elif field.field_type == 'textarea' %}
+                                                    {{ field.current_value|linebreaks }}
+                                                {% else %}
+                                                    {{ field.current_value }}
+                                                {% endif %}
+                                            {% else %}
+                                                <em>No data provided</em>
+                                            {% endif %}
+                                        </div>
+                                        {% if field.help_text %}
+                                            <small class="text-muted">{{ field.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Any additional JavaScript for the view page can go here
+</script>
+{% endblock %}

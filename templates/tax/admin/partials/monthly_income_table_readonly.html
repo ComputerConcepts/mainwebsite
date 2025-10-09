@@ -1,0 +1,47 @@
+<!-- Monthly Income Summary Table (Read-only) -->
+<table class="table table-striped table-hover monthly-income-table">
+    <thead class="table-dark">
+        <tr>
+            <th>Month</th>
+            <th>Service</th>
+            <th class="text-end">Amount Made</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for field in fields %}
+            {% if '- service' in field.field_name %}
+                {% for field2 in fields %}
+                    {% if field2.field_name == field.field_name|slice:":-9"|add:"_amount" %}
+                        <tr>
+                            <td class="fw-medium">{{ field.field_name|slice:":-9"|title }}</td>
+                            <td>{{ field.current_value|default:"—" }}</td>
+                            <td class="currency-value text-end">
+                                {% if field2.current_value %}
+                                    ${{ field2.current_value }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+        
+        <!-- Total row -->
+        {% for field in fields %}
+            {% if 'total' in field.field_name|lower %}
+                <tr class="table-primary total-row">
+                    <td colspan="2" class="fw-bold">TOTAL</td>
+                    <td class="currency-value text-end fw-bold">
+                        {% if field.current_value %}
+                            ${{ field.current_value }}
+                        {% else %}
+                            $0.00
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endif %}
+        {% endfor %}
+    </tbody>
+</table>

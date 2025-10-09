@@ -1,0 +1,74 @@
+<!-- Dependent Care Table (Read-only) -->
+<table class="table table-striped table-hover dependent-care-table">
+    <thead class="table-dark">
+        <tr>
+            <th>#</th>
+            <th>Child Name</th>
+            <th>SSN</th>
+            <th>Daycare/Provider Name</th>
+            <th>FEIN</th>
+            <th class="text-end">Amount Paid</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for i in "1234"|make_list %}
+            {% with name_field="" ssn_field="" daycare_field="" fein_field="" amount_field="" %}
+                {% for field in fields %}
+                    {% if field.field_name == "dependent_"|add:i|add:"_name" %}
+                        {% with name_field=field.current_value %}{% endwith %}
+                    {% elif field.field_name == "dependent_"|add:i|add:"_ssn" %}
+                        {% with ssn_field=field.current_value %}{% endwith %}
+                    {% elif field.field_name == "dependent_"|add:i|add:"_daycare_name" %}
+                        {% with daycare_field=field.current_value %}{% endwith %}
+                    {% elif field.field_name == "dependent_"|add:i|add:"_fein" %}
+                        {% with fein_field=field.current_value %}{% endwith %}
+                    {% elif field.field_name == "dependent_"|add:i|add:"_amount" %}
+                        {% with amount_field=field.current_value %}{% endwith %}
+                    {% endif %}
+                {% endfor %}
+                
+                <!-- Only show row if at least name is filled -->
+                {% for field in fields %}
+                    {% if field.field_name == "dependent_"|add:i|add:"_name" and field.current_value %}
+                        <tr>
+                            <td class="fw-medium">{{ i }}</td>
+                            <td>{{ field.current_value|default:"—" }}</td>
+                            <td>
+                                {% for field2 in fields %}
+                                    {% if field2.field_name == "dependent_"|add:i|add:"_ssn" %}
+                                        {{ field2.current_value|default:"—" }}
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for field2 in fields %}
+                                    {% if field2.field_name == "dependent_"|add:i|add:"_daycare_name" %}
+                                        {{ field2.current_value|default:"—" }}
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% for field2 in fields %}
+                                    {% if field2.field_name == "dependent_"|add:i|add:"_fein" %}
+                                        {{ field2.current_value|default:"—" }}
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td class="currency-value text-end">
+                                {% for field2 in fields %}
+                                    {% if field2.field_name == "dependent_"|add:i|add:"_amount" %}
+                                        {% if field2.current_value %}
+                                            ${{ field2.current_value }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            {% endwith %}
+        {% endfor %}
+    </tbody>
+</table>

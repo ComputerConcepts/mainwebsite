@@ -212,6 +212,8 @@ urlpatterns = [
     path('employee/tax/clients/<uuid:client_id>/assign/', views_tax.assign_forms, name='assign_tax_forms'),
     path('employee/tax/clients/<uuid:client_id>/forms/', views_tax.client_forms, name='client_tax_forms'),
     path('employee/tax/forms/<uuid:assignment_id>/fill/', views_tax.employee_fill_form, name='employee_fill_form'),
+    path('employee/tax/assignments/<uuid:assignment_id>/view/', views_tax.view_tax_assignment, name='view_tax_assignment'),
+    path('employee/tax/assignments/<uuid:assignment_id>/pdf/', views_tax.export_tax_assignment_pdf, name='export_tax_assignment_pdf'),
     
     # Tax Client Portal URLs (Public Access)
     path('tax/', views_tax.tax_client_login, name='tax_client_login'),
