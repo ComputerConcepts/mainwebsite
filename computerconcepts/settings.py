@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',  # Added for proper domain handling in emails
     'crispy_forms',
 ]
 
@@ -152,3 +153,15 @@ LOGIN_REDIRECT_URL = '/employee/dashboard/'
 # AI Analysis Configuration
 AI_ANALYSIS_ENABLED = True
 AI_ANALYSIS_AUTO_PROCESS = True  # Automatically process new applications
+
+# Django Sites Framework
+SITE_ID = 1
+
+# Site Domain Configuration for Email Links
+# For development
+SITE_DOMAIN = os.environ.get('SITE_DOMAIN', 'localhost:8000')
+USE_HTTPS = os.environ.get('USE_HTTPS', 'False').lower() == 'true'
+
+# For production, set these environment variables:
+# SITE_DOMAIN = 'your-domain.com'
+# USE_HTTPS = 'True'

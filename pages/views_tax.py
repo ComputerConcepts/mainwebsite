@@ -13,6 +13,7 @@ from django.db import transaction
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
+import os
 from django.conf import settings
 import json
 import base64
@@ -47,10 +48,19 @@ def send_form_completion_email(assignment, completed_by):
     try:
         # Build the login URL
         from django.urls import reverse
+        from django.contrib.sites.models import Site
         
-        # Use localhost for development (you can change this to your actual domain in production)
-        domain = getattr(settings, 'SITE_DOMAIN', 'localhost:8000')
-        protocol = 'https' if getattr(settings, 'USE_HTTPS', False) else 'http'
+        # Try to get domain from Django Sites framework first
+        try:
+            current_site = Site.objects.get_current()
+            domain = current_site.domain
+            # Use HTTPS for production domains (not localhost)
+            protocol = 'https' if not domain.startswith('localhost') and not domain.startswith('127.0.0.1') else 'http'
+        except:
+            # Fallback to settings or environment variables
+            domain = getattr(settings, 'SITE_DOMAIN', None) or os.environ.get('SITE_DOMAIN', 'localhost:8000')
+            protocol = 'https' if getattr(settings, 'USE_HTTPS', False) or os.environ.get('USE_HTTPS', '').lower() == 'true' else 'http'
+        
         login_url = f"{protocol}://{domain}{reverse('tax_client_login')}"
         
         # Prepare email context
