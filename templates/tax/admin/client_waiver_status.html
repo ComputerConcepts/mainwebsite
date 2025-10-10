@@ -179,9 +179,9 @@
         </div>
         
         <p class="mb-4">
-            <strong>Client Credentials:</strong><br>
+            <strong>Client Access Information:</strong><br>
             Email: {{ client.email }}<br>
-            PIN: {{ client.current_pin }}
+            <span class="text-muted"><i class="fas fa-shield-alt me-1"></i>PIN: Securely delivered via email to client</span>
         </p>
         
         <a href="{{ client_waiver_url }}" target="_blank" class="btn-client-link">
@@ -189,7 +189,7 @@
         </a>
         
         <div class="mt-3">
-            <small class="opacity-75">Send this link to your client or have them log in at your main website</small>
+            <small class="opacity-75">Send this link to your client - they will use their email and the PIN that was sent to them</small>
         </div>
     </div>
     {% endif %}
