@@ -662,7 +662,68 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeFileUploadDragDrop();
     loadStorageInfo();
     initializeMobileSidebar();
+    initializeUploadForm();
+    initializeModalDebugging();
 });
+
+// Modal debugging function
+function initializeModalDebugging() {
+    console.log('Initializing modal debugging...');
+    
+    // Check if Bootstrap is loaded
+    if (typeof bootstrap !== 'undefined') {
+        console.log('✓ Bootstrap is loaded');
+    } else {
+        console.error('✗ Bootstrap is not loaded!');
+        return;
+    }
+    
+    // Check for upload modal
+    const uploadModal = document.getElementById('uploadModal');
+    if (uploadModal) {
+        console.log('✓ Upload modal element found');
+        
+        // Add event listeners for debugging
+        uploadModal.addEventListener('show.bs.modal', function () {
+            console.log('Upload modal is about to show');
+        });
+        
+        uploadModal.addEventListener('shown.bs.modal', function () {
+            console.log('Upload modal is now visible');
+        });
+        
+        uploadModal.addEventListener('hide.bs.modal', function () {
+            console.log('Upload modal is about to hide');
+        });
+        
+        uploadModal.addEventListener('hidden.bs.modal', function () {
+            console.log('Upload modal is now hidden');
+        });
+    } else {
+        console.error('✗ Upload modal element not found!');
+    }
+    
+    // Check modal triggers
+    const modalTriggers = document.querySelectorAll('[data-bs-toggle="modal"]');
+    console.log(`Found ${modalTriggers.length} modal trigger(s)`);
+    
+    modalTriggers.forEach((trigger, index) => {
+        const target = trigger.getAttribute('data-bs-target');
+        console.log(`Modal trigger ${index + 1}: targets ${target}`);
+        
+        trigger.addEventListener('click', function(e) {
+            console.log(`Modal trigger clicked: ${target}`);
+            
+            // Check if target exists
+            const targetElement = document.querySelector(target);
+            if (!targetElement) {
+                console.error(`Target element ${target} not found!`);
+                e.preventDefault();
+                alert(`Modal target ${target} not found! Please refresh the page.`);
+            }
+        });
+    });
+}
 
 // Mobile sidebar functionality
 function initializeMobileSidebar() {
@@ -708,12 +769,36 @@ function initializeMobileSidebar() {
 }
 
 // Upload form handling with real-time quota validation
-document.getElementById('uploadForm').addEventListener('submit', function(e) {
+function initializeUploadForm() {
+    const uploadForm = document.getElementById('uploadForm');
+    if (!uploadForm) {
+        console.error('Upload form not found!');
+        return;
+    }
+    
+    console.log('Initializing upload form');
+    uploadForm.addEventListener('submit', function(e) {
     e.preventDefault();
+    console.log('Upload form submitted');
     
     const formData = new FormData(this);
     const submitButton = this.querySelector('button[type="submit"]');
     const originalButtonText = submitButton.textContent;
+    
+    // Debug form data
+    console.log('Form data entries:');
+    for (let pair of formData.entries()) {
+        console.log(pair[0] + ': ' + (pair[1] instanceof File ? `File: ${pair[1].name}` : pair[1]));
+    }
+    
+    // Check CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        console.error('CSRF token not found!');
+        alert('Security token missing. Please refresh the page and try again.');
+        return;
+    }
+    console.log('CSRF token found:', csrfToken.value);
     
     // Show loading state
     submitButton.disabled = true;
@@ -723,11 +808,18 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
         method: 'POST',
         body: formData,
         headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            'X-CSRFToken': csrfToken.value
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Upload response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log('Upload response data:', data);
         submitButton.disabled = false;
         submitButton.textContent = originalButtonText;
         
@@ -739,12 +831,16 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
                     `(${data.storage_info.percentage.toFixed(1)}% used)\n` +
                     `Available: ${data.storage_info.available}`;
                 alert(message);
+            } else {
+                alert('Files uploaded successfully!');
             }
             
             // Update storage display if it exists
             updateStorageDisplay(data.storage_info);
             
-            // Reload to show new files
+            // Close modal and reload to show new files
+            const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+            if (modal) modal.hide();
             location.reload();
         } else {
             // Handle storage quota errors with detailed information
@@ -760,12 +856,19 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
         }
     })
     .catch(error => {
+        console.error('Upload error:', error);
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+        alert('Upload failed: ' + error.message + '\n\nPlease check your connection and try again.');
+    });
+    })
+    .catch(error => {
         submitButton.disabled = false;
         submitButton.textContent = originalButtonText;
         console.error('Error:', error);
         alert('An error occurred during upload. Please try again.');
     });
-});
+}
 
 // Helper function to update storage display
 function updateStorageDisplay(storageInfo) {
@@ -830,34 +933,69 @@ function viewFile(fileId) {
 
 // Drag and drop for file uploads
 function initializeFileUploadDragDrop() {
+    console.log('Initializing drag and drop functionality...');
     const uploadZone = document.getElementById('uploadZone');
     
     if (uploadZone) {
+        console.log('Upload zone found, adding event listeners...');
+        
         uploadZone.addEventListener('dragover', function(e) {
             e.preventDefault();
+            console.log('Dragover event triggered');
             uploadZone.classList.add('dragover');
         });
 
         uploadZone.addEventListener('dragleave', function(e) {
             e.preventDefault();
+            console.log('Dragleave event triggered');
             uploadZone.classList.remove('dragover');
         });
 
         uploadZone.addEventListener('drop', function(e) {
             e.preventDefault();
+            console.log('Drop event triggered, files:', e.dataTransfer.files.length);
             uploadZone.classList.remove('dragover');
             
             const files = e.dataTransfer.files;
             if (files.length > 0) {
+                console.log('Files dropped, opening modal...');
                 // Auto-fill upload modal with dropped files
                 const fileInput = document.querySelector('#uploadModal input[type="file"]');
-                fileInput.files = files;
-                
-                // Show upload modal
-                const modal = new bootstrap.Modal(document.getElementById('uploadModal'));
-                modal.show();
+                if (fileInput) {
+                    fileInput.files = files;
+                    console.log('Files assigned to input, showing modal...');
+                    
+                    // Show upload modal
+                    try {
+                        const modal = new bootstrap.Modal(document.getElementById('uploadModal'));
+                        modal.show();
+                        console.log('Modal shown successfully');
+                    } catch (error) {
+                        console.error('Error showing modal:', error);
+                        alert('Error opening upload modal. Please try using the browse files link instead.');
+                    }
+                } else {
+                    console.error('File input not found');
+                    alert('Upload form not found. Please refresh the page and try again.');
+                }
             }
         });
+        
+        // Also add a click handler to the upload zone for manual browsing
+        uploadZone.addEventListener('click', function(e) {
+            if (!e.target.closest('a')) { // Don't interfere with the browse files link
+                console.log('Upload zone clicked, opening modal...');
+                try {
+                    const modal = new bootstrap.Modal(document.getElementById('uploadModal'));
+                    modal.show();
+                } catch (error) {
+                    console.error('Error showing modal on click:', error);
+                }
+            }
+        });
+        
+    } else {
+        console.error('Upload zone element not found! ID: uploadZone');
     }
 }
 

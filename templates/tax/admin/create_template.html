@@ -104,47 +104,46 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label for="id_name" class="form-label">Template Name *</label>
-                            {{ form.name }}
-                            {% if form.name.errors %}
-                                <div class="text-danger small">{{ form.name.errors.0 }}</div>
-                            {% endif %}
+                            <label for="name" class="form-label">Template Name *</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
                         </div>
 
                         <div class="mb-3">
-                            <label for="id_form_type" class="form-label">Form Type *</label>
-                            {{ form.form_type }}
-                            {% if form.form_type.errors %}
-                                <div class="text-danger small">{{ form.form_type.errors.0 }}</div>
-                            {% endif %}
+                            <label for="form_type" class="form-label">Form Type *</label>
+                            <select class="form-select" id="form_type" name="form_type" required>
+                                <option value="">Choose form type...</option>
+                                {% for value, display in form_type_choices %}
+                                    <option value="{{ value }}">{{ display }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
 
                         <div class="mb-3">
-                            <label for="id_description" class="form-label">Description</label>
-                            {{ form.description }}
-                            {% if form.description.errors %}
-                                <div class="text-danger small">{{ form.description.errors.0 }}</div>
-                            {% endif %}
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                         </div>
 
                         <div class="mb-3">
-                            <label for="id_instructions" class="form-label">Instructions for Clients</label>
-                            {{ form.instructions }}
-                            {% if form.instructions.errors %}
-                                <div class="text-danger small">{{ form.instructions.errors.0 }}</div>
-                            {% endif %}
+                            <label for="instructions" class="form-label">Instructions for Clients</label>
+                            <textarea class="form-control" id="instructions" name="instructions" rows="4" placeholder="Enter instructions for clients on how to fill out this form"></textarea>
                         </div>
 
                         <div class="mb-3">
                             <div class="form-check">
-                                {{ form.requires_signature }}
-                                <label for="id_requires_signature" class="form-check-label">
+                                <input type="checkbox" class="form-check-input" id="requires_signature" name="requires_signature" checked>
+                                <label for="requires_signature" class="form-check-label">
                                     Requires Digital Signature
                                 </label>
                             </div>
-                            {% if form.requires_signature.errors %}
-                                <div class="text-danger small">{{ form.requires_signature.errors.0 }}</div>
-                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="allow_multiple_submissions" name="allow_multiple_submissions">
+                                <label for="allow_multiple_submissions" class="form-check-label">
+                                    Allow Multiple Submissions
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
