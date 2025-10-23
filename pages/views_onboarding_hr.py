@@ -15,6 +15,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.models import User
 import json
 import uuid
+import io
+import os
 from datetime import timedelta
 
 from .models import (
@@ -443,3 +445,184 @@ def submission_detail(request, submission_id):
     }
     
     return render(request, 'hr/onboarding/submission_detail.html', context)
+
+
+@login_required
+def download_combined_pdf(request, submission_id):
+    """Download a combined PDF with all submission files"""
+    try:
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from django.core.files.storage import default_storage
+    except ImportError as e:
+        messages.error(request, f"PDF generation library not available: {str(e)}")
+        return redirect('hr_submission_detail', submission_id=submission_id)
+    
+    submission = get_object_or_404(OnboardingSubmission, id=submission_id)
+    
+    # Check permissions
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin']:
+            messages.error(request, "Access denied. HR permissions required.")
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, "Employee profile not found.")
+        return redirect('employee_dashboard')
+    
+    try:
+        # Create response
+        response = HttpResponse(content_type='application/pdf')
+        applicant_name = submission.get_applicant_name().replace(' ', '_')
+        filename = f"Onboarding_Application_{applicant_name}_{submission.submitted_at.strftime('%Y%m%d')}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Create PDF with reportlab
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=30,
+            alignment=TA_CENTER,
+            textColor=colors.darkblue
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=12,
+            textColor=colors.darkblue
+        )
+        
+        field_label_style = ParagraphStyle(
+            'FieldLabel',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceBefore=8,
+            spaceAfter=4,
+            textColor=colors.black,
+            fontName='Helvetica-Bold'
+        )
+        
+        field_value_style = ParagraphStyle(
+            'FieldValue',
+            parent=styles['Normal'],
+            fontSize=10,
+            spaceAfter=12,
+            leftIndent=20,
+            textColor=colors.darkgray
+        )
+        
+        # Build PDF content
+        story = []
+        
+        # Title page
+        story.append(Paragraph("Computer Concepts", title_style))
+        story.append(Paragraph("Employee Onboarding Application", heading_style))
+        story.append(Spacer(1, 20))
+        
+        # Applicant info
+        story.append(Paragraph("Applicant Information", heading_style))
+        story.append(Paragraph(f"Name: {submission.get_applicant_name()}", styles['Normal']))
+        story.append(Paragraph(f"Email: {submission.invitation.prospective_employee.email}", styles['Normal']))
+        story.append(Paragraph(f"Position: {submission.invitation.prospective_employee.position}", styles['Normal']))
+        story.append(Paragraph(f"Submission Date: {submission.submitted_at.strftime('%B %d, %Y')}", styles['Normal']))
+        story.append(Paragraph(f"Status: {submission.get_review_status_display()}", styles['Normal']))
+        story.append(Spacer(1, 20))
+        
+        # Form fields
+        story.append(Paragraph("Application Details", heading_style))
+        form_fields = submission.invitation.onboarding_form.fields.all().order_by('order')
+        
+        for field in form_fields:
+            field_name = field.field_name
+            value = submission.form_data.get(field_name, '')
+            
+            story.append(Paragraph(field.field_label, field_label_style))
+            
+            if field.field_type == 'file':
+                if value and isinstance(value, dict) and 'original_name' in value:
+                    story.append(Paragraph(f"File: {value.get('original_name', 'Unknown')}", field_value_style))
+                else:
+                    story.append(Paragraph("No file uploaded", field_value_style))
+                    
+            elif field.field_type == 'signature':
+                if value and isinstance(value, dict) and 'signature_data' in value:
+                    story.append(Paragraph("Digital signature provided", field_value_style))
+                    
+                    # Try to include signature image
+                    try:
+                        signature_data = value['signature_data']
+                        if signature_data and signature_data.startswith('data:image/'):
+                            import base64
+                            format_part, imgstr = signature_data.split(';base64,')
+                            img_data = base64.b64decode(imgstr)
+                            img_buffer = io.BytesIO(img_data)
+                            
+                            # Add signature to PDF
+                            img = Image(img_buffer, width=200, height=100)
+                            story.append(img)
+                            story.append(Spacer(1, 10))
+                    except Exception as e:
+                        story.append(Paragraph(f"[Signature image could not be processed]", field_value_style))
+                else:
+                    story.append(Paragraph("No signature provided", field_value_style))
+                    
+            elif field.field_type == 'checkbox':
+                if value:
+                    if isinstance(value, list):
+                        story.append(Paragraph(", ".join(str(v) for v in value), field_value_style))
+                    else:
+                        story.append(Paragraph(str(value), field_value_style))
+                else:
+                    story.append(Paragraph("None selected", field_value_style))
+            else:
+                display_value = str(value) if value else "Not provided"
+                # Clean up the display value to avoid reportlab issues
+                display_value = display_value.replace('<', '&lt;').replace('>', '&gt;')
+                story.append(Paragraph(display_value, field_value_style))
+        
+        # Add review information if available
+        if submission.review_notes or submission.hr_notes:
+            story.append(PageBreak())
+            story.append(Paragraph("Review Information", heading_style))
+            
+            if submission.review_notes:
+                story.append(Paragraph("Review Notes:", field_label_style))
+                clean_notes = submission.review_notes.replace('<', '&lt;').replace('>', '&gt;')
+                story.append(Paragraph(clean_notes, field_value_style))
+                
+            if submission.hr_notes:
+                story.append(Paragraph("HR Notes:", field_label_style))
+                clean_hr_notes = submission.hr_notes.replace('<', '&lt;').replace('>', '&gt;')
+                story.append(Paragraph(clean_hr_notes, field_value_style))
+                
+            if submission.reviewed_by:
+                story.append(Paragraph(f"Reviewed by: {submission.reviewed_by.get_full_name()}", styles['Normal']))
+                
+            if submission.reviewed_at:
+                story.append(Paragraph(f"Review Date: {submission.reviewed_at.strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
+        
+        # Build PDF
+        doc.build(story)
+        
+        # Get PDF content
+        pdf_content = buffer.getvalue()
+        buffer.close()
+        
+        # Write to response
+        response.write(pdf_content)
+        return response
+        
+    except Exception as e:
+        messages.error(request, f"Error generating PDF: {str(e)}")
+        return redirect('hr_submission_detail', submission_id=submission_id)
