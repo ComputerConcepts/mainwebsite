@@ -249,7 +249,6 @@ def onboarding_form(request, invitation_id):
                         
                         # Save signature as file for better management
                         import base64
-                        from django.core.files.base import ContentFile
                         
                         try:
                             # Extract base64 data
