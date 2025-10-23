@@ -466,12 +466,13 @@ def download_combined_pdf(request, submission_id):
     # Check permissions
     try:
         employee = Employee.objects.get(user=request.user)
-        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin']:
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin'] and not request.user.is_superuser:
             messages.error(request, "Access denied. HR permissions required.")
-            return redirect('employee_dashboard')
+            return redirect('hr_submission_detail', submission_id=submission_id)
     except Employee.DoesNotExist:
-        messages.error(request, "Employee profile not found.")
-        return redirect('employee_dashboard')
+        if not request.user.is_superuser:
+            messages.error(request, "Employee profile not found.")
+            return redirect('hr_submission_detail', submission_id=submission_id)
     
     try:
         # Create response
@@ -534,7 +535,11 @@ def download_combined_pdf(request, submission_id):
         story.append(Paragraph("Applicant Information", heading_style))
         story.append(Paragraph(f"Name: {submission.get_applicant_name()}", styles['Normal']))
         story.append(Paragraph(f"Email: {submission.invitation.prospective_employee.email}", styles['Normal']))
-        story.append(Paragraph(f"Position: {submission.invitation.prospective_employee.position}", styles['Normal']))
+        
+        # Position - check if available in form data or use default
+        position = submission.form_data.get('position') or submission.form_data.get('job_title') or submission.form_data.get('role') or 'Not specified'
+        story.append(Paragraph(f"Position: {position}", styles['Normal']))
+        
         story.append(Paragraph(f"Submission Date: {submission.submitted_at.strftime('%B %d, %Y')}", styles['Normal']))
         story.append(Paragraph(f"Status: {submission.get_review_status_display()}", styles['Normal']))
         story.append(Spacer(1, 20))
