@@ -186,8 +186,13 @@ urlpatterns = [
     path('employee/hr/onboarding/invite/', views_onboarding_hr.send_onboarding_invitation, name='send_onboarding_invitation'),
     path('employee/hr/onboarding/submissions/', views_onboarding_hr.onboarding_submissions, name='onboarding_submissions'),
     path('employee/hr/onboarding/submissions/<uuid:submission_id>/', views_onboarding_hr.submission_detail, name='hr_submission_detail'),
+    path(
+        'employee/hr/onboarding/submissions/<uuid:submission_id>/download/<slug:field_name>/',
+        views_onboarding_hr.download_submission_file,
+        name='download_submission_file',
+    ),
     path('employee/hr/onboarding/submissions/<uuid:submission_id>/download/', views_onboarding_hr.download_combined_pdf, name='download_combined_pdf'),
-    
+
     # Prospective Employee Onboarding Portal URLs
     path('onboarding/', views_onboarding_portal.onboarding_info, name='onboarding_info'),
     path('onboarding/login/', views_onboarding_portal.onboarding_login, name='onboarding_login'),

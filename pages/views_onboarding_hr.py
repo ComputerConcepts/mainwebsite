@@ -6,7 +6,7 @@ Handles form creation, invitation management, and submission review
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, FileResponse
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
 from django.utils import timezone
@@ -18,6 +18,7 @@ import uuid
 import io
 import os
 from datetime import timedelta
+from django.core.files.storage import default_storage
 
 from .models import (
     OnboardingForm, OnboardingFormField, ProspectiveEmployee, 
@@ -448,6 +449,58 @@ def submission_detail(request, submission_id):
 
 
 @login_required
+def download_submission_file(request, submission_id, field_name):
+    """Download an individual uploaded file from a submission"""
+    submission = get_object_or_404(OnboardingSubmission, id=submission_id)
+
+    # Check permissions
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin'] and not request.user.is_superuser:
+            messages.error(request, "Access denied. HR permissions required.")
+            return redirect('hr_submission_detail', submission_id=submission_id)
+    except Employee.DoesNotExist:
+        if not request.user.is_superuser:
+            messages.error(request, "Employee profile not found.")
+            return redirect('hr_submission_detail', submission_id=submission_id)
+
+    # Locate file metadata
+    file_info = None
+    value = submission.form_data.get(field_name)
+
+    if isinstance(value, dict) and 'file_path' in value:
+        file_info = {
+            'file_path': value.get('file_path'),
+            'original_name': value.get('original_name'),
+        }
+
+    if not file_info:
+        for uploaded in submission.uploaded_files:
+            if uploaded.get('field_name') == field_name:
+                file_info = {
+                    'file_path': uploaded.get('file_path'),
+                    'original_name': uploaded.get('original_name'),
+                }
+                break
+
+    if not file_info or not file_info.get('file_path'):
+        messages.error(request, "Requested file could not be found for this submission.")
+        return redirect('hr_submission_detail', submission_id=submission_id)
+
+    file_path = file_info['file_path']
+
+    if not default_storage.exists(file_path):
+        messages.error(request, "The file is no longer available in storage.")
+        return redirect('hr_submission_detail', submission_id=submission_id)
+
+    stored_file = default_storage.open(file_path, 'rb')
+    filename = file_info.get('original_name') or os.path.basename(file_path)
+
+    response = FileResponse(stored_file, as_attachment=True, filename=filename)
+    return response
+
+
+@login_required
 def download_combined_pdf(request, submission_id):
     """Download a combined PDF with all submission files"""
     try:
@@ -456,7 +509,6 @@ def download_combined_pdf(request, submission_id):
         from reportlab.lib.enums import TA_CENTER
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
-        from django.core.files.storage import default_storage
     except ImportError as e:
         messages.error(request, f"PDF generation library not available: {str(e)}")
         return redirect('hr_submission_detail', submission_id=submission_id)
