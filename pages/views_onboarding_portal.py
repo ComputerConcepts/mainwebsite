@@ -5,7 +5,7 @@ Handles PIN authentication and form submission
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from django.http import JsonResponse, Http404
+from django.http import JsonResponse, Http404, FileResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
@@ -16,13 +16,146 @@ import json
 import os
 import uuid
 import base64
+import io
+import logging
 from datetime import timedelta
 
 from .models import (
     ProspectiveEmployee, OnboardingInvitation, OnboardingSubmission,
-    OnboardingForm, OnboardingFormField
+    OnboardingForm, OnboardingFormField, OnboardingOfferLetter
 )
 from .onboarding_emails import OnboardingEmailService
+
+logger = logging.getLogger(__name__)
+
+
+def _generate_offer_letter_pdf(offer_letter):
+    try:
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.lib import colors
+    except ImportError as exc:
+        logger.error("ReportLab not available for offer letter PDF generation: %s", exc)
+        return None, None
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=72,
+        leftMargin=72,
+        topMargin=72,
+        bottomMargin=54,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'OfferTitle',
+        parent=styles['Heading1'],
+        alignment=TA_CENTER,
+        fontSize=18,
+        textColor=colors.darkblue,
+        spaceAfter=18,
+    )
+    heading_style = ParagraphStyle(
+        'OfferHeading',
+        parent=styles['Heading3'],
+        alignment=TA_LEFT,
+        fontSize=13,
+        textColor=colors.HexColor('#2c3e50'),
+        spaceBefore=12,
+        spaceAfter=6,
+    )
+    body_style = styles['Normal']
+    body_style.spaceAfter = 8
+
+    story = []
+    story.append(Paragraph("Employment Offer Letter", title_style))
+    story.append(Paragraph(
+        f"{offer_letter.submission.get_applicant_name()}",
+        ParagraphStyle('ApplicantName', parent=styles['Heading2'], alignment=TA_CENTER, textColor=colors.black)
+    ))
+    story.append(Spacer(1, 18))
+
+    prospect = offer_letter.submission.invitation.prospective_employee
+    story.append(Paragraph("<b>Candidate Details</b>", heading_style))
+    story.append(Paragraph(f"Name: {prospect.first_name} {prospect.last_name}".strip(), body_style))
+    story.append(Paragraph(f"Email: {prospect.email}", body_style))
+    if prospect.phone:
+        story.append(Paragraph(f"Phone: {prospect.phone}", body_style))
+
+    story.append(Paragraph("<b>Offer Details</b>", heading_style))
+    story.append(Paragraph(f"Position Title: {offer_letter.position_title}", body_style))
+    if offer_letter.employment_type:
+        story.append(Paragraph(f"Employment Type: {offer_letter.employment_type}", body_style))
+    if offer_letter.salary_amount:
+        story.append(Paragraph(
+            f"Base Compensation: {offer_letter.salary_currency} {offer_letter.salary_amount} {offer_letter.get_pay_frequency_display()}",
+            body_style
+        ))
+    if offer_letter.compensation_notes:
+        story.append(Paragraph(f"Compensation Notes: {offer_letter.compensation_notes}", body_style))
+    if offer_letter.start_date:
+        story.append(Paragraph(f"Target Start Date: {offer_letter.start_date.strftime('%B %d, %Y')}", body_style))
+    if offer_letter.offer_expires_at:
+        story.append(Paragraph(f"Offer Expires: {offer_letter.offer_expires_at.strftime('%B %d, %Y')}", body_style))
+
+    if offer_letter.additional_terms:
+        story.append(Paragraph("<b>Additional Terms</b>", heading_style))
+        for paragraph in offer_letter.additional_terms.splitlines():
+            if paragraph.strip():
+                story.append(Paragraph(paragraph.strip(), body_style))
+
+    story.append(Spacer(1, 18))
+    story.append(Paragraph("<b>Signature Summary</b>", heading_style))
+
+    def add_signature_block(label, name, signed_at, signature_data):
+        story.append(Paragraph(f"{label}: {name or 'Pending'}", body_style))
+        if signed_at:
+            story.append(Paragraph(f"Signed On: {signed_at.strftime('%B %d, %Y %I:%M %p %Z')}", ParagraphStyle(
+                'SignatureDate',
+                parent=body_style,
+                textColor=colors.HexColor('#555555'),
+                fontSize=10,
+                spaceAfter=4,
+            )))
+        if signature_data:
+            try:
+                header, img_str = signature_data.split(';base64,')
+                img_bytes = base64.b64decode(img_str)
+                img_buffer = io.BytesIO(img_bytes)
+                image = Image(img_buffer, width=180, height=70)
+                image.hAlign = 'LEFT'
+                story.append(image)
+            except Exception as exc:
+                logger.warning("Failed to render signature image: %s", exc)
+        story.append(Spacer(1, 12))
+
+    if offer_letter.is_employer_signed:
+        add_signature_block("Employer", offer_letter.employer_signature_name, offer_letter.employer_signed_at, offer_letter.employer_signature_data)
+    else:
+        add_signature_block("Employer", "Pending Signature", None, None)
+
+    if offer_letter.is_employee_signed:
+        add_signature_block("Candidate", offer_letter.employee_signature_name, offer_letter.employee_signed_at, offer_letter.employee_signature_data)
+    else:
+        add_signature_block("Candidate", "Pending Signature", None, None)
+
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    try:
+        if offer_letter.offer_pdf_path and default_storage.exists(offer_letter.offer_pdf_path):
+            default_storage.delete(offer_letter.offer_pdf_path)
+    except Exception as exc:
+        logger.warning("Unable to remove previous offer letter PDF: %s", exc)
+
+    filename = f"offer_letters/offer_{offer_letter.id}.pdf"
+    saved_path = default_storage.save(filename, ContentFile(pdf_bytes))
+    return pdf_bytes, saved_path
 
 
 def onboarding_login(request):
@@ -119,9 +252,15 @@ def onboarding_dashboard(request):
             submission = OnboardingSubmission.objects.get(invitation=invitation)
             # Only consider submissions as completed if they're approved
             if submission.review_status == 'approved':
+                try:
+                    offer_letter = submission.offer_letter
+                except OnboardingOfferLetter.DoesNotExist:
+                    offer_letter = None
+                
                 completed_invitations.append({
                     'invitation': invitation,
-                    'submission': submission
+                    'submission': submission,
+                    'offer_letter': offer_letter
                 })
             else:
                 # Submissions that are pending, under review, rejected, or need revision
@@ -384,6 +523,122 @@ def onboarding_form(request, invitation_id):
     }
     
     return render(request, 'onboarding/form.html', context)
+
+
+@require_http_methods(["GET", "POST"])
+def view_offer_letter(request, offer_id):
+    """Allow prospective employees to review and sign their offer letter"""
+    prospect_id = request.session.get('onboarding_prospect_id')
+    if not prospect_id:
+        messages.error(request, "Please log in to view your offer letter.")
+        return redirect('onboarding_login')
+
+    try:
+        prospective_employee = ProspectiveEmployee.objects.get(id=prospect_id, is_active=True)
+    except ProspectiveEmployee.DoesNotExist:
+        messages.error(request, "Session expired. Please log in again.")
+        return redirect('onboarding_login')
+
+    offer_letter = get_object_or_404(
+        OnboardingOfferLetter.objects.select_related(
+            'submission__invitation__onboarding_form',
+            'submission__invitation__prospective_employee'
+        ),
+        id=offer_id,
+        submission__invitation__prospective_employee=prospective_employee
+    )
+
+    if not offer_letter.is_employer_signed:
+        messages.info(request, "This offer letter is not yet ready for your signature.")
+        return redirect('onboarding_dashboard')
+
+    if request.method == 'POST':
+        if offer_letter.status != 'pending_employee':
+            messages.error(request, "This offer letter is no longer awaiting your signature.")
+            return redirect('onboarding_dashboard')
+
+        signature_name = request.POST.get('signature_name', '').strip()
+        signature_payload = request.POST.get('signature_data', '').strip()
+
+        if not signature_name:
+            messages.error(request, "Please type your full name to sign the offer letter.")
+            return redirect('onboarding_offer_letter', offer_id=offer_id)
+        if not signature_payload or not signature_payload.startswith('data:image/'):
+            messages.error(request, "Please provide your drawn signature to complete the offer letter.")
+            return redirect('onboarding_offer_letter', offer_id=offer_id)
+
+        offer_letter.employee_signature_name = signature_name
+        offer_letter.employee_signed_at = timezone.now()
+        offer_letter.employee_signature_data = signature_payload
+        offer_letter.status = 'signed'
+        pdf_bytes, saved_path = _generate_offer_letter_pdf(offer_letter)
+
+        update_fields = [
+            'employee_signature_name',
+            'employee_signed_at',
+            'employee_signature_data',
+            'status',
+            'updated_at'
+        ]
+        if saved_path:
+            offer_letter.offer_pdf_path = saved_path
+            update_fields.append('offer_pdf_path')
+
+        offer_letter.save(update_fields=update_fields)
+
+        email_sent = OnboardingEmailService.send_offer_signed_email(offer_letter, pdf_bytes, request)
+        if email_sent:
+            messages.success(request, "Thank you! Your offer letter has been signed successfully. A copy has been emailed to you.")
+        else:
+            messages.warning(request, "Your offer letter has been signed, but we were unable to email the PDF copy. Please download it from the portal.")
+        return redirect('onboarding_dashboard')
+
+    context = {
+        'prospective_employee': prospective_employee,
+        'offer_letter': offer_letter,
+        'submission': offer_letter.submission,
+    }
+    return render(request, 'onboarding/offer_letter.html', context)
+
+
+@require_http_methods(["GET"])
+def download_offer_letter_pdf(request, offer_id):
+    """Allow prospective employees to download their signed offer letter"""
+    prospect_id = request.session.get('onboarding_prospect_id')
+    if not prospect_id:
+        messages.error(request, "Please log in to download your offer letter.")
+        return redirect('onboarding_login')
+
+    try:
+        prospective_employee = ProspectiveEmployee.objects.get(id=prospect_id, is_active=True)
+    except ProspectiveEmployee.DoesNotExist:
+        messages.error(request, "Session expired. Please log in again.")
+        return redirect('onboarding_login')
+
+    offer_letter = get_object_or_404(
+        OnboardingOfferLetter,
+        id=offer_id,
+        submission__invitation__prospective_employee=prospective_employee
+    )
+
+    if not offer_letter.offer_pdf_path:
+        messages.error(request, "A signed PDF is not yet available for this offer letter.")
+        return redirect('onboarding_offer_letter', offer_id=offer_id)
+
+    try:
+        if not default_storage.exists(offer_letter.offer_pdf_path):
+            messages.error(request, "The offer letter PDF could not be found. Please contact HR.")
+            return redirect('onboarding_offer_letter', offer_id=offer_id)
+        pdf_file = default_storage.open(offer_letter.offer_pdf_path, 'rb')
+    except Exception as exc:
+        logger.error("Failed to open offer letter PDF: %s", exc)
+        messages.error(request, "Unable to open the offer letter PDF. Please contact HR.")
+        return redirect('onboarding_offer_letter', offer_id=offer_id)
+
+    filename = f"Offer_Letter_{offer_letter.position_title.replace(' ', '_')}.pdf"
+    response = FileResponse(pdf_file, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 def onboarding_status(request, submission_id):

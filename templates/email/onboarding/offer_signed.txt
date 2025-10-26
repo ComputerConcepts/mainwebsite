@@ -1,0 +1,16 @@
+Congratulations!
+
+The employment offer for {{ offer_letter.position_title }} has been signed by both the employer and the candidate.
+
+Candidate: {{ prospective_employee.first_name }} {{ prospective_employee.last_name }}
+Position: {{ offer_letter.position_title }}
+{% if offer_letter.start_date %}Start Date: {{ offer_letter.start_date|date:"F j, Y" }}
+{% endif %}
+
+A PDF copy of the fully executed agreement is attached for your records. You can also download the document at any time from the onboarding portal:
+{{ offer_pdf_url }}
+
+If you have any questions, reply to this email or contact the Computer Concepts HR team.
+
+Computer Concepts HR Team
+hr@onecomputerconcepts.com

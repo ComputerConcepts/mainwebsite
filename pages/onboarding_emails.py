@@ -199,6 +199,133 @@ class OnboardingEmailService:
             return False
     
     @staticmethod
+    def send_offer_ready_email(offer_letter, request=None):
+        """
+        Notify the prospective employee that their offer letter is ready to sign.
+        
+        Args:
+            offer_letter: OnboardingOfferLetter instance
+            request: Optional HttpRequest for building absolute URLs
+        
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            submission = offer_letter.submission
+            invitation = submission.invitation
+            prospective_employee = invitation.prospective_employee
+
+            if request:
+                offer_url = request.build_absolute_uri(
+                    reverse('onboarding_offer_letter', kwargs={'offer_id': offer_letter.id})
+                )
+                login_url = request.build_absolute_uri(reverse('onboarding_login'))
+            else:
+                base_url = "https://onecomputerconcepts.com"
+                offer_url = f"{base_url}{reverse('onboarding_offer_letter', kwargs={'offer_id': offer_letter.id})}"
+                login_url = f"{base_url}{reverse('onboarding_login')}"
+
+            context = {
+                'offer_letter': offer_letter,
+                'submission': submission,
+                'invitation': invitation,
+                'prospective_employee': prospective_employee,
+                'pin': prospective_employee.current_pin,
+                'pin_expiry': prospective_employee.pin_expiry,
+                'offer_url': offer_url,
+                'login_url': login_url,
+                'current_year': timezone.now().year,
+            }
+
+            subject = f"Your Offer Letter is Ready - {offer_letter.position_title}"
+            text_content = render_to_string('email/onboarding/offer_ready.txt', context)
+            html_content = render_to_string('email/onboarding/offer_ready.html', context)
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[prospective_employee.email],
+                reply_to=['hr@onecomputerconcepts.com']
+            )
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+
+            logger.info(f"Offer ready email sent to {prospective_employee.email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send offer ready email: {str(e)}")
+            return False
+
+    @staticmethod
+    def send_offer_signed_email(offer_letter, pdf_content=None, request=None):
+        """
+        Send the fully executed offer letter to the candidate and employer.
+
+        Args:
+            offer_letter: OnboardingOfferLetter instance
+            pdf_content: Optional bytes of the signed PDF to attach
+            request: Optional HttpRequest for absolute URLs
+
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            submission = offer_letter.submission
+            invitation = submission.invitation
+            prospective_employee = invitation.prospective_employee
+
+            if request:
+                offer_url = request.build_absolute_uri(
+                    reverse('onboarding_offer_letter', kwargs={'offer_id': offer_letter.id})
+                )
+                pdf_url = request.build_absolute_uri(
+                    reverse('onboarding_offer_letter_download', kwargs={'offer_id': offer_letter.id})
+                )
+            else:
+                base_url = "https://onecomputerconcepts.com"
+                offer_url = f"{base_url}{reverse('onboarding_offer_letter', kwargs={'offer_id': offer_letter.id})}"
+                pdf_url = f"{base_url}{reverse('onboarding_offer_letter_download', kwargs={'offer_id': offer_letter.id})}"
+
+            recipients = [prospective_employee.email]
+            if offer_letter.employer_signed_by and offer_letter.employer_signed_by.email:
+                recipients.append(offer_letter.employer_signed_by.email)
+
+            context = {
+                'offer_letter': offer_letter,
+                'submission': submission,
+                'invitation': invitation,
+                'prospective_employee': prospective_employee,
+                'offer_url': offer_url,
+                'offer_pdf_url': pdf_url,
+                'current_year': timezone.now().year,
+            }
+
+            subject = f"Signed Offer Letter - {offer_letter.position_title}"
+            text_content = render_to_string('email/onboarding/offer_signed.txt', context)
+            html_content = render_to_string('email/onboarding/offer_signed.html', context)
+
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=recipients,
+                reply_to=['hr@onecomputerconcepts.com']
+            )
+            email.attach_alternative(html_content, "text/html")
+
+            if pdf_content:
+                filename = f"Offer_Letter_{offer_letter.position_title.replace(' ', '_')}.pdf"
+                email.attach(filename, pdf_content, 'application/pdf')
+
+            email.send()
+            logger.info(f"Signed offer letter emailed to {', '.join(recipients)}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send signed offer letter email: {str(e)}")
+            return False
+
+    @staticmethod
     def send_status_update(submission, old_status, new_status, notes="", request=None):
         """
         Send status update email to prospective employee
@@ -257,6 +384,8 @@ class OnboardingEmailTemplates:
         ('confirmation', 'Submission Confirmation'),
         ('hr_notification', 'HR Notification'),
         ('status_update', 'Status Update'),
+        ('offer_ready', 'Offer Letter Ready'),
+        ('offer_signed', 'Offer Letter Fully Signed'),
         ('reminder', 'Reminder Email'),
     ]
     
@@ -308,8 +437,15 @@ class OnboardingEmailTemplates:
                 'last_name': 'Doe',
                 'email': 'john.doe@example.com'
             },
+            'offer_letter': {
+                'position_title': 'Software Engineer',
+                'start_date': datetime.now().date()
+            },
             'pin': '123456',
             'pin_expiry': datetime.now() + timedelta(hours=48),
             'onboarding_url': 'https://onecomputerconcepts.com/onboarding/login/',
+            'offer_url': 'https://onecomputerconcepts.com/onboarding/offer/sample-offer-id/',
+            'login_url': 'https://onecomputerconcepts.com/onboarding/login/',
+            'offer_pdf_url': 'https://onecomputerconcepts.com/onboarding/offer/sample-offer-id/download/',
             'current_year': datetime.now().year,
         }

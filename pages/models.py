@@ -1331,14 +1331,17 @@ class ProspectiveEmployee(models.Model):
             return False
         return timezone.now() < self.pin_expiry and not self.is_pin_locked
     
-    def generate_pin(self):
-        """Generate a new 6-digit PIN"""
+    def generate_pin(self, expiry_at=None, expiry_hours=48):
+        """Generate a new 6-digit PIN and optionally control expiry"""
         import random
         from datetime import timedelta
         
         self.current_pin = str(random.randint(100000, 999999))
         self.pin_created_at = timezone.now()
-        self.pin_expiry = timezone.now() + timedelta(hours=48)  # Default 48 hours
+        if expiry_at:
+            self.pin_expiry = expiry_at
+        else:
+            self.pin_expiry = timezone.now() + timedelta(hours=expiry_hours or 48)
         self.pin_attempts = 0
         self.is_pin_locked = False
         self.save()
@@ -1427,6 +1430,88 @@ class OnboardingSubmission(models.Model):
         if 'first_name' in self.form_data and 'last_name' in self.form_data:
             return f"{self.form_data['first_name']} {self.form_data['last_name']}"
         return self.invitation.prospective_employee.email
+
+
+class OnboardingOfferLetter(models.Model):
+    """Formal employment offer generated from an onboarding submission"""
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('pending_employee', 'Awaiting Employee Signature'),
+        ('signed', 'Fully Signed'),
+        ('declined', 'Declined'),
+    ]
+
+    COMPENSATION_FREQUENCY_CHOICES = [
+        ('annual', 'Per Year'),
+        ('monthly', 'Per Month'),
+        ('biweekly', 'Per Pay Period'),
+        ('weekly', 'Per Week'),
+        ('hourly', 'Per Hour'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.OneToOneField(
+        OnboardingSubmission,
+        on_delete=models.CASCADE,
+        related_name='offer_letter'
+    )
+
+    position_title = models.CharField(max_length=200)
+    employment_type = models.CharField(max_length=100, blank=True)
+    salary_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    salary_currency = models.CharField(max_length=10, default='USD')
+    pay_frequency = models.CharField(
+        max_length=20,
+        choices=COMPENSATION_FREQUENCY_CHOICES,
+        default='annual'
+    )
+    compensation_notes = models.TextField(blank=True, help_text="Additional compensation details (bonuses, benefits, etc.)")
+    start_date = models.DateField(null=True, blank=True)
+    offer_expires_at = models.DateField(null=True, blank=True)
+    additional_terms = models.TextField(blank=True)
+
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='draft')
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='offer_letters_created'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    employer_signed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='offer_letters_signed'
+    )
+    employer_signature_name = models.CharField(max_length=200, blank=True)
+    employer_signature_data = models.TextField(blank=True, help_text="Base64 encoded employer signature image")
+    employer_signed_at = models.DateTimeField(null=True, blank=True)
+
+    employee_signature_name = models.CharField(max_length=200, blank=True)
+    employee_signed_at = models.DateTimeField(null=True, blank=True)
+    employee_signature_data = models.TextField(blank=True, help_text="Base64 encoded employee signature image")
+    decline_reason = models.TextField(blank=True)
+    offer_pdf_path = models.CharField(max_length=500, blank=True, help_text="Stored PDF path for the signed offer letter")
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        applicant = self.submission.get_applicant_name()
+        return f"Offer Letter for {applicant} ({self.position_title})"
+
+    @property
+    def is_employer_signed(self):
+        return bool(self.employer_signed_at and self.employer_signature_name and self.employer_signature_data)
+
+    @property
+    def is_employee_signed(self):
+        return bool(self.employee_signed_at and self.employee_signature_name and self.employee_signature_data)
 
 
 class OnboardingFormField(models.Model):

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signed Offer Letter</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 620px;
+            margin: 20px auto;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 32px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 32px 30px;
+        }
+        .content h2 {
+            font-size: 20px;
+            color: #1f2937;
+            margin-bottom: 16px;
+        }
+        .content p {
+            margin-bottom: 16px;
+            color: #4b5563;
+        }
+        .details {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .details p {
+            margin: 0 0 10px 0;
+        }
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white !important;
+            padding: 12px 24px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .footer {
+            padding: 24px 30px;
+            background: #f9fafb;
+            text-align: center;
+            font-size: 13px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Offer Letter Completed</h1>
+        </div>
+        <div class="content">
+            <h2>Congratulations!</h2>
+            <p>
+                The employment offer for <strong>{{ offer_letter.position_title }}</strong> has been signed by both parties.
+                A PDF copy is attached for your records.
+            </p>
+
+            <div class="details">
+                <p><strong>Candidate:</strong> {{ prospective_employee.first_name }} {{ prospective_employee.last_name }}</p>
+                <p><strong>Position:</strong> {{ offer_letter.position_title }}</p>
+                {% if offer_letter.start_date %}
+                <p><strong>Start Date:</strong> {{ offer_letter.start_date|date:"F j, Y" }}</p>
+                {% endif %}
+            </div>
+
+            <p>
+                You can also download the signed document at any time from the onboarding portal using the link below.
+            </p>
+
+            <p style="text-align: center; margin: 24px 0;">
+                <a href="{{ offer_pdf_url }}" class="btn">Download Signed Offer Letter</a>
+            </p>
+
+            <p>
+                If you have any questions, please reply to this email or reach out to the Computer Concepts HR team.
+            </p>
+
+            <p style="margin-bottom: 0;">
+                Best regards,<br>
+                <strong>Computer Concepts HR Team</strong>
+            </p>
+        </div>
+        <div class="footer">
+            &copy; {{ current_year }} Computer Concepts. All rights reserved.
+        </div>
+    </div>
+</body>
+</html>

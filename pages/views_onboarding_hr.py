@@ -10,6 +10,7 @@ from django.http import JsonResponse, HttpResponse, FileResponse
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.models import User
@@ -17,12 +18,13 @@ import json
 import uuid
 import io
 import os
-from datetime import timedelta
+from datetime import timedelta, datetime, time
 from django.core.files.storage import default_storage
+from decimal import Decimal, InvalidOperation
 
 from .models import (
     OnboardingForm, OnboardingFormField, ProspectiveEmployee, 
-    OnboardingInvitation, OnboardingSubmission, Employee
+    OnboardingInvitation, OnboardingSubmission, Employee, OnboardingOfferLetter
 )
 from .onboarding_emails import OnboardingEmailService
 
@@ -394,48 +396,198 @@ def submission_detail(request, submission_id):
         messages.error(request, "Employee profile not found.")
         return redirect('employee_dashboard')
     
+    offer_letter = getattr(submission, 'offer_letter', None)
+    
     if request.method == 'POST':
-        # Update submission review
-        old_status = submission.review_status
-        new_status = request.POST.get('review_status')
-        review_notes = request.POST.get('review_notes', '').strip()
-        hr_notes = request.POST.get('hr_notes', '').strip()
-        next_steps = request.POST.get('next_steps', '').strip()
-        priority = request.POST.get('priority', 'medium')
-        
-        submission.review_status = new_status
-        submission.review_notes = review_notes
-        submission.hr_notes = hr_notes
-        submission.next_steps = next_steps
-        submission.priority = priority
-        submission.reviewed_by = request.user
-        submission.reviewed_at = timezone.now()
-        submission.save()
-        
-        # When requesting revisions, resend invitation with fresh PIN
-        if new_status == 'needs_revision':
-            invitation = submission.invitation
-            invitation.sent_by = request.user
-            invitation.save(update_fields=['sent_by'])
-            resend_success = OnboardingEmailService.send_onboarding_invitation(
-                invitation,
-                request,
-                force_new_pin=True
-            )
-            if not resend_success:
-                messages.warning(
+        action = request.POST.get('action', 'update_review')
+
+        if action == 'update_review':
+            # Update submission review
+            old_status = submission.review_status
+            new_status = request.POST.get('review_status')
+            review_notes = request.POST.get('review_notes', '').strip()
+            hr_notes = request.POST.get('hr_notes', '').strip()
+            next_steps = request.POST.get('next_steps', '').strip()
+            priority = request.POST.get('priority', 'medium')
+            
+            submission.review_status = new_status
+            submission.review_notes = review_notes
+            submission.hr_notes = hr_notes
+            submission.next_steps = next_steps
+            submission.priority = priority
+            submission.reviewed_by = request.user
+            submission.reviewed_at = timezone.now()
+            submission.save()
+            
+            # When requesting revisions, resend invitation with fresh PIN
+            if new_status == 'needs_revision':
+                invitation = submission.invitation
+                invitation.sent_by = request.user
+                invitation.save(update_fields=['sent_by'])
+                resend_success = OnboardingEmailService.send_onboarding_invitation(
+                    invitation,
                     request,
-                    "Submission updated, but we could not resend the onboarding PIN email. "
-                    "Please retry or contact support."
+                    force_new_pin=True
                 )
-        
-        # Send status update email if status changed or HR flagged needs revision again
-        if old_status != new_status or new_status == 'needs_revision':
-            OnboardingEmailService.send_status_update(
-                submission, old_status, new_status, review_notes, request
-            )
-        
-        messages.success(request, "Submission updated successfully!")
+                if not resend_success:
+                    messages.warning(
+                        request,
+                        "Submission updated, but we could not resend the onboarding PIN email. "
+                        "Please retry or contact support."
+                    )
+            
+            # Send status update email if status changed or HR flagged needs revision again
+            if old_status != new_status or new_status == 'needs_revision':
+                OnboardingEmailService.send_status_update(
+                    submission, old_status, new_status, review_notes, request
+                )
+            
+            messages.success(request, "Submission updated successfully!")
+            return redirect('hr_submission_detail', submission_id=submission_id)
+
+        if action == 'save_offer_letter':
+            if submission.review_status != 'approved':
+                messages.error(request, "Offer letters can only be created once an application is approved.")
+                return redirect('hr_submission_detail', submission_id=submission_id)
+
+            position_title = request.POST.get('position_title', '').strip()
+            employment_type = request.POST.get('employment_type', '').strip()
+            salary_amount_input = request.POST.get('salary_amount', '').strip()
+            salary_currency = request.POST.get('salary_currency', 'USD').strip() or 'USD'
+            pay_frequency = request.POST.get('pay_frequency', 'annual')
+            compensation_notes = request.POST.get('compensation_notes', '').strip()
+            start_date_input = request.POST.get('start_date', '').strip()
+            expires_input = request.POST.get('offer_expires_at', '').strip()
+            additional_terms = request.POST.get('additional_terms', '').strip()
+
+            if not position_title:
+                messages.error(request, "Please provide a position title for the offer letter.")
+                return redirect('hr_submission_detail', submission_id=submission_id)
+
+            salary_amount = None
+            if salary_amount_input:
+                try:
+                    salary_amount = Decimal(salary_amount_input.replace(',', ''))
+                except (InvalidOperation, AttributeError):
+                    messages.error(request, "Salary amount must be a valid number.")
+                    return redirect('hr_submission_detail', submission_id=submission_id)
+
+            if pay_frequency not in dict(OnboardingOfferLetter.COMPENSATION_FREQUENCY_CHOICES):
+                pay_frequency = 'annual'
+
+            start_date = parse_date(start_date_input) if start_date_input else None
+            offer_expires_at = parse_date(expires_input) if expires_input else None
+
+            if offer_letter and offer_letter.status == 'signed':
+                messages.error(request, "This offer letter is already fully signed and cannot be modified.")
+                return redirect('hr_submission_detail', submission_id=submission_id)
+
+            if not offer_letter:
+                offer_letter = OnboardingOfferLetter.objects.create(
+                    submission=submission,
+                    created_by=request.user,
+                    position_title=position_title,
+                    employment_type=employment_type,
+                    salary_amount=salary_amount,
+                    salary_currency=salary_currency.upper(),
+                    pay_frequency=pay_frequency,
+                    compensation_notes=compensation_notes,
+                    start_date=start_date,
+                    offer_expires_at=offer_expires_at,
+                    additional_terms=additional_terms,
+                )
+            else:
+                if offer_letter.offer_pdf_path:
+                    try:
+                        if default_storage.exists(offer_letter.offer_pdf_path):
+                            default_storage.delete(offer_letter.offer_pdf_path)
+                    except Exception:
+                        pass
+                    offer_letter.offer_pdf_path = ''
+                offer_letter.position_title = position_title
+                offer_letter.employment_type = employment_type
+                offer_letter.salary_amount = salary_amount
+                offer_letter.salary_currency = salary_currency.upper()
+                offer_letter.pay_frequency = pay_frequency
+                offer_letter.compensation_notes = compensation_notes
+                offer_letter.start_date = start_date
+                offer_letter.offer_expires_at = offer_expires_at
+                offer_letter.additional_terms = additional_terms
+                offer_letter.status = 'draft'
+                offer_letter.employer_signed_by = None
+                offer_letter.employer_signature_name = ''
+                offer_letter.employer_signature_data = ''
+                offer_letter.employer_signed_at = None
+                offer_letter.employee_signature_name = ''
+                offer_letter.employee_signed_at = None
+                offer_letter.employee_signature_data = ''
+                offer_letter.decline_reason = ''
+                offer_letter.save()
+
+            messages.success(request, "Offer letter details saved. Please sign to send to the candidate.")
+            return redirect('hr_submission_detail', submission_id=submission_id)
+
+        if action == 'employer_sign_offer':
+            if not offer_letter:
+                messages.error(request, "Create the offer letter details before signing.")
+                return redirect('hr_submission_detail', submission_id=submission_id)
+
+            if offer_letter.status == 'signed':
+                messages.info(request, "Offer letter already fully signed.")
+                return redirect('hr_submission_detail', submission_id=submission_id)
+
+            signature_name = request.POST.get('employer_signature_name', '').strip()
+            signature_data = request.POST.get('employer_signature_data', '').strip()
+            if not signature_name:
+                messages.error(request, "Please provide your name to sign the offer letter.")
+                return redirect('hr_submission_detail', submission_id=submission_id)
+            if not signature_data or not signature_data.startswith('data:image/'):
+                messages.error(request, "Please provide your signature to complete the offer letter.")
+                return redirect('hr_submission_detail', submission_id=submission_id)
+
+            offer_letter.employer_signature_name = signature_name
+            offer_letter.employer_signature_data = signature_data
+            offer_letter.employer_signed_at = timezone.now()
+            offer_letter.employer_signed_by = request.user
+            offer_letter.status = 'pending_employee'
+            offer_letter.employee_signature_name = ''
+            offer_letter.employee_signed_at = None
+            offer_letter.employee_signature_data = ''
+            offer_letter.decline_reason = ''
+            offer_letter.offer_pdf_path = ''
+            offer_letter.save(update_fields=[
+                'employer_signature_name',
+                'employer_signature_data',
+                'employer_signed_at',
+                'employer_signed_by',
+                'status',
+                'employee_signature_name',
+                'employee_signed_at',
+                'employee_signature_data',
+                'decline_reason',
+                'offer_pdf_path',
+                'updated_at'
+            ])
+
+            prospective_employee = submission.invitation.prospective_employee
+            pin_expiry_at = None
+            if offer_letter.start_date:
+                start_dt = datetime.combine(offer_letter.start_date, time(23, 59, 59))
+                if timezone.is_naive(start_dt):
+                    start_dt = timezone.make_aware(start_dt, timezone.get_current_timezone())
+                if start_dt > timezone.now():
+                    pin_expiry_at = start_dt
+
+            prospective_employee.generate_pin(expiry_at=pin_expiry_at)
+            email_sent = OnboardingEmailService.send_offer_ready_email(offer_letter, request)
+
+            if email_sent:
+                messages.success(request, "Offer letter signed. The candidate has been notified and can now review and sign it.")
+            else:
+                messages.warning(request, "Offer letter signed, but we were unable to send the notification email. Please contact the candidate manually.")
+            return redirect('hr_submission_detail', submission_id=submission_id)
+
+        messages.error(request, "Unknown action.")
         return redirect('hr_submission_detail', submission_id=submission_id)
     
     # Get form fields for display
@@ -452,6 +604,7 @@ def submission_detail(request, submission_id):
     
     context = {
         'submission': submission,
+        'offer_letter': offer_letter,
         'form_display_data': form_display_data,
         'status_choices': OnboardingSubmission.REVIEW_STATUS_CHOICES,
         'priority_choices': [
@@ -459,7 +612,8 @@ def submission_detail(request, submission_id):
             ('medium', 'Medium'),
             ('high', 'High'),
             ('urgent', 'Urgent'),
-        ]
+        ],
+        'pay_frequency_choices': OnboardingOfferLetter.COMPENSATION_FREQUENCY_CHOICES,
     }
     
     return render(request, 'hr/onboarding/submission_detail.html', context)
@@ -514,6 +668,42 @@ def download_submission_file(request, submission_id, field_name):
     filename = file_info.get('original_name') or os.path.basename(file_path)
 
     response = FileResponse(stored_file, as_attachment=True, filename=filename)
+    return response
+
+
+@login_required
+def download_offer_letter_pdf(request, offer_id):
+    """Allow HR to download the signed offer letter PDF"""
+    offer_letter = get_object_or_404(OnboardingOfferLetter, id=offer_id)
+    submission = offer_letter.submission
+
+    # Check HR permissions
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin'] and not request.user.is_superuser:
+            messages.error(request, "Access denied. HR permissions required.")
+            return redirect('hr_submission_detail', submission_id=submission.id)
+    except Employee.DoesNotExist:
+        if not request.user.is_superuser:
+            messages.error(request, "Employee profile not found.")
+            return redirect('hr_submission_detail', submission_id=submission.id)
+
+    if not offer_letter.offer_pdf_path:
+        messages.error(request, "A signed PDF is not yet available for this offer letter.")
+        return redirect('hr_submission_detail', submission_id=submission.id)
+
+    try:
+        if not default_storage.exists(offer_letter.offer_pdf_path):
+            messages.error(request, "The signed offer letter file could not be found.")
+            return redirect('hr_submission_detail', submission_id=submission.id)
+        pdf_file = default_storage.open(offer_letter.offer_pdf_path, 'rb')
+    except Exception as exc:
+        messages.error(request, f"Unable to open the offer letter PDF: {str(exc)}")
+        return redirect('hr_submission_detail', submission_id=submission.id)
+
+    filename = f"Offer_Letter_{offer_letter.position_title.replace(' ', '_')}.pdf"
+    response = FileResponse(pdf_file, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
 

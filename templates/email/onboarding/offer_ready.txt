@@ -1,0 +1,22 @@
+Hi {{ prospective_employee.first_name|default:"there" }},
+
+Great news! Your offer letter for the {{ offer_letter.position_title }} position with Computer Concepts is ready for you to review and sign.
+
+Access PIN: {{ pin }}
+{% if pin_expiry %}PIN expires: {{ pin_expiry|date:"F j, Y g:i A T" }}
+{% else %}This PIN will remain active for the next 48 hours.
+{% endif %}
+
+Next steps:
+1. Visit the onboarding portal: {{ login_url }}
+2. Log in using your email address and the PIN above.
+3. Review and sign your offer letter: {{ offer_url }}
+
+{% if offer_letter.start_date %}Your anticipated start date is {{ offer_letter.start_date|date:"F j, Y" }}.{% endif %}
+
+If you have any questions or need assistance, simply reply to this message and our HR team will be happy to help.
+
+Welcome to Computer Concepts!
+
+Computer Concepts HR Team
+hr@onecomputerconcepts.com

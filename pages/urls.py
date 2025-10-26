@@ -191,6 +191,11 @@ urlpatterns = [
         views_onboarding_hr.download_submission_file,
         name='download_submission_file',
     ),
+    path(
+        'employee/hr/onboarding/offer-letter/<uuid:offer_id>/download/',
+        views_onboarding_hr.download_offer_letter_pdf,
+        name='hr_offer_letter_pdf',
+    ),
     path('employee/hr/onboarding/submissions/<uuid:submission_id>/download/', views_onboarding_hr.download_combined_pdf, name='download_combined_pdf'),
 
     # Prospective Employee Onboarding Portal URLs
@@ -198,6 +203,8 @@ urlpatterns = [
     path('onboarding/login/', views_onboarding_portal.onboarding_login, name='onboarding_login'),
     path('onboarding/dashboard/', views_onboarding_portal.onboarding_dashboard, name='onboarding_dashboard'),
     path('onboarding/form/<uuid:invitation_id>/', views_onboarding_portal.onboarding_form, name='onboarding_form'),
+    path('onboarding/offer/<uuid:offer_id>/', views_onboarding_portal.view_offer_letter, name='onboarding_offer_letter'),
+    path('onboarding/offer/<uuid:offer_id>/download/', views_onboarding_portal.download_offer_letter_pdf, name='onboarding_offer_letter_download'),
     path('onboarding/status/<uuid:submission_id>/', views_onboarding_portal.onboarding_status, name='onboarding_status'),
     path('onboarding/logout/', views_onboarding_portal.onboarding_logout, name='onboarding_logout'),
     path('onboarding/api/form/<uuid:form_id>/field/<str:field_name>/options/', views_onboarding_portal.form_field_options, name='form_field_options'),
