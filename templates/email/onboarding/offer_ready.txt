@@ -12,6 +12,19 @@ Next steps:
 2. Log in using your email address and the PIN above.
 3. Review and sign your offer letter: {{ offer_url }}
 
+{% if job_posting %}
+Role highlights:
+- Position: {{ job_posting.title }}
+{% if job_posting.department %}- Department: {{ job_posting.department }}{% endif %}
+{% if job_posting.location %}- Location: {{ job_posting.location }}{% endif %}
+{% if job_posting.get_job_type_display %}- Role Type: {{ job_posting.get_job_type_display }}{% endif %}
+{% if job_posting.salary_range %}- Salary Range: {{ job_posting.salary_range }}{% endif %}
+{% if job_posting.description %}- Description: {{ job_posting.description }}{% endif %}
+{% if job_posting.requirements %}- Requirements: {{ job_posting.requirements }}{% endif %}
+{% if job_posting.responsibilities %}- Responsibilities: {{ job_posting.responsibilities }}{% endif %}
+{% if job_posting.benefits %}- Benefits: {{ job_posting.benefits }}{% endif %}
+{% endif %}
+
 {% if offer_letter.start_date %}Your anticipated start date is {{ offer_letter.start_date|date:"F j, Y" }}.{% endif %}
 
 If you have any questions or need assistance, simply reply to this message and our HR team will be happy to help.

@@ -21,10 +21,11 @@ import os
 from datetime import timedelta, datetime, time
 from django.core.files.storage import default_storage
 from decimal import Decimal, InvalidOperation
+from django.urls import reverse
 
 from .models import (
     OnboardingForm, OnboardingFormField, ProspectiveEmployee, 
-    OnboardingInvitation, OnboardingSubmission, Employee, OnboardingOfferLetter
+    OnboardingInvitation, OnboardingSubmission, Employee, OnboardingOfferLetter, JobPosting
 )
 from .onboarding_emails import OnboardingEmailService
 
@@ -450,6 +451,11 @@ def submission_detail(request, submission_id):
                 messages.error(request, "Offer letters can only be created once an application is approved.")
                 return redirect('hr_submission_detail', submission_id=submission_id)
 
+            job_posting_id = request.POST.get('job_posting_id', '').strip()
+            job_posting = None
+            if job_posting_id:
+                job_posting = JobPosting.objects.filter(id=job_posting_id).first()
+
             position_title = request.POST.get('position_title', '').strip()
             employment_type = request.POST.get('employment_type', '').strip()
             salary_amount_input = request.POST.get('salary_amount', '').strip()
@@ -459,6 +465,13 @@ def submission_detail(request, submission_id):
             start_date_input = request.POST.get('start_date', '').strip()
             expires_input = request.POST.get('offer_expires_at', '').strip()
             additional_terms = request.POST.get('additional_terms', '').strip()
+
+            if job_posting and not position_title:
+                position_title = job_posting.title
+            if job_posting and not employment_type:
+                employment_type = job_posting.get_job_type_display()
+            if job_posting and not compensation_notes and job_posting.salary_range:
+                compensation_notes = f"Salary Range: {job_posting.salary_range}"
 
             if not position_title:
                 messages.error(request, "Please provide a position title for the offer letter.")
@@ -495,6 +508,7 @@ def submission_detail(request, submission_id):
                     start_date=start_date,
                     offer_expires_at=offer_expires_at,
                     additional_terms=additional_terms,
+                    job_posting=job_posting,
                 )
             else:
                 if offer_letter.offer_pdf_path:
@@ -513,6 +527,7 @@ def submission_detail(request, submission_id):
                 offer_letter.start_date = start_date
                 offer_letter.offer_expires_at = offer_expires_at
                 offer_letter.additional_terms = additional_terms
+                offer_letter.job_posting = job_posting
                 offer_letter.status = 'draft'
                 offer_letter.employer_signed_by = None
                 offer_letter.employer_signature_name = ''
@@ -601,6 +616,28 @@ def submission_detail(request, submission_id):
             'field': field,
             'value': value
         })
+
+    job_postings_qs = JobPosting.objects.filter(is_active=True).order_by('-created_at')
+    job_postings = list(job_postings_qs)
+    if offer_letter and offer_letter.job_posting and offer_letter.job_posting not in job_postings:
+        job_postings.append(offer_letter.job_posting)
+
+    job_postings_data = []
+    for job in job_postings:
+        job_postings_data.append({
+            'id': str(job.id),
+            'title': job.title,
+            'department': job.department,
+            'location': job.location,
+            'job_type': job.job_type,
+            'job_type_display': job.get_job_type_display(),
+            'salary_range': job.salary_range or '',
+            'description': job.description or '',
+            'requirements': job.requirements or '',
+            'responsibilities': job.responsibilities or '',
+            'benefits': job.benefits or '',
+            'detail_url': reverse('career_apply', kwargs={'job_id': job.id}),
+        })
     
     context = {
         'submission': submission,
@@ -614,6 +651,9 @@ def submission_detail(request, submission_id):
             ('urgent', 'Urgent'),
         ],
         'pay_frequency_choices': OnboardingOfferLetter.COMPENSATION_FREQUENCY_CHOICES,
+        'job_postings': job_postings,
+        'job_postings_data': job_postings_data,
+        'selected_job_posting_id': str(offer_letter.job_posting.id) if offer_letter and offer_letter.job_posting else '',
     }
     
     return render(request, 'hr/onboarding/submission_detail.html', context)

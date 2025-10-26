@@ -108,6 +108,34 @@ def _generate_offer_letter_pdf(offer_letter):
             if paragraph.strip():
                 story.append(Paragraph(paragraph.strip(), body_style))
 
+    job_posting = offer_letter.job_posting
+    if job_posting:
+        story.append(Paragraph("<b>Job Posting Details</b>", heading_style))
+        if job_posting.department:
+            story.append(Paragraph(f"Department: {job_posting.department}", body_style))
+        if job_posting.location:
+            story.append(Paragraph(f"Location: {job_posting.location}", body_style))
+        try:
+            job_type_display = job_posting.get_job_type_display()
+        except Exception:
+            job_type_display = ''
+        if job_type_display:
+            story.append(Paragraph(f"Role Type: {job_type_display}", body_style))
+        if job_posting.salary_range:
+            story.append(Paragraph(f"Salary Range: {job_posting.salary_range}", body_style))
+
+        def add_multiline_section(label, text):
+            if text:
+                story.append(Paragraph(f"<b>{label}</b>", body_style))
+                for paragraph in text.splitlines():
+                    if paragraph.strip():
+                        story.append(Paragraph(paragraph.strip(), body_style))
+
+        add_multiline_section("Description", job_posting.description or "")
+        add_multiline_section("Requirements", job_posting.requirements or "")
+        add_multiline_section("Responsibilities", job_posting.responsibilities or "")
+        add_multiline_section("Benefits", job_posting.benefits or "")
+
     story.append(Spacer(1, 18))
     story.append(Paragraph("<b>Signature Summary</b>", heading_style))
 

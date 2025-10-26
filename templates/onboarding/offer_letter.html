@@ -186,6 +186,16 @@
                     <i class="fas fa-briefcase me-1"></i>{{ offer_letter.employment_type }}
                 </span>
                 {% endif %}
+                {% if offer_letter.job_posting and offer_letter.job_posting.department %}
+                <span class="meta-pill">
+                    <i class="fas fa-building me-1"></i>{{ offer_letter.job_posting.department }}
+                </span>
+                {% endif %}
+                {% if offer_letter.job_posting and offer_letter.job_posting.location %}
+                <span class="meta-pill">
+                    <i class="fas fa-map-marker-alt me-1"></i>{{ offer_letter.job_posting.location }}
+                </span>
+                {% endif %}
                 {% if offer_letter.start_date %}
                 <span class="meta-pill">
                     <i class="fas fa-calendar-alt me-1"></i>Target Start: {{ offer_letter.start_date|date:"F j, Y" }}
@@ -194,6 +204,11 @@
                 {% if offer_letter.offer_expires_at %}
                 <span class="meta-pill">
                     <i class="fas fa-hourglass-half me-1"></i>Expires {{ offer_letter.offer_expires_at|date:"F j, Y" }}
+                </span>
+                {% endif %}
+                {% if offer_letter.job_posting and offer_letter.job_posting.salary_range %}
+                <span class="meta-pill">
+                    <i class="fas fa-dollar-sign me-1"></i>{{ offer_letter.job_posting.salary_range }}
                 </span>
                 {% endif %}
             </div>
@@ -226,6 +241,52 @@
                 </div>
                 <div class="section-box">
                     {{ offer_letter.additional_terms|linebreaksbr }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if offer_letter.job_posting %}
+            <div>
+                <div class="section-title">
+                    <i class="fas fa-briefcase"></i>Role Details
+                </div>
+                <div class="section-box">
+                    {% if offer_letter.job_posting.department %}
+                    <p class="mb-2"><strong>Department:</strong> {{ offer_letter.job_posting.department }}</p>
+                    {% endif %}
+                    {% if offer_letter.job_posting.location %}
+                    <p class="mb-2"><strong>Location:</strong> {{ offer_letter.job_posting.location }}</p>
+                    {% endif %}
+                    {% if offer_letter.job_posting.get_job_type_display %}
+                    <p class="mb-2"><strong>Role Type:</strong> {{ offer_letter.job_posting.get_job_type_display }}</p>
+                    {% endif %}
+                    {% if offer_letter.job_posting.salary_range %}
+                    <p class="mb-2"><strong>Salary Range:</strong> {{ offer_letter.job_posting.salary_range }}</p>
+                    {% endif %}
+                    {% if offer_letter.job_posting.description %}
+                    <div class="mb-3">
+                        <strong>Description</strong>
+                        <p class="mb-0">{{ offer_letter.job_posting.description|linebreaksbr }}</p>
+                    </div>
+                    {% endif %}
+                    {% if offer_letter.job_posting.requirements %}
+                    <div class="mb-3">
+                        <strong>Requirements</strong>
+                        <p class="mb-0">{{ offer_letter.job_posting.requirements|linebreaksbr }}</p>
+                    </div>
+                    {% endif %}
+                    {% if offer_letter.job_posting.responsibilities %}
+                    <div class="mb-3">
+                        <strong>Responsibilities</strong>
+                        <p class="mb-0">{{ offer_letter.job_posting.responsibilities|linebreaksbr }}</p>
+                    </div>
+                    {% endif %}
+                    {% if offer_letter.job_posting.benefits %}
+                    <div>
+                        <strong>Benefits</strong>
+                        <p class="mb-0">{{ offer_letter.job_posting.benefits|linebreaksbr }}</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}

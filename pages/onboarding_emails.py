@@ -234,6 +234,7 @@ class OnboardingEmailService:
                 'pin_expiry': prospective_employee.pin_expiry,
                 'offer_url': offer_url,
                 'login_url': login_url,
+                'job_posting': offer_letter.job_posting,
                 'current_year': timezone.now().year,
             }
 
@@ -298,6 +299,7 @@ class OnboardingEmailService:
                 'prospective_employee': prospective_employee,
                 'offer_url': offer_url,
                 'offer_pdf_url': pdf_url,
+                'job_posting': offer_letter.job_posting,
                 'current_year': timezone.now().year,
             }
 
@@ -423,6 +425,19 @@ class OnboardingEmailTemplates:
         """Generate sample data for template previews"""
         from datetime import datetime, timedelta
         
+        SampleJob = type('SampleJob', (), {
+            'title': 'Software Engineer',
+            'department': 'Engineering',
+            'location': 'Remote',
+            'salary_range': '$90,000 - $110,000',
+            'description': 'Design, build, and ship delightful experiences for our customers.\nCollaborate with product and design on roadmap initiatives.',
+            'requirements': '3+ years of professional software development experience.\nComfortable with Python and modern frontend frameworks.',
+            'responsibilities': 'Own feature development from discovery through launch.\nReview code and mentor junior engineers.',
+            'benefits': 'Medical, dental, and vision coverage.\n401(k) with company match.\nGenerous PTO policy.',
+            'job_type_display': 'Full Time',
+            'get_job_type_display': lambda self: getattr(self, 'job_type_display', 'Full Time'),
+        })()
+        
         return {
             'invitation': {
                 'id': 'sample-id',
@@ -439,8 +454,10 @@ class OnboardingEmailTemplates:
             },
             'offer_letter': {
                 'position_title': 'Software Engineer',
-                'start_date': datetime.now().date()
+                'start_date': datetime.now().date(),
+                'job_posting': SampleJob
             },
+            'job_posting': SampleJob,
             'pin': '123456',
             'pin_expiry': datetime.now() + timedelta(hours=48),
             'onboarding_url': 'https://onecomputerconcepts.com/onboarding/login/',

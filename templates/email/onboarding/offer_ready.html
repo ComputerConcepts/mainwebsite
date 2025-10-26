@@ -110,6 +110,29 @@
                 <a href="{{ offer_url }}" class="btn">Review &amp; Sign Offer Letter</a>
             </p>
 
+            {% if job_posting %}
+            <div class="card">
+                <h2>Role Highlights</h2>
+                <p class="mb-2"><strong>Position:</strong> {{ job_posting.title }}</p>
+                {% if job_posting.department %}<p class="mb-2"><strong>Department:</strong> {{ job_posting.department }}</p>{% endif %}
+                {% if job_posting.location %}<p class="mb-2"><strong>Location:</strong> {{ job_posting.location }}</p>{% endif %}
+                {% if job_posting.get_job_type_display %}<p class="mb-2"><strong>Role Type:</strong> {{ job_posting.get_job_type_display }}</p>{% endif %}
+                {% if job_posting.salary_range %}<p class="mb-2"><strong>Salary Range:</strong> {{ job_posting.salary_range }}</p>{% endif %}
+                {% if job_posting.description %}
+                <p class="mb-0"><strong>Description:</strong><br>{{ job_posting.description|linebreaksbr }}</p>
+                {% endif %}
+                {% if job_posting.requirements %}
+                <p class="mb-0" style="margin-top: 12px;"><strong>Requirements:</strong><br>{{ job_posting.requirements|linebreaksbr }}</p>
+                {% endif %}
+                {% if job_posting.responsibilities %}
+                <p class="mb-0" style="margin-top: 12px;"><strong>Responsibilities:</strong><br>{{ job_posting.responsibilities|linebreaksbr }}</p>
+                {% endif %}
+                {% if job_posting.benefits %}
+                <p class="mb-0" style="margin-top: 12px;"><strong>Benefits:</strong><br>{{ job_posting.benefits|linebreaksbr }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
             {% if offer_letter.start_date %}
             <p>
                 Your anticipated start date is <strong>{{ offer_letter.start_date|date:"F j, Y" }}</strong>. If you need any adjustments, please reply to this email and our HR team will be happy to help.
@@ -117,7 +140,7 @@
             {% endif %}
 
             <p>
-                Thank you for choosing to grow your career with Computer Concepts. We’re excited to welcome you to the team!
+                Thank you for choosing to grow your career with Computer Concepts. We're excited to welcome you to the team!
             </p>
 
             <p style="margin-bottom: 0;">

@@ -1455,6 +1455,13 @@ class OnboardingOfferLetter(models.Model):
         on_delete=models.CASCADE,
         related_name='offer_letter'
     )
+    job_posting = models.ForeignKey(
+        'JobPosting',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='offer_letters'
+    )
 
     position_title = models.CharField(max_length=200)
     employment_type = models.CharField(max_length=100, blank=True)

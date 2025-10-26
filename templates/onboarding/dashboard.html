@@ -422,6 +422,13 @@
                                         {% else %}
                                             Status: {{ item.offer_letter.get_status_display }}.
                                         {% endif %}
+                                        {% if item.offer_letter.job_posting %}
+                                        <div class="mt-1 text-muted small">
+                                            {% with job=item.offer_letter.job_posting %}
+                                                {{ job.title }}{% if job.department %} | {{ job.department }}{% endif %}{% if job.location %} | {{ job.location }}{% endif %}{% if job.salary_range %} | Salary: {{ job.salary_range }}{% endif %}
+                                            {% endwith %}
+                                        </div>
+                                        {% endif %}
                                     </div>
                                     <div class="text-end">
                                         {% if item.offer_letter.status == 'pending_employee' %}
@@ -439,6 +446,18 @@
                                         {% endif %}
                                     </div>
                                 </div>
+                                {% if item.offer_letter.job_posting %}
+                                <div class="mt-3 small">
+                                    {% with job=item.offer_letter.job_posting %}
+                                        {% if job.description %}
+                                        <div><strong>Description:</strong> {{ job.description|truncatewords:35 }}</div>
+                                        {% endif %}
+                                        {% if job.requirements %}
+                                        <div class="mt-1"><strong>Requirements:</strong> {{ job.requirements|truncatewords:25 }}</div>
+                                        {% endif %}
+                                    {% endwith %}
+                                </div>
+                                {% endif %}
                             </div>
                             {% endif %}
                         </div>

@@ -4,7 +4,17 @@ The employment offer for {{ offer_letter.position_title }} has been signed by bo
 
 Candidate: {{ prospective_employee.first_name }} {{ prospective_employee.last_name }}
 Position: {{ offer_letter.position_title }}
+{% if job_posting and job_posting.department %}Department: {{ job_posting.department }}
+{% endif %}{% if job_posting and job_posting.location %}Location: {{ job_posting.location }}
+{% endif %}{% if job_posting and job_posting.get_job_type_display %}Role Type: {{ job_posting.get_job_type_display }}
+{% endif %}{% if job_posting and job_posting.salary_range %}Salary Range: {{ job_posting.salary_range }}
+{% endif %}
 {% if offer_letter.start_date %}Start Date: {{ offer_letter.start_date|date:"F j, Y" }}
+{% endif %}
+{% if job_posting and job_posting.description %}Description: {{ job_posting.description }}
+{% endif %}{% if job_posting and job_posting.requirements %}Requirements: {{ job_posting.requirements }}
+{% endif %}{% if job_posting and job_posting.responsibilities %}Responsibilities: {{ job_posting.responsibilities }}
+{% endif %}{% if job_posting and job_posting.benefits %}Benefits: {{ job_posting.benefits }}
 {% endif %}
 
 A PDF copy of the fully executed agreement is attached for your records. You can also download the document at any time from the onboarding portal:

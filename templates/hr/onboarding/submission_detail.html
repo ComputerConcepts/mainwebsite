@@ -83,6 +83,33 @@
         align-items: center;
         gap: 6px;
     }
+
+    .job-preview {
+        background: #f8f9fa;
+        border-radius: 12px;
+        border: 1px solid rgba(103, 126, 234, 0.25);
+        padding: 18px;
+        display: none;
+    }
+    .job-preview.active {
+        display: block;
+    }
+    .job-preview h6 {
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: #364152;
+    }
+    .job-preview .job-meta {
+        color: #6c757d;
+    }
+    .job-preview .job-section {
+        margin-top: 12px;
+    }
+    .job-preview .job-section strong {
+        display: inline-block;
+        margin-bottom: 4px;
+        color: #4a5568;
+    }
     
     .review-form {
         background: #f8f9fa;
@@ -321,13 +348,76 @@
                     <input type="hidden" name="action" value="save_offer_letter">
                     
                     <div class="mb-3">
+                        <label class="form-label">Job Posting</label>
+                        <select class="form-control" name="job_posting_id" id="job_posting_id">
+                            <option value="">Select a job posting...</option>
+                            {% for job in job_postings %}
+                            <option value="{{ job.id }}" {% if selected_job_posting_id == job.id|stringformat:"s" %}selected{% endif %}>
+                                {{ job.title }}{% if job.department %} ({{ job.department }}){% endif %}{% if not job.is_active %} - inactive{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Link a published role to automatically include job details in the offer letter.</div>
+                    </div>
+
+                    <div id="jobPostingPreview" class="job-preview {% if selected_job_posting_id %}active{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                            <div>
+                                <h6 id="jobPreviewTitle">
+                                    {% if offer_letter and offer_letter.job_posting %}{{ offer_letter.job_posting.title }}{% endif %}
+                                </h6>
+                                <div class="job-meta small" id="jobPreviewMeta">
+                                    {% if offer_letter and offer_letter.job_posting %}
+                                        {% with job=offer_letter.job_posting %}
+                                            {% if job.department %}{{ job.department }}{% endif %}{% if job.location %}{% if job.department %} | {% endif %}{{ job.location }}{% endif %}{% if job.get_job_type_display %}{% if job.department or job.location %} | {% endif %}{{ job.get_job_type_display }}{% endif %}{% if job.salary_range %}{% if job.department or job.location or job.get_job_type_display %} | {% endif %}Salary: {{ job.salary_range }}{% endif %}
+                                        {% endwith %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <a id="jobPreviewLink" href="{% if offer_letter and offer_letter.job_posting %}{% url 'career_apply' offer_letter.job_posting.id %}{% endif %}" target="_blank" class="btn btn-sm btn-outline-primary {% if not offer_letter or not offer_letter.job_posting %}d-none{% endif %}">
+                                View posting
+                            </a>
+                        </div>
+                        <div class="job-preview-body small mt-3" id="jobPreviewDetails">
+                            {% if offer_letter and offer_letter.job_posting %}
+                                {% with job=offer_letter.job_posting %}
+                                    {% if job.description %}
+                                    <div class="job-section">
+                                        <strong>Description</strong>
+                                        <div>{{ job.description|linebreaksbr }}</div>
+                                    </div>
+                                    {% endif %}
+                                    {% if job.requirements %}
+                                    <div class="job-section">
+                                        <strong>Requirements</strong>
+                                        <div>{{ job.requirements|linebreaksbr }}</div>
+                                    </div>
+                                    {% endif %}
+                                    {% if job.responsibilities %}
+                                    <div class="job-section">
+                                        <strong>Responsibilities</strong>
+                                        <div>{{ job.responsibilities|linebreaksbr }}</div>
+                                    </div>
+                                    {% endif %}
+                                    {% if job.benefits %}
+                                    <div class="job-section">
+                                        <strong>Benefits</strong>
+                                        <div>{{ job.benefits|linebreaksbr }}</div>
+                                    </div>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 mt-3">
                         <label class="form-label">Position Title<span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="position_title" value="{{ offer_letter.position_title|default_if_none:'' }}" required>
+                        <input type="text" class="form-control" name="position_title" id="position_title" value="{{ offer_letter.position_title|default_if_none:'' }}" required>
                     </div>
                     
                     <div class="mb-3">
                         <label class="form-label">Employment Type</label>
-                        <input type="text" class="form-control" name="employment_type" value="{{ offer_letter.employment_type|default_if_none:'' }}" placeholder="Full Time, Part Time, Contract, etc.">
+                        <input type="text" class="form-control" name="employment_type" id="employment_type" value="{{ offer_letter.employment_type|default_if_none:'' }}" placeholder="Full Time, Part Time, Contract, etc.">
                     </div>
                     
                     <div class="row">
@@ -353,7 +443,7 @@
                     
                     <div class="mb-3">
                         <label class="form-label">Compensation Notes</label>
-                        <textarea class="form-control" name="compensation_notes" rows="2" placeholder="Bonuses, benefits, commission structure...">{{ offer_letter.compensation_notes|default_if_none:'' }}</textarea>
+                        <textarea class="form-control" name="compensation_notes" id="compensation_notes" rows="2" placeholder="Bonuses, benefits, commission structure...">{{ offer_letter.compensation_notes|default_if_none:'' }}</textarea>
                     </div>
                     
                     <div class="row">
@@ -485,6 +575,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ job_postings_data|json_script:"job-postings-data" }}
 <script>
 class SimpleSignaturePad {
     constructor(canvas, hiddenInput, statusElement) {
@@ -594,6 +685,26 @@ class SimpleSignaturePad {
     }
 }
 
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function formatMultiline(str) {
+    return escapeHtml(str).replace(/\r?\n/g, '<br>');
+}
+
+function buildJobSection(title, text) {
+    if (!text) {
+        return '';
+    }
+    return `<div class="job-section"><strong>${escapeHtml(title)}</strong><div>${formatMultiline(text)}</div></div>`;
+}
+
 function setupSignaturePad(canvasId, inputId, statusId, clearId, undoId) {
     const canvas = document.getElementById(canvasId);
     const hiddenInput = document.getElementById(inputId);
@@ -637,6 +748,7 @@ document.addEventListener('DOMContentLoaded', function() {
     wireSubmission('reviewUpdateForm', 'Updating...');
     wireSubmission('offerDetailsForm', 'Saving...');
     wireSubmission('employerSignatureForm', 'Submitting...');
+
     setupSignaturePad(
         'employer_signature_canvas',
         'employer_signature_data',
@@ -644,6 +756,111 @@ document.addEventListener('DOMContentLoaded', function() {
         'clearEmployerSignature',
         'undoEmployerSignature'
     );
+
+    const jobDataElement = document.getElementById('job-postings-data');
+    const jobPostings = jobDataElement ? JSON.parse(jobDataElement.textContent) : [];
+    const jobSelect = document.getElementById('job_posting_id');
+    const jobPreview = document.getElementById('jobPostingPreview');
+    const jobPreviewTitle = document.getElementById('jobPreviewTitle');
+    const jobPreviewMeta = document.getElementById('jobPreviewMeta');
+    const jobPreviewDetails = document.getElementById('jobPreviewDetails');
+    const jobPreviewLink = document.getElementById('jobPreviewLink');
+    const positionInput = document.getElementById('position_title');
+    const employmentInput = document.getElementById('employment_type');
+    const compensationNotesInput = document.getElementById('compensation_notes');
+
+    if (compensationNotesInput && !compensationNotesInput.dataset.autoFilled) {
+        compensationNotesInput.dataset.autoFilled = 'false';
+    }
+
+    function renderJob(jobId, autoFill = true) {
+        if (!jobPreview || !jobPreviewTitle || !jobPreviewMeta || !jobPreviewDetails) {
+            return;
+        }
+
+        const job = jobPostings.find((item) => item.id === jobId);
+        if (!job) {
+            jobPreview.classList.remove('active');
+            jobPreviewTitle.textContent = '';
+            jobPreviewMeta.textContent = '';
+            jobPreviewDetails.innerHTML = '';
+            if (jobPreviewLink) {
+                jobPreviewLink.classList.add('d-none');
+            }
+            return;
+        }
+
+        jobPreview.classList.add('active');
+        jobPreviewTitle.textContent = job.title || '';
+        const metaParts = [];
+        if (job.department) {
+            metaParts.push(job.department);
+        }
+        if (job.location) {
+            metaParts.push(job.location);
+        }
+        if (job.job_type_display) {
+            metaParts.push(job.job_type_display);
+        }
+        if (job.salary_range) {
+            metaParts.push(`Salary: ${job.salary_range}`);
+        }
+        jobPreviewMeta.textContent = metaParts.join(' | ');
+
+        if (jobPreviewLink) {
+            if (job.detail_url) {
+                jobPreviewLink.href = job.detail_url;
+                jobPreviewLink.classList.remove('d-none');
+            } else {
+                jobPreviewLink.classList.add('d-none');
+            }
+        }
+
+        const sections = [
+            buildJobSection('Description', job.description),
+            buildJobSection('Requirements', job.requirements),
+            buildJobSection('Responsibilities', job.responsibilities),
+            buildJobSection('Benefits', job.benefits)
+        ].filter(Boolean);
+        jobPreviewDetails.innerHTML = sections.length
+            ? sections.join('')
+            : '<span class="text-muted">No additional details provided for this role.</span>';
+
+        if (autoFill) {
+            if (positionInput && job.title) {
+                positionInput.value = job.title;
+            }
+            if (employmentInput && (job.job_type_display || job.job_type)) {
+                employmentInput.value = job.job_type_display || job.job_type || '';
+            }
+            if (compensationNotesInput) {
+                if (job.salary_range) {
+                    if (!compensationNotesInput.value || compensationNotesInput.dataset.autoFilled === 'true') {
+                        compensationNotesInput.value = `Salary Range: ${job.salary_range}`;
+                        compensationNotesInput.dataset.autoFilled = 'true';
+                    }
+                } else if (compensationNotesInput.dataset.autoFilled === 'true') {
+                    compensationNotesInput.value = '';
+                    compensationNotesInput.dataset.autoFilled = 'false';
+                }
+            }
+        }
+    }
+
+    if (compensationNotesInput) {
+        compensationNotesInput.addEventListener('input', () => {
+            compensationNotesInput.dataset.autoFilled = 'false';
+        });
+    }
+
+    if (jobSelect) {
+        jobSelect.addEventListener('change', () => renderJob(jobSelect.value, true));
+        if (jobSelect.value) {
+            renderJob(jobSelect.value, false);
+        } else if (jobPreview) {
+            jobPreview.classList.remove('active');
+        }
+    }
 });
 </script>
 {% endblock %}

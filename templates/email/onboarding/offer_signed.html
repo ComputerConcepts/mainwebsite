@@ -87,10 +87,51 @@
             <div class="details">
                 <p><strong>Candidate:</strong> {{ prospective_employee.first_name }} {{ prospective_employee.last_name }}</p>
                 <p><strong>Position:</strong> {{ offer_letter.position_title }}</p>
+                {% if job_posting and job_posting.department %}
+                <p><strong>Department:</strong> {{ job_posting.department }}</p>
+                {% endif %}
+                {% if job_posting and job_posting.location %}
+                <p><strong>Location:</strong> {{ job_posting.location }}</p>
+                {% endif %}
+                {% if job_posting and job_posting.get_job_type_display %}
+                <p><strong>Role Type:</strong> {{ job_posting.get_job_type_display }}</p>
+                {% endif %}
+                {% if job_posting and job_posting.salary_range %}
+                <p><strong>Salary Range:</strong> {{ job_posting.salary_range }}</p>
+                {% endif %}
                 {% if offer_letter.start_date %}
                 <p><strong>Start Date:</strong> {{ offer_letter.start_date|date:"F j, Y" }}</p>
                 {% endif %}
             </div>
+
+            {% if job_posting and (job_posting.description or job_posting.requirements or job_posting.responsibilities or job_posting.benefits) %}
+            <div class="details" style="margin-top: 16px;">
+                {% if job_posting.description %}
+                <p style="margin-bottom: 12px;">
+                    <strong>Description</strong><br>
+                    {{ job_posting.description|linebreaksbr }}
+                </p>
+                {% endif %}
+                {% if job_posting.requirements %}
+                <p style="margin-bottom: 12px;">
+                    <strong>Requirements</strong><br>
+                    {{ job_posting.requirements|linebreaksbr }}
+                </p>
+                {% endif %}
+                {% if job_posting.responsibilities %}
+                <p style="margin-bottom: 12px;">
+                    <strong>Responsibilities</strong><br>
+                    {{ job_posting.responsibilities|linebreaksbr }}
+                </p>
+                {% endif %}
+                {% if job_posting.benefits %}
+                <p style="margin-bottom: 0;">
+                    <strong>Benefits</strong><br>
+                    {{ job_posting.benefits|linebreaksbr }}
+                </p>
+                {% endif %}
+            </div>
+            {% endif %}
 
             <p>
                 You can also download the signed document at any time from the onboarding portal using the link below.
