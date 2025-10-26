@@ -412,8 +412,8 @@ def submission_detail(request, submission_id):
         submission.reviewed_at = timezone.now()
         submission.save()
         
-        # Send status update email if status changed
-        if old_status != new_status:
+        # Send status update email if status changed or HR flagged needs revision again
+        if old_status != new_status or new_status == 'needs_revision':
             OnboardingEmailService.send_status_update(
                 submission, old_status, new_status, review_notes, request
             )
