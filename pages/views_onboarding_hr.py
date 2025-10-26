@@ -412,6 +412,23 @@ def submission_detail(request, submission_id):
         submission.reviewed_at = timezone.now()
         submission.save()
         
+        # When requesting revisions, resend invitation with fresh PIN
+        if new_status == 'needs_revision':
+            invitation = submission.invitation
+            invitation.sent_by = request.user
+            invitation.save(update_fields=['sent_by'])
+            resend_success = OnboardingEmailService.send_onboarding_invitation(
+                invitation,
+                request,
+                force_new_pin=True
+            )
+            if not resend_success:
+                messages.warning(
+                    request,
+                    "Submission updated, but we could not resend the onboarding PIN email. "
+                    "Please retry or contact support."
+                )
+        
         # Send status update email if status changed or HR flagged needs revision again
         if old_status != new_status or new_status == 'needs_revision':
             OnboardingEmailService.send_status_update(

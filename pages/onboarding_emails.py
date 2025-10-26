@@ -17,13 +17,14 @@ class OnboardingEmailService:
     """Service class for handling onboarding-related emails"""
     
     @staticmethod
-    def send_onboarding_invitation(invitation, request=None):
+    def send_onboarding_invitation(invitation, request=None, force_new_pin=False):
         """
         Send onboarding invitation email with PIN to prospective employee
         
         Args:
             invitation: OnboardingInvitation instance
             request: HttpRequest object for building absolute URLs
+            force_new_pin: If True, generate a brand new PIN even if the current one is valid
             
         Returns:
             bool: True if email sent successfully, False otherwise
@@ -33,7 +34,7 @@ class OnboardingEmailService:
             onboarding_form = invitation.onboarding_form
             
             # Generate PIN if not exists or expired
-            if not prospective_employee.is_pin_valid():
+            if force_new_pin or not prospective_employee.is_pin_valid():
                 pin = prospective_employee.generate_pin()
             else:
                 pin = prospective_employee.current_pin
@@ -79,7 +80,8 @@ class OnboardingEmailService:
             
             # Update invitation status
             invitation.status = 'sent'
-            invitation.save()
+            invitation.sent_at = timezone.now()
+            invitation.save(update_fields=['status', 'sent_at'])
             
             logger.info(f"Onboarding invitation sent to {prospective_employee.email}")
             return True
