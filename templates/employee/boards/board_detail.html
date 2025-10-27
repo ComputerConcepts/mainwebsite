@@ -49,6 +49,18 @@
         color: #495057;
         flex-grow: 1;
     }
+    .list-actions {
+        margin-left: 10px;
+    }
+    .list-action-btn {
+        border: none;
+        background: transparent;
+        color: #6c757d;
+        padding: 4px 6px;
+    }
+    .list-action-btn:hover {
+        color: #343a40;
+    }
     
     /* Board Info Sidebar */
     .board-info-sidebar {
@@ -398,6 +410,28 @@
         background: rgba(0,123,255,0.1);
         border: 2px dashed #007bff;
     }
+    .card-action-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        border: none;
+        background: rgba(255,255,255,0.9);
+        color: #6c757d;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    .kanban-card:hover .card-action-btn {
+        opacity: 1;
+    }
+    .card-action-btn:hover {
+        color: #dc3545;
+    }
 
     .board-list:not(.dragging-over) .kanban-card:not(.dragging) {
         transition: transform 0.2s ease;
@@ -504,12 +538,41 @@
         <div class="board-list" data-list-id="{{ list.id }}">
             <div class="list-header">
                 <h5 class="list-title">{{ list.title }}</h5>
-                <span class="card-count">{{ list.cards.count }}</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="card-count">{{ list.cards.count }}</span>
+                    {% if can_edit %}
+                    <div class="dropdown list-actions">
+                        <button class="list-action-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-ellipsis-h"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <button type="button"
+                                        class="dropdown-item text-danger"
+                                        data-delete-url="{% url 'delete_board_list' list.id %}"
+                                        data-list-id="{{ list.id }}"
+                                        onclick="deleteList(this, '{{ list.title|escapejs }}')">
+                                    <i class="fas fa-trash me-2"></i>Delete List
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
             
             <div class="list-cards list-drop-zone" data-list-id="{{ list.id }}">
                 {% for card in list.cards.all %}
                 <div class="kanban-card" data-card-id="{{ card.id }}" draggable="true" onclick="handleCardClick(event, '{{ card.id }}')">
+                    {% if can_edit %}
+                    <button type="button"
+                            class="card-action-btn"
+                            data-delete-url="{% url 'delete_card' card.id %}"
+                            data-card-id="{{ card.id }}"
+                            onclick="event.stopPropagation(); deleteCard(this, '{{ card.title|escapejs }}');">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    {% endif %}
                     <div class="card-priority priority-{{ card.priority }}"></div>
                     <div class="card-content">
                         <div class="card-title">{{ card.title }}</div>
@@ -1023,6 +1086,92 @@ function moveCard(cardId, newListId, position = null) {
                 draggedCard.style.pointerEvents = 'auto';
             }
         }
+    });
+}
+
+function deleteCard(button, cardTitle) {
+    const url = button.dataset.deleteUrl;
+    if (!url) {
+        alert('Unable to delete card: missing information.');
+        return;
+    }
+    if (!confirm(`Delete card "${cardTitle}"? This action cannot be undone.`)) {
+        return;
+    }
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken');
+    if (!csrfToken) {
+        alert('Security token not found. Please refresh the page.');
+        return;
+    }
+    button.disabled = true;
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().catch(() => ({})).then(data => {
+                throw new Error(data.error || `Request failed with status ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            throw new Error(data.error || 'Unknown error deleting card');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting card:', error);
+        alert(error.message);
+        button.disabled = false;
+    });
+}
+
+function deleteList(button, listTitle) {
+    const url = button.dataset.deleteUrl;
+    if (!url) {
+        alert('Unable to delete list: missing information.');
+        return;
+    }
+    if (!confirm(`Delete list "${listTitle}" and all of its cards? This action cannot be undone.`)) {
+        return;
+    }
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken');
+    if (!csrfToken) {
+        alert('Security token not found. Please refresh the page.');
+        return;
+    }
+    button.disabled = true;
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().catch(() => ({})).then(data => {
+                throw new Error(data.error || `Request failed with status ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            throw new Error(data.error || 'Unknown error deleting list');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting list:', error);
+        alert(error.message);
+        button.disabled = false;
     });
 }
 

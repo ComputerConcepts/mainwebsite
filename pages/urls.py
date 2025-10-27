@@ -99,8 +99,10 @@ urlpatterns = [
     path('api/lists/<uuid:list_id>/cards/create/', views_boards.create_card, name='create_card'),
     path('api/cards/<uuid:card_id>/', views_boards.card_detail, name='card_detail'),
     path('api/cards/<uuid:card_id>/update/', views_boards.update_card, name='update_card'),
+    path('api/cards/<uuid:card_id>/delete/', views_boards.delete_card, name='delete_card'),
     path('api/cards/<uuid:card_id>/comments/', views_boards.add_card_comment, name='add_card_comment'),
     path('api/cards/move/', views_boards.move_card, name='move_card'),
+    path('api/lists/<uuid:list_id>/delete/', views_boards.delete_board_list, name='delete_board_list'),
     
     # File Management URLs
     path('employee/files/', views_files.file_manager, name='file_manager'),

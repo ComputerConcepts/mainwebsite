@@ -23,6 +23,15 @@ def reorder_cards_in_list(board_list):
             card.save()
 
 
+def reorder_lists(board):
+    """Ensure board lists have sequential positions"""
+    lists = board.lists.all().order_by('position', 'created_at')
+    for index, board_list in enumerate(lists, 1):
+        if board_list.position != index:
+            board_list.position = index
+            board_list.save(update_fields=['position'])
+
+
 @login_required
 def project_boards(request):
     """Display all project boards for the authenticated employee"""
@@ -443,6 +452,81 @@ def move_card(request):
                 return JsonResponse({'error': f'Failed to move card after position correction: {str(retry_error)}'}, status=500)
         else:
             return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_card(request, card_id):
+    """Delete a card from a list"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        card = Card.objects.get(id=card_id)
+        employee = Employee.objects.get(user=request.user)
+
+        board = card.board_list.board
+        if board.created_by != employee and employee not in board.members.all():
+            return JsonResponse({'error': 'Access denied'}, status=403)
+
+        board_list = card.board_list
+        card_title = card.title
+        card.delete()
+
+        reorder_cards_in_list(board_list)
+
+        BoardActivity.objects.create(
+            board=board,
+            user=employee,
+            action='delete',
+            details=f'deleted card "{card_title}" from {board_list.title}',
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+        )
+
+        return JsonResponse({'success': True})
+
+    except Card.DoesNotExist:
+        return JsonResponse({'error': 'Card not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_board_list(request, list_id):
+    """Delete a board list (and its cards)"""
+    if not is_employee_authenticated(request):
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        board_list = BoardList.objects.get(id=list_id)
+        employee = Employee.objects.get(user=request.user)
+
+        board = board_list.board
+        if board.created_by != employee and employee not in board.members.all():
+            return JsonResponse({'error': 'Access denied'}, status=403)
+
+        list_title = board_list.title
+        board_list.delete()
+
+        reorder_lists(board)
+
+        BoardActivity.objects.create(
+            board=board,
+            user=employee,
+            action='delete',
+            details=f'deleted list "{list_title}"',
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+        )
+
+        return JsonResponse({'success': True})
+
+    except BoardList.DoesNotExist:
+        return JsonResponse({'error': 'List not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required
