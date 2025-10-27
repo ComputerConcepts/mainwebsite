@@ -29,7 +29,11 @@ def project_boards(request):
     if not is_employee_authenticated(request):
         return redirect('employee_login')
     
-    employee = Employee.objects.get(user=request.user)
+    try:
+        employee = Employee.objects.get(user=request.user)
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found. Please complete your employee profile before accessing project boards.')
+        return redirect('employee_dashboard')
     
     # Get URL parameters
     search_query = request.GET.get('search', '').strip()

@@ -878,20 +878,21 @@ function handleDrop(e) {
     }
     
     // For same list moves, ensure we don't calculate invalid positions
+    const currentPosition = Array.from(draggedCard.parentElement.children).indexOf(draggedCard) + 1;
+
     if (newListId === currentListId) {
         // If moving within same list, adjust position calculation
-        const currentPosition = Array.from(draggedCard.parentElement.children).indexOf(draggedCard) + 1;
         if (calculatedPosition > currentPosition) {
             calculatedPosition -= 1; // Adjust for the card being removed
         }
     }
     
     // Move card if dropping to a different list or different position
-    if (newListId !== currentListId) {
+    if (newListId !== currentListId || calculatedPosition !== currentPosition) {
         console.log('Dropping card:', cardId, 'to list:', newListId, 'at position:', calculatedPosition);
         moveCard(cardId, newListId, calculatedPosition);
     } else {
-        console.log('Card dropped in same list - no move needed');
+        console.log('Card dropped in same list - position unchanged');
     }
 }
 
