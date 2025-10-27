@@ -52,6 +52,82 @@
     .table tbody tr:hover {
         background-color: #f8f9fa;
     }
+
+    .submission-card {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin-bottom: 30px;
+    }
+
+    .review-form {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 25px;
+        border: 2px solid #e9ecef;
+    }
+
+    .job-preview {
+        background: #f8f9fa;
+        border-radius: 12px;
+        border: 1px solid rgba(103, 126, 234, 0.25);
+        padding: 18px;
+        display: none;
+    }
+
+    .job-preview.active {
+        display: block;
+    }
+
+    .job-preview h6 {
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: #364152;
+    }
+
+    .job-preview .job-meta {
+        color: #6c757d;
+    }
+
+    .job-preview .job-section {
+        margin-top: 12px;
+    }
+
+    .job-preview .job-section strong {
+        display: inline-block;
+        margin-bottom: 4px;
+        color: #4a5568;
+    }
+
+    .signature-pad-wrapper {
+        border: 2px dashed rgba(102, 126, 234, 0.4);
+        border-radius: 12px;
+        background: #fff;
+        padding: 12px;
+    }
+
+    .signature-canvas {
+        width: 100%;
+        height: 160px;
+        border-radius: 8px;
+        background: #fafafa;
+        cursor: crosshair;
+        touch-action: none;
+    }
+
+    .signature-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+
+    .signature-status small {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
 </style>
 {% endblock %}
 
@@ -97,6 +173,12 @@
             </div>
         </form>
     </div>
+    
+    {% if selected_submission %}
+    <div class="mb-4">
+        {% include 'hr/onboarding/partials/offer_letter_panel.html' with submission=selected_submission offer_letter=selected_offer_letter job_postings=offer_letter_job_postings job_postings_data=offer_letter_job_postings_data selected_job_posting_id=offer_letter_selected_job_posting_id pay_frequency_choices=offer_letter_pay_frequency_choices show_offer_letter_actions=True return_path=request.get_full_path job_postings_script_id=offer_letter_job_postings_script_id preview_url=offer_letter_preview_url %}
+    </div>
+    {% endif %}
     
     <!-- Submissions Table -->
     <div class="submissions-table">

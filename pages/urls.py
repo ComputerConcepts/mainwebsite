@@ -183,6 +183,7 @@ urlpatterns = [
     path('employee/hr/onboarding/', views_onboarding_hr.hr_onboarding_dashboard, name='hr_onboarding_dashboard'),
     path('employee/hr/onboarding/forms/create/', views_onboarding_hr.create_onboarding_form, name='create_onboarding_form'),
     path('employee/hr/onboarding/forms/<uuid:form_id>/edit/', views_onboarding_hr.edit_onboarding_form, name='edit_onboarding_form'),
+    path('employee/hr/onboarding/employees/create/', views_onboarding_hr.create_onboarding_employee, name='create_onboarding_employee'),
     path('employee/hr/onboarding/invite/', views_onboarding_hr.send_onboarding_invitation, name='send_onboarding_invitation'),
     path('employee/hr/onboarding/submissions/', views_onboarding_hr.onboarding_submissions, name='onboarding_submissions'),
     path('employee/hr/onboarding/submissions/<uuid:submission_id>/', views_onboarding_hr.submission_detail, name='hr_submission_detail'),
@@ -190,6 +191,11 @@ urlpatterns = [
         'employee/hr/onboarding/submissions/<uuid:submission_id>/download/<slug:field_name>/',
         views_onboarding_hr.download_submission_file,
         name='download_submission_file',
+    ),
+    path(
+        'employee/hr/onboarding/submissions/<uuid:submission_id>/offer-letter/preview/',
+        views_onboarding_hr.preview_offer_letter,
+        name='preview_offer_letter',
     ),
     path(
         'employee/hr/onboarding/offer-letter/<uuid:offer_id>/download/',

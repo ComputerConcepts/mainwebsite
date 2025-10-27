@@ -1,0 +1,353 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Create Onboarding Employee{% endblock %}
+
+{% block extra_css %}
+<style>
+    .wizard-container {
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+        padding: 35px;
+        max-width: 980px;
+        margin: 0 auto;
+    }
+    .wizard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+    .wizard-steps {
+        display: flex;
+        gap: 16px;
+    }
+    .wizard-step-pill {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 18px;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    .wizard-step-pill.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #ffffff;
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.35);
+    }
+    .wizard-step {
+        display: none;
+    }
+    .wizard-step.active {
+        display: block;
+    }
+    .form-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 18px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .form-card:hover {
+        border-color: #6366f1;
+        box-shadow: 0 12px 25px rgba(99, 102, 241, 0.12);
+    }
+    .form-card input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        margin-right: 12px;
+        accent-color: #6366f1;
+    }
+    .wizard-footer {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 30px;
+    }
+    .wizard-footer button {
+        border-radius: 999px;
+        padding: 12px 22px;
+        font-weight: 600;
+        border: none;
+    }
+    .btn-secondary {
+        background: #e2e8f0;
+        color: #1f2937;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: #ffffff;
+        box-shadow: 0 12px 25px rgba(99, 102, 241, 0.35);
+    }
+    .selected-summary ul {
+        list-style: none;
+        padding-left: 0;
+        margin-bottom: 0;
+    }
+    .selected-summary li {
+        background: #f1f5f9;
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-bottom: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="wizard-container">
+        <div class="wizard-header">
+            <div>
+                <h2 class="mb-1">Create Onboarding Employee</h2>
+                <p class="text-muted mb-0">
+                    Capture candidate details, assign onboarding forms, and send everything in one flow.
+                </p>
+            </div>
+            <div class="wizard-steps">
+                <div class="wizard-step-pill active" data-step-pill="1">
+                    <span>1</span>
+                    Candidate
+                </div>
+                <div class="wizard-step-pill" data-step-pill="2">
+                    <span>2</span>
+                    Assign Forms
+                </div>
+                <div class="wizard-step-pill" data-step-pill="3">
+                    <span>3</span>
+                    Review & Send
+                </div>
+            </div>
+        </div>
+
+        <form id="employee-wizard-form" method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="wizard-step active" data-step="1">
+                <h4 class="mb-4">Candidate Details</h4>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">First Name</label>
+                        <input type="text" name="first_name" class="form-control form-control-lg"
+                               value="{{ form_state.first_name|default:'' }}" placeholder="Jane">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Last Name</label>
+                        <input type="text" name="last_name" class="form-control form-control-lg"
+                               value="{{ form_state.last_name|default:'' }}" placeholder="Doe">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Email<span class="text-danger">*</span></label>
+                        <input type="email" name="email" class="form-control form-control-lg"
+                               value="{{ form_state.email|default:'' }}" placeholder="jane.doe@example.com" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Phone</label>
+                        <input type="text" name="phone" class="form-control form-control-lg"
+                               value="{{ form_state.phone|default:'' }}" placeholder="+1 (555) 123-4567">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Related Job Posting</label>
+                        <select class="form-select form-select-lg" name="job_posting">
+                            <option value="">Optional – link to a job posting</option>
+                            {% for job in job_postings %}
+                                <option value="{{ job.id }}"
+                                    {% if job.id|stringformat:"s" == form_state.job_posting %}selected{% endif %}>
+                                    {{ job.title }} – {{ job.department }}{% if job.location %} ({{ job.location }}){% endif %}
+                                </option>
+                            {% empty %}
+                                <option value="" disabled>No active job postings</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            Linking a posting keeps the context handy when you generate an offer letter later.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="wizard-step" data-step="2">
+                <h4 class="mb-4">Assign Onboarding Forms</h4>
+                <p class="text-muted mb-4">
+                    Select every form this candidate needs to complete. You can return later to add more.
+                </p>
+                <div class="row g-3">
+                    {% for onboarding_form in forms %}
+                        <div class="col-md-6">
+                            <label class="form-card d-flex align-items-start">
+                                <input type="checkbox" name="form_ids" value="{{ onboarding_form.id }}"
+                                       {% if onboarding_form.id|stringformat:"s" in selected_forms %}checked{% endif %}>
+                                <div>
+                                    <div class="fw-semibold">{{ onboarding_form.title }}</div>
+                                    <div class="text-muted small mt-1">
+                                        {{ onboarding_form.description|default:"No description provided."|truncatechars:160 }}
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    {% empty %}
+                        <div class="col-12">
+                            <div class="alert alert-warning mb-0">
+                                You have not created any onboarding forms yet.
+                                <a href="{% url 'create_onboarding_form' %}">Create a form first.</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="wizard-step" data-step="3">
+                <h4 class="mb-4">Review & Send</h4>
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="p-4 border rounded-4 h-100">
+                            <h5 class="fw-semibold mb-3">Candidate Summary</h5>
+                            <p class="mb-1"><strong>Name:</strong> <span id="summary-name">—</span></p>
+                            <p class="mb-1"><strong>Email:</strong> <span id="summary-email">—</span></p>
+                            <p class="mb-1"><strong>Phone:</strong> <span id="summary-phone">—</span></p>
+                            <p class="mb-0"><strong>Job Posting:</strong> <span id="summary-job">—</span></p>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="p-4 border rounded-4 h-100 selected-summary">
+                            <h5 class="fw-semibold mb-3">Assigned Forms</h5>
+                            <ul id="summary-forms">
+                                <li>No forms selected yet.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <label class="form-label fw-semibold">Include a custom message</label>
+                    <textarea class="form-control" rows="4" name="custom_message"
+                              placeholder="Let the candidate know what to expect next.">{{ form_state.custom_message|default:'' }}</textarea>
+                    <div class="form-text">
+                        The message is included in every invitation email you send from this wizard.
+                    </div>
+                </div>
+
+                <div class="form-check form-switch mt-4">
+                    <input class="form-check-input" type="checkbox" role="switch" id="send_email" name="send_email"
+                           {% if form_state.send_email %}checked{% endif %}>
+                    <label class="form-check-label fw-semibold" for="send_email">
+                        Email the selected forms to the candidate right away
+                    </label>
+                    <div class="form-text">
+                        When disabled, invitations are created but emails are not sent. You can resend later.
+                    </div>
+                </div>
+            </div>
+
+            <div class="wizard-footer">
+                <button type="button" class="btn btn-secondary" id="wizard-back" disabled>Back</button>
+                <button type="button" class="btn btn-primary" id="wizard-next">Next</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const steps = Array.from(document.querySelectorAll('.wizard-step'));
+    const stepPills = Array.from(document.querySelectorAll('.wizard-step-pill'));
+    const backButton = document.getElementById('wizard-back');
+    const nextButton = document.getElementById('wizard-next');
+    const form = document.getElementById('employee-wizard-form');
+    let currentStep = 0;
+
+    function updateStep(direction) {
+        if (direction === 'next' && currentStep < steps.length - 1) {
+            currentStep += 1;
+        } else if (direction === 'back' && currentStep > 0) {
+            currentStep -= 1;
+        }
+
+        steps.forEach((step, idx) => {
+            step.classList.toggle('active', idx === currentStep);
+        });
+        stepPills.forEach((pill, idx) => {
+            pill.classList.toggle('active', idx === currentStep);
+        });
+
+        backButton.disabled = currentStep === 0;
+        if (currentStep === steps.length - 1) {
+            nextButton.textContent = 'Create & Send';
+            refreshSummary();
+        } else {
+            nextButton.textContent = 'Next';
+        }
+    }
+
+    function refreshSummary() {
+        const name = [
+            form.querySelector('input[name="first_name"]').value.trim(),
+            form.querySelector('input[name="last_name"]').value.trim()
+        ].filter(Boolean).join(' ');
+        const email = form.querySelector('input[name="email"]').value.trim() || '—';
+        const phone = form.querySelector('input[name="phone"]').value.trim() || '—';
+        const jobSelect = form.querySelector('select[name="job_posting"]');
+        const job = jobSelect && jobSelect.options[jobSelect.selectedIndex].text.trim();
+        const formsList = document.getElementById('summary-forms');
+
+        document.getElementById('summary-name').textContent = name || '—';
+        document.getElementById('summary-email').textContent = email;
+        document.getElementById('summary-phone').textContent = phone;
+        document.getElementById('summary-job').textContent = job || '—';
+
+        const checkedForms = Array.from(form.querySelectorAll('input[name="form_ids"]:checked'));
+        formsList.innerHTML = '';
+        if (!checkedForms.length) {
+            const item = document.createElement('li');
+            item.textContent = 'No forms selected yet.';
+            formsList.appendChild(item);
+            return;
+        }
+
+        checkedForms.forEach(input => {
+            const label = input.closest('.form-card');
+            const title = label ? label.querySelector('.fw-semibold').textContent.trim() : input.value;
+            const item = document.createElement('li');
+            item.textContent = title;
+            formsList.appendChild(item);
+        });
+    }
+
+    backButton.addEventListener('click', () => updateStep('back'));
+
+    nextButton.addEventListener('click', () => {
+        if (currentStep === 0) {
+            const emailField = form.querySelector('input[name="email"]');
+            if (!emailField.value.trim()) {
+                emailField.focus();
+                emailField.classList.add('is-invalid');
+                return;
+            }
+            emailField.classList.remove('is-invalid');
+        }
+
+        if (currentStep === steps.length - 1) {
+            form.submit();
+        } else {
+            updateStep('next');
+        }
+    });
+
+    // Allow direct navigation by clicking the pills (only backwards)
+    stepPills.forEach((pill, idx) => {
+        pill.addEventListener('click', () => {
+            if (idx <= currentStep) {
+                currentStep = idx;
+                updateStep();
+            }
+        });
+    });
+
+    // Prefill summary on load in case of validation errors
+    refreshSummary();
+})();
+</script>
+{% endblock %}

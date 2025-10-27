@@ -1,0 +1,512 @@
+{% load static %}
+
+{% if submission.review_status == 'approved' %}
+<div class="submission-card">
+    <h4 class="mb-3">
+        <i class="fas fa-file-signature me-2"></i>Offer Letter
+    </h4>
+
+    {% if offer_letter %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="status-badge status-{{ offer_letter.status|default:'draft' }}">
+            {{ offer_letter.get_status_display }}
+        </span>
+        <small class="text-muted">
+            Last updated {{ offer_letter.updated_at|date:"M j, Y g:i A" }}
+        </small>
+    </div>
+    {% if preview_url %}
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a href="{{ preview_url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-eye"></i> Preview PDF
+        </a>
+        {% if offer_letter.offer_pdf_path %}
+        <a href="{% url 'hr_offer_letter_pdf' offer_letter.id %}" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-file-pdf"></i> Download Signed PDF
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <p class="text-muted">
+        Capture role and compensation to generate the official offer letter for this candidate.
+    </p>
+    {% endif %}
+
+    {% if show_offer_letter_actions %}
+    <form method="post" class="review-form" id="offerDetailsForm_{{ submission.id }}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_offer_letter">
+        <input type="hidden" name="submission_id" value="{{ submission.id }}">
+        <input type="hidden" name="return_path" value="{{ return_path|default:request.get_full_path }}">
+
+        <div class="mb-3">
+            <label class="form-label">Job Posting</label>
+            <select class="form-control" name="job_posting_id" id="job_posting_id_{{ submission.id }}">
+                <option value="">Select a job posting...</option>
+                {% for job in job_postings %}
+                <option value="{{ job.id }}" {% if selected_job_posting_id == job.id|stringformat:"s" %}selected{% endif %}>
+                    {{ job.title }}{% if job.department %} ({{ job.department }}){% endif %}{% if not job.is_active %} - inactive{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+            <div class="form-text">Link a published role to automatically include job details in the offer letter.</div>
+        </div>
+
+        <div id="jobPostingPreview_{{ submission.id }}" class="job-preview {% if selected_job_posting_id %}active{% endif %}">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                    <h6 id="jobPreviewTitle_{{ submission.id }}">
+                        {% if offer_letter and offer_letter.job_posting %}{{ offer_letter.job_posting.title }}{% endif %}
+                    </h6>
+                    <div class="job-meta" id="jobPreviewMeta_{{ submission.id }}"></div>
+                </div>
+                <a href="#" target="_blank" id="jobPreviewLink_{{ submission.id }}" class="btn btn-sm btn-outline-primary {% if not offer_letter or not offer_letter.job_posting %}d-none{% endif %}">
+                    View Posting
+                </a>
+            </div>
+            <div class="job-section mt-3" id="jobPreviewDetails_{{ submission.id }}">
+                {% if offer_letter and offer_letter.job_posting %}
+                    <strong>Description</strong>
+                    <p class="mb-2">{{ offer_letter.job_posting.description|default:"No description provided." }}</p>
+                {% else %}
+                    <span class="text-muted">Select a job posting to preview details.</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Position Title</label>
+            <input type="text" class="form-control" name="position_title" id="position_title_{{ submission.id }}"
+                   value="{% if offer_letter %}{{ offer_letter.position_title }}{% endif %}" required>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Employment Type</label>
+                <input type="text" class="form-control" name="employment_type" id="employment_type_{{ submission.id }}"
+                       value="{% if offer_letter %}{{ offer_letter.employment_type }}{% endif %}">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Pay Frequency</label>
+                <select class="form-control" name="pay_frequency">
+                    {% for value, label in pay_frequency_choices %}
+                    <option value="{{ value }}" {% if offer_letter and offer_letter.pay_frequency == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Salary Amount</label>
+                <input type="text" class="form-control" name="salary_amount"
+                       value="{% if offer_letter and offer_letter.salary_amount %}{{ offer_letter.salary_amount }}{% endif %}"
+                       placeholder="e.g. 85000">
+                <div class="form-text">Leave blank if no fixed salary amount should be included.</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Currency</label>
+                <input type="text" class="form-control" name="salary_currency"
+                       value="{% if offer_letter %}{{ offer_letter.salary_currency|default:'USD' }}{% else %}USD{% endif %}"
+                       maxlength="3" style="text-transform: uppercase;">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Target Start Date</label>
+                <input type="date" class="form-control" name="start_date"
+                       value="{% if offer_letter and offer_letter.start_date %}{{ offer_letter.start_date|date:'Y-m-d' }}{% endif %}">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Offer Expires</label>
+                <input type="date" class="form-control" name="offer_expires_at"
+                       value="{% if offer_letter and offer_letter.offer_expires_at %}{{ offer_letter.offer_expires_at|date:'Y-m-d' }}{% endif %}">
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Compensation Notes</label>
+            <textarea class="form-control" name="compensation_notes" rows="3" id="compensation_notes_{{ submission.id }}"
+                      placeholder="Additional compensation details, bonuses, equity, etc.">{% if offer_letter %}{{ offer_letter.compensation_notes }}{% endif %}</textarea>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Additional Terms</label>
+            <textarea class="form-control" name="additional_terms" rows="4" placeholder="Include benefits, probationary period, and other terms...">{% if offer_letter %}{{ offer_letter.additional_terms }}{% endif %}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 mb-3">
+            <i class="fas fa-save me-2"></i>Save Offer Letter Details
+        </button>
+    </form>
+
+    <div class="submission-card mt-3">
+        <h5 class="mb-3">
+            <i class="fas fa-file-signature me-2"></i>Offer Letter Signatures
+        </h5>
+
+        {% if offer_letter %}
+        <ul class="list-unstyled mb-4">
+            <li class="mb-2">
+                <strong>Status:</strong> {{ offer_letter.get_status_display }}
+            </li>
+            <li class="mb-2">
+                <strong>Employer:</strong>
+                {% if offer_letter.is_employer_signed %}
+                    {{ offer_letter.employer_signature_name }} &middot; {{ offer_letter.employer_signed_at|date:"M j, Y g:i A" }}
+                {% else %}
+                    <span class="text-muted">Not yet signed</span>
+                {% endif %}
+            </li>
+            <li class="mb-3">
+                <strong>Candidate:</strong>
+                {% if offer_letter.is_employee_signed %}
+                    {{ offer_letter.employee_signature_name }} &middot; {{ offer_letter.employee_signed_at|date:"M j, Y g:i A" }}
+                {% else %}
+                    <span class="text-muted">Pending signature</span>
+                {% endif %}
+            </li>
+        </ul>
+
+        {% if not offer_letter.is_employer_signed %}
+        <form method="post" class="review-form" id="employerSignatureForm_{{ submission.id }}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="employer_sign_offer">
+            <input type="hidden" name="submission_id" value="{{ submission.id }}">
+            <input type="hidden" name="return_path" value="{{ return_path|default:request.get_full_path }}">
+
+            <div class="mb-3">
+                <label class="form-label">Employer Signature</label>
+                <div class="signature-pad-wrapper">
+                    <canvas id="employer_signature_canvas_{{ submission.id }}" class="signature-canvas"></canvas>
+                </div>
+                <div class="signature-actions">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="clearEmployerSignature_{{ submission.id }}">
+                        <i class="fas fa-eraser me-1"></i>Clear
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-info" id="undoEmployerSignature_{{ submission.id }}">
+                        <i class="fas fa-undo me-1"></i>Undo
+                    </button>
+                    <small class="text-muted d-flex align-items-center gap-2">
+                        <i class="fas fa-info-circle"></i>Use your mouse or touch to draw your signature.
+                    </small>
+                </div>
+                <input type="hidden" name="employer_signature_data" id="employer_signature_data_{{ submission.id }}" required>
+                <div class="signature-status mt-2" id="employer_signature_status_{{ submission.id }}">
+                    <small class="text-warning">
+                        <i class="fas fa-exclamation-triangle"></i>Signature required
+                    </small>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Printed Name</label>
+                <input type="text" class="form-control" name="employer_signature_name" placeholder="Type your full name to sign" required>
+                <div class="form-text">Your signature locks the letter and notifies the candidate.</div>
+            </div>
+            <button type="submit" class="btn btn-success w-100">
+                <i class="fas fa-pen-nib me-2"></i>Sign &amp; Send to Candidate
+            </button>
+        </form>
+        {% elif offer_letter.status == 'pending_employee' %}
+        <div class="alert alert-info mb-0">
+            <i class="fas fa-hourglass-half me-2"></i>Awaiting the candidate's signature.
+        </div>
+        {% elif offer_letter.status == 'signed' %}
+        <div class="alert alert-success mb-0">
+            <i class="fas fa-check me-2"></i>Offer letter fully signed by both parties.
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="text-muted mb-0">
+            Save the offer letter details to unlock signatures.
+        </p>
+        {% endif %}
+    </div>
+
+    {% if job_postings_script_id %}
+    {{ job_postings_data|json_script:job_postings_script_id }}
+    {% endif %}
+
+    <script>
+    (function() {
+        const submissionId = "{{ submission.id }}";
+        const jobDataElementId = "{{ job_postings_script_id }}";
+
+        function wireSubmission(formId, loadingText) {
+            const form = document.getElementById(formId);
+            if (!form) {
+                return;
+            }
+
+            form.addEventListener('submit', function(evt) {
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i>${loadingText}`;
+                }
+            });
+        }
+
+        function setupSignaturePad(canvasId, outputFieldId, statusId, clearBtnId, undoBtnId) {
+            const canvas = document.getElementById(canvasId);
+            const outputField = document.getElementById(outputFieldId);
+            const statusEl = document.getElementById(statusId);
+            const clearBtn = document.getElementById(clearBtnId);
+            const undoBtn = document.getElementById(undoBtnId);
+
+            if (!canvas || !outputField) {
+                return;
+            }
+
+            const ctx = canvas.getContext('2d');
+            const strokes = [];
+            let drawing = false;
+
+            function resizeCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                const dataUrl = canvas.toDataURL();
+                canvas.width = rect.width * window.devicePixelRatio;
+                canvas.height = 160 * window.devicePixelRatio;
+                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                if (strokes.length === 0 && statusEl) {
+                    statusEl.innerHTML = '<small class="text-warning"><i class="fas fa-exclamation-triangle"></i>Signature required</small>';
+                }
+                const img = new Image();
+                img.onload = function() {
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = dataUrl;
+            }
+
+            function redraw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#1f2937';
+
+                strokes.forEach(path => {
+                    ctx.beginPath();
+                    path.forEach((point, index) => {
+                        if (index === 0) {
+                            ctx.moveTo(point.x, point.y);
+                        } else {
+                            ctx.lineTo(point.x, point.y);
+                        }
+                    });
+                    ctx.stroke();
+                });
+                if (outputField) {
+                    outputField.value = strokes.length ? canvas.toDataURL() : '';
+                }
+                if (statusEl) {
+                    if (strokes.length) {
+                        statusEl.innerHTML = '<small class="text-success"><i class="fas fa-check-circle"></i>Signature captured</small>';
+                    } else {
+                        statusEl.innerHTML = '<small class="text-warning"><i class="fas fa-exclamation-triangle"></i>Signature required</small>';
+                    }
+                }
+            }
+
+            function addPoint(x, y, path) {
+                path.push({ x, y });
+            }
+
+            function pointerDown(event) {
+                drawing = true;
+                const rect = canvas.getBoundingClientRect();
+                const path = [];
+                strokes.push(path);
+                addPoint((event.clientX - rect.left), (event.clientY - rect.top), path);
+                redraw();
+            }
+
+            function pointerMove(event) {
+                if (!drawing) return;
+                const rect = canvas.getBoundingClientRect();
+                const path = strokes[strokes.length - 1];
+                addPoint((event.clientX - rect.left), (event.clientY - rect.top), path);
+                redraw();
+            }
+
+            function pointerUp() {
+                drawing = false;
+            }
+
+            canvas.addEventListener('mousedown', pointerDown);
+            canvas.addEventListener('mousemove', pointerMove);
+            document.addEventListener('mouseup', pointerUp);
+
+            canvas.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                pointerDown(e.touches[0]);
+            }, { passive: false });
+            canvas.addEventListener('touchmove', function(e) {
+                e.preventDefault();
+                pointerMove(e.touches[0]);
+            }, { passive: false });
+            document.addEventListener('touchend', function() {
+                pointerUp();
+            }, { passive: false });
+
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function() {
+                    strokes.length = 0;
+                    redraw();
+                });
+            }
+
+            if (undoBtn) {
+                undoBtn.addEventListener('click', function() {
+                    if (strokes.length) {
+                        strokes.pop();
+                        redraw();
+                    }
+                });
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            wireSubmission('offerDetailsForm_' + submissionId, 'Saving...');
+            wireSubmission('employerSignatureForm_' + submissionId, 'Submitting...');
+
+            setupSignaturePad(
+                'employer_signature_canvas_' + submissionId,
+                'employer_signature_data_' + submissionId,
+                'employer_signature_status_' + submissionId,
+                'clearEmployerSignature_' + submissionId,
+                'undoEmployerSignature_' + submissionId
+            );
+
+            const dataElement = document.getElementById(jobDataElementId);
+            const jobPostings = dataElement ? JSON.parse(dataElement.textContent) : [];
+            const jobSelect = document.getElementById('job_posting_id_' + submissionId);
+            const jobPreview = document.getElementById('jobPostingPreview_' + submissionId);
+            const jobPreviewTitle = document.getElementById('jobPreviewTitle_' + submissionId);
+            const jobPreviewMeta = document.getElementById('jobPreviewMeta_' + submissionId);
+            const jobPreviewDetails = document.getElementById('jobPreviewDetails_' + submissionId);
+            const jobPreviewLink = document.getElementById('jobPreviewLink_' + submissionId);
+            const positionInput = document.getElementById('position_title_' + submissionId);
+            const employmentInput = document.getElementById('employment_type_' + submissionId);
+            const compensationNotesInput = document.getElementById('compensation_notes_' + submissionId);
+
+            if (compensationNotesInput && !compensationNotesInput.dataset.autoFilled) {
+                compensationNotesInput.dataset.autoFilled = 'false';
+            }
+
+            function buildJobSection(label, text) {
+                if (!text) {
+                    return '';
+                }
+                return '<div class="job-section"><strong>' + label + '</strong><p class="mb-2">' + text.replace(/\\n/g, '<br>') + '</p></div>';
+            }
+
+            function renderJob(jobId, autoFill = true) {
+                if (!jobPreview || !jobPreviewTitle || !jobPreviewMeta || !jobPreviewDetails) {
+                    return;
+                }
+
+                const job = jobPostings.find((item) => item.id === jobId);
+                if (!job) {
+                    jobPreview.classList.remove('active');
+                    jobPreviewTitle.textContent = '';
+                    jobPreviewMeta.textContent = '';
+                    jobPreviewDetails.innerHTML = '<span class="text-muted">Select a job posting to preview details.</span>';
+                    if (jobPreviewLink) {
+                        jobPreviewLink.classList.add('d-none');
+                    }
+                    return;
+                }
+
+                jobPreview.classList.add('active');
+                jobPreviewTitle.textContent = job.title || '';
+                const metaParts = [];
+                if (job.department) metaParts.push(job.department);
+                if (job.location) metaParts.push(job.location);
+                if (job.job_type_display) metaParts.push(job.job_type_display);
+                if (job.salary_range) metaParts.push('Salary: ' + job.salary_range);
+                jobPreviewMeta.textContent = metaParts.join(' | ');
+
+            if (jobPreviewLink) {
+                if (job.detail_url) {
+                    jobPreviewLink.href = job.detail_url;
+                    jobPreviewLink.classList.remove('d-none');
+                } else {
+                    jobPreviewLink.classList.add('d-none');
+                }
+            }
+
+            const sections = [
+                buildJobSection('Description', job.description),
+                buildJobSection('Requirements', job.requirements),
+                buildJobSection('Responsibilities', job.responsibilities),
+                buildJobSection('Benefits', job.benefits)
+            ].filter(Boolean);
+            jobPreviewDetails.innerHTML = sections.length
+                ? sections.join('')
+                : '<span class="text-muted">No additional details provided for this role.</span>';
+
+            if (autoFill) {
+                if (positionInput && job.title) {
+                    positionInput.value = job.title;
+                }
+                if (employmentInput && (job.job_type_display || job.job_type)) {
+                    employmentInput.value = job.job_type_display || job.job_type || '';
+                }
+                if (compensationNotesInput) {
+                    if (job.salary_range) {
+                        if (!compensationNotesInput.value || compensationNotesInput.dataset.autoFilled === 'true') {
+                            compensationNotesInput.value = 'Salary Range: ' + job.salary_range;
+                            compensationNotesInput.dataset.autoFilled = 'true';
+                        }
+                    } else if (compensationNotesInput.dataset.autoFilled === 'true') {
+                        compensationNotesInput.value = '';
+                        compensationNotesInput.dataset.autoFilled = 'false';
+                    }
+                }
+            }
+        }
+
+        if (compensationNotesInput) {
+            compensationNotesInput.addEventListener('input', () => {
+                compensationNotesInput.dataset.autoFilled = 'false';
+            });
+        }
+
+        if (jobSelect) {
+            jobSelect.addEventListener('change', () => renderJob(jobSelect.value, true));
+            if (jobSelect.value) {
+                renderJob(jobSelect.value, false);
+            } else if (jobPreview) {
+                jobPreview.classList.remove('active');
+            }
+        }
+    });
+})();
+</script>
+    {% else %}
+    <div class="alert alert-info mb-3">
+        <i class="fas fa-location-arrow me-2"></i>Manage the offer letter from the submissions overview.
+    </div>
+    <a href="{{ management_url }}" class="btn btn-outline-primary">
+        <i class="fas fa-search me-2"></i>Open Offer Letter Workspace
+    </a>
+    {% endif %}
+</div>
+{% else %}
+<div class="submission-card">
+    <h5 class="mb-3">
+        <i class="fas fa-file-signature me-2"></i>Offer Letter
+    </h5>
+    <p class="text-muted mb-0">
+        Approve the submission to unlock the offer letter workflow and signatures.
+    </p>
+</div>
+{% endif %}
