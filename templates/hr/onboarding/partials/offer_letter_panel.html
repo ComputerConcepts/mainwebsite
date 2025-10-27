@@ -15,23 +15,42 @@
             Last updated {{ offer_letter.updated_at|date:"M j, Y g:i A" }}
         </small>
     </div>
-    {% if preview_url %}
-    <div class="d-flex flex-wrap gap-2 mb-3">
-        <a href="{{ preview_url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-eye"></i> Preview PDF
-        </a>
-        {% if offer_letter.offer_pdf_path %}
-        <a href="{% url 'hr_offer_letter_pdf' offer_letter.id %}" class="btn btn-outline-primary btn-sm">
-            <i class="fas fa-file-pdf"></i> Download Signed PDF
-        </a>
-        {% endif %}
-    </div>
-    {% endif %}
     {% else %}
     <p class="text-muted">
         Capture role and compensation to generate the official offer letter for this candidate.
     </p>
     {% endif %}
+
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <form method="post" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="resend_pin">
+            <input type="hidden" name="submission_id" value="{{ submission.id }}">
+            <input type="hidden" name="return_path" value="{{ return_path|default:request.get_full_path }}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-paper-plane"></i> Resend PIN
+            </button>
+        </form>
+        <form method="post" class="d-inline" onsubmit="return confirm('Delete this applicant and all related onboarding records?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_applicant">
+            <input type="hidden" name="submission_id" value="{{ submission.id }}">
+            <input type="hidden" name="return_path" value="{{ return_path|default:request.get_full_path }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+                <i class="fas fa-user-slash"></i> Delete Applicant
+            </button>
+        </form>
+        {% if offer_letter and preview_url %}
+        <a href="{{ preview_url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-eye"></i> Preview PDF
+        </a>
+        {% endif %}
+        {% if offer_letter and offer_letter.offer_pdf_path %}
+        <a href="{% url 'hr_offer_letter_pdf' offer_letter.id %}" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-file-pdf"></i> Download Signed PDF
+        </a>
+        {% endif %}
+    </div>
 
     {% if show_offer_letter_actions %}
     <form method="post" class="review-form" id="offerDetailsForm_{{ submission.id }}">

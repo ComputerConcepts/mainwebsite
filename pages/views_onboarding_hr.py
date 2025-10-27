@@ -270,6 +270,30 @@ def _handle_submission_post(request, submission, default_redirect_url):
             messages.warning(request, "Offer letter signed, but we were unable to send the notification email. Please contact the candidate manually.")
         return redirect(redirect_url)
 
+    if action == 'resend_pin':
+        prospective = submission.invitation.prospective_employee
+        prospective.generate_pin()
+        success = OnboardingEmailService.send_onboarding_invitation(
+            submission.invitation,
+            request,
+            force_new_pin=True,
+        )
+        if success:
+            messages.success(request, f"A fresh PIN was emailed to {prospective.email}.")
+        else:
+            messages.warning(
+                request,
+                "Generated a new PIN, but the invitation email could not be sent. Please retry or contact support.",
+            )
+        return redirect(redirect_url)
+
+    if action == 'delete_applicant':
+        prospective = submission.invitation.prospective_employee
+        applicant_email = prospective.email
+        prospective.delete()
+        messages.success(request, f"{applicant_email} and associated onboarding records were removed.")
+        return redirect(redirect_url)
+
     messages.error(request, "Unknown action.")
     return redirect(redirect_url)
 
