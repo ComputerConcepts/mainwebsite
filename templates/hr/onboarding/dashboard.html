@@ -168,6 +168,9 @@
         <a href="{% url 'create_onboarding_form' %}" class="action-btn">
             <i class="fas fa-plus"></i> Create New Form
         </a>
+        <a href="{% url 'manage_onboarding_pdf_forms' %}" class="action-btn">
+            <i class="fas fa-file-pdf"></i> Manage PDF Forms
+        </a>
         <a href="{% url 'send_onboarding_invitation' %}" class="action-btn secondary">
             <i class="fas fa-paper-plane"></i> Send Invitation
         </a>
@@ -177,7 +180,7 @@
     </div>
     
     <!-- Statistics Cards -->
-    <div class="row">
+    <div class="row mt-3">
         <div class="col-md-3">
             <div class="dashboard-card">
                 <div class="stat-number">{{ stats.total_forms }}</div>
@@ -206,7 +209,7 @@
     
     <div class="row">
         <!-- Recent Submissions -->
-        <div class="col-lg-6">
+        <div class="col-xl-4 col-lg-6">
             <div class="recent-activity">
                 <div class="activity-header">
                     <i class="fas fa-clock"></i> Recent Submissions
@@ -240,8 +243,49 @@
             </div>
         </div>
 
+        <!-- PDF Tasks -->
+        <div class="col-xl-4 col-lg-6 mt-4 mt-lg-0">
+            <div class="recent-activity">
+                <div class="activity-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="fas fa-file-pdf"></i> PDF Tasks Needing Attention
+                </div>
+                <div class="activity-content">
+                    {% for task in recent_pdf_tasks %}
+                    <div class="activity-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ task.pdf_form.title }}</h6>
+                                <p class="mb-1 text-muted small">{{ task.invitation.prospective_employee.email }}</p>
+                                {% if task.completed_at %}
+                                <small class="text-muted d-block">Uploaded {{ task.completed_at|timesince }} ago</small>
+                                {% endif %}
+                                {% if task.review_notes %}
+                                <small class="d-block mt-1 text-danger">
+                                    <i class="fas fa-comment-dots me-1"></i>{{ task.review_notes|truncatechars:80 }}
+                                </small>
+                                {% endif %}
+                            </div>
+                            <span class="status-chip">
+                                {% if task.status == 'needs_revision' %}
+                                    <i class="fas fa-exclamation-triangle text-warning"></i> Needs Revision
+                                {% else %}
+                                    <i class="fas fa-inbox text-primary"></i> Awaiting Review
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="activity-item text-center text-muted">
+                        <i class="fas fa-file-pdf fa-2x mb-2"></i>
+                        <p class="mb-0">No PDF submissions need attention</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
         <!-- Applicant Review -->
-        <div class="col-lg-6">
+        <div class="col-xl-4 col-lg-6 mt-4 mt-xl-0">
             <div class="recent-activity">
                 <div class="activity-header" style="background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);">
                     <i class="fas fa-user-tie"></i> Applicant Review
@@ -301,9 +345,30 @@
         </div>
     </div>
 
+    <div class="row">
+        <div class="col-md-4">
+            <div class="dashboard-card" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #2c3e50;">
+                <div class="stat-number">{{ stats.pdf_forms }}</div>
+                <div class="stat-label">Active PDF Templates</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dashboard-card" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #2d3436;">
+                <div class="stat-number">{{ stats.pdf_pending_review }}</div>
+                <div class="stat-label">PDF Awaiting Review</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dashboard-card" style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); color: #1d3557;">
+                <div class="stat-number">{{ stats.pdf_waiting_upload }}</div>
+                <div class="stat-label">PDF Awaiting Upload</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Recent Invitations -->
     <div class="row mt-4">
-        <div class="col-lg-6">
+        <div class="col-12">
             <div class="recent-activity">
                 <div class="activity-header" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
                     <i class="fas fa-paper-plane"></i> Recent Invitations

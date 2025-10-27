@@ -55,6 +55,14 @@
         border-color: #6366f1;
         box-shadow: 0 12px 25px rgba(99, 102, 241, 0.12);
     }
+    .pdf-select-card {
+        border-left: 4px solid #f97316;
+        background: #fff7ed;
+    }
+    .pdf-select-card:hover {
+        border-color: #ea580c;
+        box-shadow: 0 12px 22px rgba(234, 88, 12, 0.15);
+    }
     .form-card input[type="checkbox"] {
         width: 20px;
         height: 20px;
@@ -195,6 +203,42 @@
                         </div>
                     {% endfor %}
                 </div>
+
+                <div class="mt-5">
+                    <h5 class="fw-semibold mb-3">
+                        <i class="fas fa-file-pdf me-2 text-danger"></i>Attach PDF Templates
+                    </h5>
+                    <p class="text-muted mb-3">
+                        Select any PDF documents the candidate must download, complete, and re-upload during onboarding.
+                    </p>
+                    {% if pdf_forms %}
+                    <div class="row g-3">
+                        {% for pdf_form in pdf_forms %}
+                        <div class="col-md-6">
+                            <label class="form-card pdf-select-card d-flex align-items-start">
+                                <input type="checkbox" name="pdf_form_ids" value="{{ pdf_form.id }}"
+                                       {% if pdf_form.id|stringformat:"s" in selected_pdf_forms %}checked{% endif %}>
+                                <div>
+                                    <div class="fw-semibold">{{ pdf_form.title }}</div>
+                                    <div class="text-muted small mt-1">
+                                        {{ pdf_form.description|default:"No description provided."|truncatechars:140 }}
+                                    </div>
+                                    {% if pdf_form.default_instructions %}
+                                    <div class="text-muted small mt-1">
+                                        <i class="fas fa-info-circle me-1"></i>{{ pdf_form.default_instructions|truncatechars:160 }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-light border">
+                        <i class="fas fa-info-circle me-1"></i>No PDF templates are active. Upload one from the PDF manager.
+                    </div>
+                    {% endif %}
+                </div>
             </div>
 
             <div class="wizard-step" data-step="3">
@@ -214,6 +258,11 @@
                             <h5 class="fw-semibold mb-3">Assigned Forms</h5>
                             <ul id="summary-forms">
                                 <li>No forms selected yet.</li>
+                            </ul>
+                            <hr>
+                            <h5 class="fw-semibold mb-3">PDF Attachments</h5>
+                            <ul id="summary-pdf-forms">
+                                <li>No PDF documents attached.</li>
                             </ul>
                         </div>
                     </div>
@@ -287,16 +336,17 @@
             form.querySelector('input[name="first_name"]').value.trim(),
             form.querySelector('input[name="last_name"]').value.trim()
         ].filter(Boolean).join(' ');
-        const email = form.querySelector('input[name="email"]').value.trim() || '—';
-        const phone = form.querySelector('input[name="phone"]').value.trim() || '—';
+        const email = form.querySelector('input[name="email"]').value.trim() || '-';
+        const phone = form.querySelector('input[name="phone"]').value.trim() || '-';
         const jobSelect = form.querySelector('select[name="job_posting"]');
         const job = jobSelect && jobSelect.options[jobSelect.selectedIndex].text.trim();
         const formsList = document.getElementById('summary-forms');
+        const pdfList = document.getElementById('summary-pdf-forms');
 
-        document.getElementById('summary-name').textContent = name || '—';
+        document.getElementById('summary-name').textContent = name || '-';
         document.getElementById('summary-email').textContent = email;
         document.getElementById('summary-phone').textContent = phone;
-        document.getElementById('summary-job').textContent = job || '—';
+        document.getElementById('summary-job').textContent = job || '-';
 
         const checkedForms = Array.from(form.querySelectorAll('input[name="form_ids"]:checked'));
         formsList.innerHTML = '';
@@ -304,16 +354,31 @@
             const item = document.createElement('li');
             item.textContent = 'No forms selected yet.';
             formsList.appendChild(item);
-            return;
+        } else {
+            checkedForms.forEach(input => {
+                const label = input.closest('.form-card');
+                const title = label ? label.querySelector('.fw-semibold').textContent.trim() : input.value;
+                const item = document.createElement('li');
+                item.textContent = title;
+                formsList.appendChild(item);
+            });
         }
 
-        checkedForms.forEach(input => {
-            const label = input.closest('.form-card');
-            const title = label ? label.querySelector('.fw-semibold').textContent.trim() : input.value;
+        const checkedPdfs = Array.from(form.querySelectorAll('input[name="pdf_form_ids"]:checked'));
+        pdfList.innerHTML = '';
+        if (!checkedPdfs.length) {
             const item = document.createElement('li');
-            item.textContent = title;
-            formsList.appendChild(item);
-        });
+            item.textContent = 'No PDF documents attached.';
+            pdfList.appendChild(item);
+        } else {
+            checkedPdfs.forEach(input => {
+                const label = input.closest('.form-card');
+                const title = label ? label.querySelector('.fw-semibold').textContent.trim() : input.value;
+                const item = document.createElement('li');
+                item.textContent = title;
+                pdfList.appendChild(item);
+            });
+        }
     }
 
     backButton.addEventListener('click', () => updateStep('back'));

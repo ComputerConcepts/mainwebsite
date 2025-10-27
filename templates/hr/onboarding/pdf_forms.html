@@ -1,0 +1,290 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Manage PDF Onboarding Forms{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        margin-bottom: 2rem;
+    }
+    .card-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        padding: 24px;
+        color: #fff;
+        box-shadow: 0 15px 35px rgba(102, 126, 234, 0.25);
+    }
+    .card-gradient h1 {
+        margin-bottom: 0.25rem;
+    }
+    .card-gradient p {
+        margin-bottom: 0;
+        opacity: 0.9;
+    }
+    .upload-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+        border: 1px solid rgba(99, 102, 241, 0.15);
+    }
+    .upload-card h3 {
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: #1f2937;
+    }
+    .pdf-form-card {
+        background: #fff;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+        border: 1px solid #e5e7eb;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .pdf-form-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+    }
+    .pdf-form-card h5 {
+        margin-bottom: 0.25rem;
+    }
+    .pdf-form-card .meta {
+        color: #64748b;
+        font-size: 0.9rem;
+    }
+    .stat-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .stat-chip i {
+        font-size: 0.7rem;
+    }
+    .pending-task-card {
+        border-left: 4px solid #6366f1;
+        padding: 15px 18px;
+        border-radius: 12px;
+        background: #f8fafc;
+        margin-bottom: 14px;
+    }
+    .pending-task-card:last-child {
+        margin-bottom: 0;
+    }
+    .btn-soft {
+        border-radius: 999px;
+        padding: 8px 16px;
+        font-weight: 600;
+    }
+    textarea.form-control {
+        min-height: 110px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="page-header">
+        <div class="card-gradient">
+            <h1 class="h3 mb-1"><i class="fas fa-file-signature me-2"></i> PDF Form Library</h1>
+            <p>Upload fillable PDFs for candidates and keep track of their completed documents.</p>
+        </div>
+    </div>
+
+    <div class="row g-4 align-items-stretch">
+        <div class="col-lg-5">
+            <div class="upload-card h-100">
+                <h3 class="mb-3"><i class="fas fa-upload me-2 text-primary"></i>Upload New PDF Template</h3>
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create">
+                    <div class="mb-3">
+                        <label for="title" class="form-label fw-semibold">Title</label>
+                        <input type="text" class="form-control" id="title" name="title" placeholder="e.g. Direct Deposit Authorization" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label fw-semibold">Description</label>
+                        <textarea class="form-control" id="description" name="description" placeholder="Short summary for HR staff"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="default_instructions" class="form-label fw-semibold">Applicant Instructions</label>
+                        <textarea class="form-control" id="default_instructions" name="default_instructions" placeholder="Explain how the applicant should complete and upload the document."></textarea>
+                        <div class="form-text">These instructions appear to the applicant unless you override them per invitation.</div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="template_file" class="form-label fw-semibold">PDF Template</label>
+                        <input type="file" class="form-control" id="template_file" name="template_file" accept="application/pdf" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-soft w-100">
+                        <i class="fas fa-cloud-upload-alt me-2"></i>Save PDF Template
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="upload-card h-100">
+                <h3 class="mb-3">
+                    <i class="fas fa-clipboard-check me-2 text-success"></i>PDF Uploads Awaiting Review
+                </h3>
+                {% if pending_reviews %}
+                    {% for task in pending_reviews %}
+                    <div class="pending-task-card">
+                        <div class="d-flex justify-content-between flex-wrap gap-2">
+                            <div>
+                                <h6 class="mb-1">{{ task.pdf_form.title }}</h6>
+                                <div class="meta">
+                                    {{ task.invitation.prospective_employee.email }}
+                                    {% if task.completed_at %}
+                                        &middot; Uploaded {{ task.completed_at|timesince }} ago
+                                    {% endif %}
+                                </div>
+                                {% if task.review_notes %}
+                                <div class="mt-2 text-danger small">
+                                    <i class="fas fa-comment-dots me-1"></i>{{ task.review_notes }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex flex-column gap-2 align-items-start">
+                                <a class="btn btn-outline-primary btn-sm"
+                                   href="{% url 'download_onboarding_pdf_submission' task.id %}?next={{ request.path }}">
+                                    <i class="fas fa-file-download me-1"></i>Download Upload
+                                </a>
+                                <a class="btn btn-outline-secondary btn-sm"
+                                   href="{% url 'download_onboarding_pdf_template' task.pdf_form.id %}">
+                                    <i class="fas fa-file-pdf me-1"></i>Blank Template
+                                </a>
+                                <a class="btn btn-outline-dark btn-sm"
+                                   href="{% url 'onboarding_submissions' %}?search={{ task.invitation.prospective_employee.email }}">
+                                    <i class="fas fa-user-search me-1"></i>Open Candidate
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="pending-task-card text-center">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <p class="mb-0 text-muted">No PDF submissions are waiting for review right now.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0">Existing PDF Templates</h4>
+            <span class="text-muted small">{{ pdf_forms|length }} template{{ pdf_forms|length|pluralize }}</span>
+        </div>
+
+        {% if pdf_forms %}
+        <div class="row g-4">
+            {% for pdf_form in pdf_forms %}
+            <div class="col-xl-4 col-lg-6">
+                <div class="pdf-form-card h-100 d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">{{ pdf_form.title }}</h5>
+                            <div class="meta">
+                                Uploaded {{ pdf_form.created_at|date:"M j, Y" }}
+                                {% if pdf_form.created_by %}
+                                    &middot; {{ pdf_form.created_by.get_full_name|default:pdf_form.created_by.username }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if not pdf_form.is_active %}
+                            <span class="badge bg-secondary">Archived</span>
+                        {% endif %}
+                    </div>
+                    <p class="mt-3 mb-3 text-muted">
+                        {{ pdf_form.description|default:"No description provided." }}
+                    </p>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="stat-chip">
+                            <i class="fas fa-users"></i>{{ pdf_form.total_tasks }} assigned
+                        </span>
+                        <span class="stat-chip" style="background:#e0f2fe;color:#0369a1;">
+                            <i class="fas fa-hourglass-half"></i>{{ pdf_form.pending_uploads }} awaiting upload
+                        </span>
+                        <span class="stat-chip" style="background:#fee2f8;color:#9d174d;">
+                            <i class="fas fa-inbox"></i>{{ pdf_form.awaiting_review }} awaiting review
+                        </span>
+                        {% if pdf_form.needs_revision %}
+                        <span class="stat-chip" style="background:#fee2e2;color:#b91c1c;">
+                            <i class="fas fa-exclamation-triangle"></i>{{ pdf_form.needs_revision }} needs revision
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="mt-auto">
+                        <div class="btn-group w-100 mb-3" role="group">
+                            <a class="btn btn-outline-primary"
+                               href="{% url 'download_onboarding_pdf_template' pdf_form.id %}">
+                                <i class="fas fa-file-download me-1"></i>Template
+                            </a>
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="toggle">
+                                <input type="hidden" name="pdf_form_id" value="{{ pdf_form.id }}">
+                                <button type="submit" class="btn btn-outline-secondary">
+                                    {% if pdf_form.is_active %}
+                                        <i class="fas fa-archive me-1"></i>Archive
+                                    {% else %}
+                                        <i class="fas fa-undo me-1"></i>Activate
+                                    {% endif %}
+                                </button>
+                            </form>
+                            <form method="post" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="pdf_form_id" value="{{ pdf_form.id }}">
+                                <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Delete this PDF template?')">
+                                    <i class="fas fa-trash-alt me-1"></i>Delete
+                                </button>
+                            </form>
+                        </div>
+                        <form method="post" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update">
+                            <input type="hidden" name="pdf_form_id" value="{{ pdf_form.id }}">
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold">Edit Title</label>
+                                <input type="text" class="form-control" name="title" value="{{ pdf_form.title }}">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold">Edit Description</label>
+                                <textarea class="form-control" name="description" rows="2">{{ pdf_form.description }}</textarea>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold">Applicant Instructions</label>
+                                <textarea class="form-control" name="default_instructions" rows="3">{{ pdf_form.default_instructions }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Replace PDF (optional)</label>
+                                <input type="file" class="form-control" name="template_file" accept="application/pdf">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-save me-1"></i>Save Changes
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="pdf-form-card text-center">
+            <i class="fas fa-file-pdf fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No PDF templates yet</h5>
+            <p class="text-muted mb-0">Upload your first PDF form using the panel above.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

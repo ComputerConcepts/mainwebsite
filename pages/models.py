@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+import os
 import uuid
 
 class StorageAllocation(models.Model):
@@ -1380,6 +1381,145 @@ class OnboardingInvitation(models.Model):
     
     def __str__(self):
         return f"{self.onboarding_form.title} -> {self.prospective_employee.email}"
+
+
+def onboarding_pdf_template_upload_path(instance, filename):
+    """Path helper for storing blank onboarding PDF templates"""
+    identifier = instance.id or uuid.uuid4()
+    return os.path.join('onboarding', 'pdf_templates', str(identifier), filename)
+
+
+def onboarding_pdf_submission_upload_path(instance, filename):
+    """Path helper for storing completed onboarding PDF submissions"""
+    identifier = instance.id or uuid.uuid4()
+    return os.path.join('onboarding', 'pdf_submissions', str(identifier), filename)
+
+
+class OnboardingPDFForm(models.Model):
+    """Blank PDF documents that prospects must download, fill, and re-upload"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    template_file = models.FileField(upload_to=onboarding_pdf_template_upload_path)
+    default_instructions = models.TextField(
+        blank=True,
+        help_text="Guidance shown to prospects when completing this PDF."
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='onboarding_pdf_forms'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['title']
+
+    def __str__(self):
+        return self.title
+
+
+class OnboardingPDFTask(models.Model):
+    """Assignment linking a PDF form to a specific invitation/prospect workflow"""
+    STATUS_PENDING = 'pending'
+    STATUS_SUBMITTED = 'submitted'
+    STATUS_APPROVED = 'approved'
+    STATUS_NEEDS_REVISION = 'needs_revision'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Awaiting Upload'),
+        (STATUS_SUBMITTED, 'Submitted'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_NEEDS_REVISION, 'Needs Revision'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    pdf_form = models.ForeignKey(
+        OnboardingPDFForm,
+        on_delete=models.CASCADE,
+        related_name='tasks'
+    )
+    invitation = models.ForeignKey(
+        OnboardingInvitation,
+        on_delete=models.CASCADE,
+        related_name='pdf_tasks'
+    )
+    assigned_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_onboarding_pdf_tasks'
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    due_date = models.DateField(null=True, blank=True)
+    custom_instructions = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    completed_file = models.FileField(
+        upload_to=onboarding_pdf_submission_upload_path,
+        blank=True,
+        null=True
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    submitted_by = models.ForeignKey(
+        ProspectiveEmployee,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='submitted_onboarding_pdf_tasks'
+    )
+    review_notes = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_onboarding_pdf_tasks'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ['pdf_form', 'invitation']
+        ordering = ['-assigned_at']
+
+    def __str__(self):
+        return f"{self.pdf_form.title} for {self.invitation.prospective_employee.email}"
+
+    @property
+    def instructions(self):
+        """Instructions visible to the prospect, falling back to the template defaults."""
+        return self.custom_instructions or self.pdf_form.default_instructions
+
+    def mark_submitted(self, prospect, uploaded_file):
+        """Convenience helper when a prospect uploads a completed PDF."""
+        if self.completed_file:
+            try:
+                self.completed_file.delete(save=False)
+            except Exception:
+                pass
+        self.completed_file = uploaded_file
+        self.completed_at = timezone.now()
+        self.submitted_by = prospect
+        self.status = self.STATUS_SUBMITTED
+        self.review_notes = ''
+        self.reviewed_by = None
+        self.reviewed_at = None
+        self.save(
+            update_fields=[
+                'completed_file',
+                'completed_at',
+                'submitted_by',
+                'status',
+                'review_notes',
+                'reviewed_by',
+                'reviewed_at'
+            ]
+        )
 
 
 class OnboardingSubmission(models.Model):

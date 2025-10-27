@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.db.models import Prefetch
 from django.conf import settings
 import json
 import os
@@ -21,12 +22,22 @@ import logging
 from datetime import timedelta
 
 from .models import (
-    ProspectiveEmployee, OnboardingInvitation, OnboardingSubmission,
-    OnboardingForm, OnboardingFormField, OnboardingOfferLetter
+    ProspectiveEmployee,
+    OnboardingInvitation,
+    OnboardingSubmission,
+    OnboardingForm,
+    OnboardingFormField,
+    OnboardingOfferLetter,
+    OnboardingPDFTask,
 )
 from .onboarding_emails import OnboardingEmailService
 
 logger = logging.getLogger(__name__)
+
+
+def onboarding_info(request):
+    """Public landing page describing the onboarding process."""
+    return render(request, 'onboarding/info.html')
 
 
 def _generate_offer_letter_pdf(offer_letter):
@@ -266,19 +277,44 @@ def onboarding_dashboard(request):
         messages.error(request, "Session expired. Please log in again.")
         return redirect('onboarding_login')
     
-    # Get pending invitations
+    pdf_task_prefetch = Prefetch(
+        'pdf_tasks',
+        queryset=OnboardingPDFTask.objects.filter(is_active=True).select_related('pdf_form'),
+        to_attr='active_pdf_tasks'
+    )
     invitations = OnboardingInvitation.objects.filter(
         prospective_employee=prospective_employee
-    ).select_related('onboarding_form').order_by('-sent_at')
+    ).select_related('onboarding_form').prefetch_related(pdf_task_prefetch).order_by('-sent_at')
     
     # Check for completed submissions and those needing revision
     completed_invitations = []
     pending_invitations = []
+    total_pdf_tasks = 0
+    awaiting_pdf_upload = 0
+    awaiting_pdf_review = 0
     
     for invitation in invitations:
+        pdf_tasks = list(getattr(invitation, 'active_pdf_tasks', []))
+        invite_pdf_summary = {
+            'needs_upload': 0,
+            'awaiting_review': 0,
+            'all_approved': True,
+        }
+        for task in pdf_tasks:
+            total_pdf_tasks += 1
+            if task.status in [OnboardingPDFTask.STATUS_PENDING, OnboardingPDFTask.STATUS_NEEDS_REVISION]:
+                awaiting_pdf_upload += 1
+                invite_pdf_summary['needs_upload'] += 1
+                invite_pdf_summary['all_approved'] = False
+            elif task.status == OnboardingPDFTask.STATUS_SUBMITTED:
+                awaiting_pdf_review += 1
+                invite_pdf_summary['awaiting_review'] += 1
+                invite_pdf_summary['all_approved'] = False
+            elif task.status != OnboardingPDFTask.STATUS_APPROVED:
+                invite_pdf_summary['all_approved'] = False
+        
         try:
             submission = OnboardingSubmission.objects.get(invitation=invitation)
-            # Only consider submissions as completed if they're approved
             if submission.review_status == 'approved':
                 try:
                     offer_letter = submission.offer_letter
@@ -288,30 +324,38 @@ def onboarding_dashboard(request):
                 completed_invitations.append({
                     'invitation': invitation,
                     'submission': submission,
-                    'offer_letter': offer_letter
+                    'offer_letter': offer_letter,
+                    'pdf_tasks': pdf_tasks,
+                    'pdf_summary': invite_pdf_summary,
                 })
             else:
-                # Submissions that are pending, under review, rejected, or need revision
-                # should appear as pending with relevant feedback
                 pending_invitations.append({
                     'invitation': invitation,
                     'submission': submission,
                     'needs_revision': submission.review_status == 'needs_revision',
-                    'review_notes': submission.review_notes if submission.review_status == 'needs_revision' else None
+                    'review_notes': submission.review_notes if submission.review_status == 'needs_revision' else None,
+                    'pdf_tasks': pdf_tasks,
+                    'pdf_summary': invite_pdf_summary,
                 })
         except OnboardingSubmission.DoesNotExist:
-            # No submission yet - truly pending
             pending_invitations.append({
                 'invitation': invitation,
                 'submission': None,
                 'needs_revision': False,
-                'review_notes': None
+                'review_notes': None,
+                'pdf_tasks': pdf_tasks,
+                'pdf_summary': invite_pdf_summary,
             })
     
     context = {
         'prospective_employee': prospective_employee,
         'pending_invitations': pending_invitations,
         'completed_invitations': completed_invitations,
+        'pdf_task_stats': {
+            'total': total_pdf_tasks,
+            'awaiting_upload': awaiting_pdf_upload,
+            'awaiting_review': awaiting_pdf_review,
+        },
     }
     
     return render(request, 'onboarding/dashboard.html', context)
@@ -669,63 +713,205 @@ def download_offer_letter_pdf(request, offer_id):
     return response
 
 
-def onboarding_status(request, submission_id):
-    """Check status of submitted onboarding form"""
-    # Check if user is logged in
+
+@require_http_methods(["GET"])
+def download_onboarding_pdf_template(request, task_id):
+    """Allow prospects to download the blank PDF template for an assigned task."""
     prospect_id = request.session.get('onboarding_prospect_id')
     if not prospect_id:
-        messages.error(request, "Please log in to check your application status.")
+        messages.error(request, "Please log in to access onboarding documents.")
         return redirect('onboarding_login')
-    
+
     try:
         prospective_employee = ProspectiveEmployee.objects.get(id=prospect_id, is_active=True)
     except ProspectiveEmployee.DoesNotExist:
         messages.error(request, "Session expired. Please log in again.")
         return redirect('onboarding_login')
-    
-    # Get submission
+
+    task = get_object_or_404(
+        OnboardingPDFTask,
+        id=task_id,
+        invitation__prospective_employee=prospective_employee,
+        is_active=True,
+    )
+
+    pdf_form = task.pdf_form
+    if not pdf_form.template_file:
+        messages.error(request, "This PDF template is not available right now. Please contact HR.")
+        return redirect('onboarding_dashboard')
+
+    try:
+        pdf_file = pdf_form.template_file.open('rb')
+    except Exception as exc:
+        logger.error("Failed to open onboarding PDF template: %s", exc)
+        messages.error(request, "We couldn't open that PDF template. Please try again later.")
+        return redirect('onboarding_dashboard')
+
+    filename = os.path.basename(pdf_form.template_file.name) or f"{pdf_form.title}.pdf"
+    response = FileResponse(pdf_file, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@require_http_methods(["GET"])
+def download_onboarding_pdf_submission(request, task_id):
+    """Allow prospects to download the PDF they previously uploaded."""
+    prospect_id = request.session.get('onboarding_prospect_id')
+    if not prospect_id:
+        messages.error(request, "Please log in to access onboarding documents.")
+        return redirect('onboarding_login')
+
+    try:
+        prospective_employee = ProspectiveEmployee.objects.get(id=prospect_id, is_active=True)
+    except ProspectiveEmployee.DoesNotExist:
+        messages.error(request, "Session expired. Please log in again.")
+        return redirect('onboarding_login')
+
+    task = get_object_or_404(
+        OnboardingPDFTask,
+        id=task_id,
+        invitation__prospective_employee=prospective_employee,
+    )
+
+    if not task.completed_file:
+        messages.error(request, "You haven't uploaded this PDF yet.")
+        return redirect('onboarding_dashboard')
+
+    try:
+        uploaded_pdf = task.completed_file.open('rb')
+    except Exception as exc:
+        logger.error("Failed to open uploaded PDF for prospect: %s", exc)
+        messages.error(request, "We couldn't open your uploaded PDF. Please try uploading it again.")
+        return redirect('onboarding_dashboard')
+
+    filename = os.path.basename(task.completed_file.name) or f"{task.pdf_form.title}_Uploaded.pdf"
+    response = FileResponse(uploaded_pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@require_http_methods(["POST"])
+def upload_onboarding_pdf(request, task_id):
+    """Handle PDF uploads from prospects."""
+    prospect_id = request.session.get('onboarding_prospect_id')
+    if not prospect_id:
+        messages.error(request, "Please log in to upload your documents.")
+        return redirect('onboarding_login')
+
+    try:
+        prospective_employee = ProspectiveEmployee.objects.get(id=prospect_id, is_active=True)
+    except ProspectiveEmployee.DoesNotExist:
+        messages.error(request, "Session expired. Please log in again.")
+        return redirect('onboarding_login')
+
+    task = get_object_or_404(
+        OnboardingPDFTask,
+        id=task_id,
+        invitation__prospective_employee=prospective_employee,
+        is_active=True,
+    )
+
+    uploaded_file = request.FILES.get('completed_pdf')
+    if not uploaded_file:
+        messages.error(request, "Please choose a PDF file to upload.")
+        return redirect('onboarding_dashboard')
+
+    if uploaded_file.content_type not in ['application/pdf', 'application/x-pdf'] and not uploaded_file.name.lower().endswith('.pdf'):
+        messages.error(request, "Only PDF files are supported for these documents.")
+        return redirect('onboarding_dashboard')
+
+    if uploaded_file.size > 15 * 1024 * 1024:
+        messages.error(request, "The PDF is too large. Please upload a file smaller than 15 MB.")
+        return redirect('onboarding_dashboard')
+
+    try:
+        task.mark_submitted(prospective_employee, uploaded_file)
+        messages.success(request, f"{task.pdf_form.title} uploaded successfully. We'll review it shortly.")
+    except Exception as exc:
+        logger.error("Failed to save uploaded onboarding PDF: %s", exc)
+        messages.error(request, "We couldn't upload that PDF. Please try again or contact HR.")
+
+    return redirect('onboarding_dashboard')
+
+
+def onboarding_status(request, submission_id):
+    """Check status of submitted onboarding form"""
+    prospect_id = request.session.get("onboarding_prospect_id")
+    if not prospect_id:
+        messages.error(request, "Please log in to check your application status.")
+        return redirect("onboarding_login")
+
+    try:
+        prospective_employee = ProspectiveEmployee.objects.get(id=prospect_id, is_active=True)
+    except ProspectiveEmployee.DoesNotExist:
+        messages.error(request, "Session expired. Please log in again.")
+        return redirect("onboarding_login")
+
     submission = get_object_or_404(
         OnboardingSubmission,
         id=submission_id,
         invitation__prospective_employee=prospective_employee
     )
-    
+
     context = {
-        'submission': submission,
-        'prospective_employee': prospective_employee,
+        "submission": submission,
+        "prospective_employee": prospective_employee,
     }
-    
-    return render(request, 'onboarding/status.html', context)
+
+    return render(request, "onboarding/status.html", context)
 
 
 def onboarding_logout(request):
-    """Logout prospective employee"""
-    # Clear session
-    if 'onboarding_prospect_id' in request.session:
-        del request.session['onboarding_prospect_id']
-    if 'onboarding_email' in request.session:
-        del request.session['onboarding_email']
-    
+    """Clear onboarding session data for the prospect."""
+    for key in ["onboarding_prospect_id", "onboarding_email"]:
+        if key in request.session:
+            del request.session[key]
     messages.success(request, "You have been logged out successfully.")
-    return redirect('onboarding_login')
+    return redirect("onboarding_login")
 
 
 @require_http_methods(["GET"])
 def form_field_options(request, form_id, field_name):
-    """API endpoint to get field options for dynamic forms"""
+    """Return available options for a specific form field.
+
+    Supports optional filtering via query parameter `q` and limiting via `limit`.
+    Response shape: { "options": ["opt1", "opt2", ...] }
+    """
     try:
         form = OnboardingForm.objects.get(id=form_id, is_active=True)
-        field = form.fields.get(field_name=field_name)
-        
-        return JsonResponse({
-            'options': field.field_options,
-            'field_type': field.field_type
-        })
-    except (OnboardingForm.DoesNotExist, OnboardingFormField.DoesNotExist):
-        return JsonResponse({'error': 'Field not found'}, status=404)
+    except OnboardingForm.DoesNotExist:
+        return JsonResponse({"error": "Form not found"}, status=404)
 
+    try:
+        field = OnboardingFormField.objects.get(
+            onboarding_form=form, field_name=field_name, is_active=True
+        )
+    except OnboardingFormField.DoesNotExist:
+        return JsonResponse({"error": "Field not found"}, status=404)
 
-# Public landing page for onboarding (no login required)
-def onboarding_info(request):
-    """Public information page about the onboarding process"""
-    return render(request, 'onboarding/info.html')
+    options = field.field_options or []
+
+    # Normalize to list of strings
+    normalized = []
+    for opt in options:
+        if isinstance(opt, (list, tuple)) and len(opt) >= 1:
+            normalized.append(str(opt[0]))
+        elif isinstance(opt, dict):
+            # Try common keys like value/label
+            normalized.append(str(opt.get("value") or opt.get("label") or ""))
+        else:
+            normalized.append(str(opt))
+    normalized = [o for o in normalized if o]
+
+    q = (request.GET.get("q") or "").strip().lower()
+    if q:
+        normalized = [o for o in normalized if q in o.lower()]
+
+    try:
+        limit = int(request.GET.get("limit", 100))
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(1, min(limit, 500))
+
+    return JsonResponse({"options": normalized[:limit]})
+

@@ -84,6 +84,34 @@
         gap: 6px;
     }
 
+    .pdf-task-block {
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 18px;
+        margin-bottom: 18px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .pdf-task-block:last-child {
+        margin-bottom: 0;
+    }
+    .pdf-task-block.pending-upload {
+        border-left: 4px solid #94a3b8;
+    }
+    .pdf-task-block.awaiting-review {
+        border-left: 4px solid #6366f1;
+    }
+    .pdf-task-block.approved {
+        border-left: 4px solid #22c55e;
+    }
+    .pdf-task-block.needs-revision {
+        border-left: 4px solid #f97316;
+        background: #fff7ed;
+    }
+    .pdf-task-block:hover {
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+    }
+
     .job-preview {
         background: #f8f9fa;
         border-radius: 12px;
@@ -259,6 +287,87 @@
         
         <!-- Review Panel -->
         <div class="col-lg-4">
+            <div class="submission-card mb-4">
+                <h4 class="mb-4">
+                    <i class="fas fa-file-pdf me-2"></i>PDF Assignments
+                </h4>
+                {% if pdf_tasks %}
+                    {% for task in pdf_tasks %}
+                    <div class="pdf-task-block {% if task.status == 'approved' %}approved{% elif task.status == 'needs_revision' %}needs-revision{% elif task.status == 'submitted' %}awaiting-review{% else %}pending-upload{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                                <h6 class="mb-1">{{ task.pdf_form.title }}</h6>
+                                {% if task.instructions %}
+                                <div class="text-muted small">{{ task.instructions }}</div>
+                                {% endif %}
+                                <div class="text-muted small mt-2">
+                                    Assigned {{ task.assigned_at|date:"M j, Y" }}
+                                    {% if task.completed_file %}
+                                        &middot; Uploaded {{ task.completed_at|timesince }} ago
+                                    {% else %}
+                                        &middot; Awaiting candidate upload
+                                    {% endif %}
+                                </div>
+                                {% if task.submitted_by %}
+                                <div class="text-muted small">
+                                    Submitted by {{ task.submitted_by.email }}
+                                </div>
+                                {% endif %}
+                                {% if task.reviewed_by %}
+                                <div class="text-muted small">
+                                    Last reviewed {{ task.reviewed_at|date:"M j, Y g:i A" }} by {{ task.reviewed_by.get_full_name }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <span class="status-chip {% if task.status == 'approved' %}bg-success text-white{% elif task.status == 'needs_revision' %}bg-warning text-dark{% elif task.status == 'submitted' %}bg-primary text-white{% else %}bg-light text-muted{% endif %}">
+                                {{ task.get_status_display }}
+                            </span>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <a href="{% url 'download_onboarding_pdf_template' task.pdf_form.id %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-file-download me-1"></i>Blank Template
+                            </a>
+                            {% if task.completed_file %}
+                            <a href="{% url 'download_onboarding_pdf_submission' task.id %}?next={{ request.get_full_path }}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-file-signature me-1"></i>Download Upload
+                            </a>
+                            {% else %}
+                            <button type="button" class="btn btn-outline-light btn-sm text-muted" disabled>
+                                <i class="fas fa-clock me-1"></i>No upload yet
+                            </button>
+                            {% endif %}
+                        </div>
+
+                        <form method="post" class="mt-3">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update_pdf_task">
+                            <input type="hidden" name="task_id" value="{{ task.id }}">
+                            <input type="hidden" name="return_path" value="{{ request.get_full_path }}">
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold">Status</label>
+                                <select class="form-select form-select-sm" name="status">
+                                    <option value="pending" {% if task.status == 'pending' %}selected{% endif %}>Awaiting Upload</option>
+                                    <option value="approved" {% if task.status == 'approved' %}selected{% endif %} {% if not task.completed_file %}disabled{% endif %}>Approved</option>
+                                    <option value="needs_revision" {% if task.status == 'needs_revision' %}selected{% endif %}>Needs Revision</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Review Notes</label>
+                                <textarea class="form-control form-control-sm" name="review_notes" rows="2" placeholder="Notes sent to candidate when revision needed.">{{ task.review_notes }}</textarea>
+                                <div class="form-text">Leave empty to clear prior notes.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                                <i class="fas fa-save me-1"></i>Update PDF Status
+                            </button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-muted small mb-0">No PDF assignments are linked to this invitation.</p>
+                {% endif %}
+            </div>
+
             <div class="submission-card">
                 <h4 class="mb-4">
                     <i class="fas fa-edit me-2"></i>Review & Update

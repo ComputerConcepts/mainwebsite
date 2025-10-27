@@ -26,8 +26,16 @@ from django.urls import reverse
 from urllib.parse import urlencode
 
 from .models import (
-    OnboardingForm, OnboardingFormField, ProspectiveEmployee, 
-    OnboardingInvitation, OnboardingSubmission, Employee, OnboardingOfferLetter, JobPosting
+    OnboardingForm,
+    OnboardingFormField,
+    ProspectiveEmployee,
+    OnboardingInvitation,
+    OnboardingSubmission,
+    Employee,
+    OnboardingOfferLetter,
+    JobPosting,
+    OnboardingPDFForm,
+    OnboardingPDFTask,
 )
 from .onboarding_emails import OnboardingEmailService
 from .views_onboarding_portal import _generate_offer_letter_pdf
@@ -67,6 +75,57 @@ def _build_offer_letter_context(submission):
         'pay_frequency_choices': OnboardingOfferLetter.COMPENSATION_FREQUENCY_CHOICES,
         'preview_url': reverse('preview_offer_letter', kwargs={'submission_id': submission.id}) if offer_letter else '',
     }
+
+
+def _assign_pdf_tasks(invitation, pdf_forms, assigned_by, instructions=None, deactivate_missing=False):
+    """
+    Ensure the provided PDF forms are linked to an invitation.
+
+    When deactivate_missing=True, any existing tasks not in pdf_forms are archived so
+    prospects no longer see them.
+    """
+    if not pdf_forms:
+        if deactivate_missing:
+            invitation.pdf_tasks.filter(is_active=True).update(is_active=False)
+        return 0
+
+    instruction_map = instructions or {}
+    created_count = 0
+    active_ids = set()
+
+    for pdf_form in pdf_forms:
+        instruction_value = instruction_map.get(str(pdf_form.id)) or pdf_form.default_instructions
+        defaults = {
+            'assigned_by': assigned_by,
+            'custom_instructions': instruction_value,
+        }
+        task, created = OnboardingPDFTask.objects.get_or_create(
+            invitation=invitation,
+            pdf_form=pdf_form,
+            defaults=defaults,
+        )
+        if created:
+            created_count += 1
+        else:
+            updates = []
+            if not task.is_active:
+                task.is_active = True
+                updates.append('is_active')
+            if instruction_value and task.custom_instructions != instruction_value:
+                task.custom_instructions = instruction_value
+                updates.append('custom_instructions')
+            elif not task.custom_instructions and pdf_form.default_instructions:
+                task.custom_instructions = pdf_form.default_instructions
+                updates.append('custom_instructions')
+            if updates:
+                task.save(update_fields=updates)
+
+        active_ids.add(task.pdf_form_id)
+
+    if deactivate_missing:
+        invitation.pdf_tasks.exclude(pdf_form_id__in=active_ids).update(is_active=False)
+
+    return created_count
 
 
 def _handle_submission_post(request, submission, default_redirect_url):
@@ -116,10 +175,80 @@ def _handle_submission_post(request, submission, default_redirect_url):
         messages.success(request, "Submission updated successfully!")
         return redirect(redirect_url)
 
+    if action == 'update_pdf_task':
+        task_id = request.POST.get('task_id')
+        new_status = request.POST.get('status')
+        review_notes = request.POST.get('review_notes', '').strip()
+
+        if not task_id:
+            messages.error(request, "Missing PDF assignment reference.")
+            return redirect(redirect_url)
+
+        try:
+            task = submission.invitation.pdf_tasks.select_related('pdf_form').get(id=task_id)
+        except OnboardingPDFTask.DoesNotExist:
+            messages.error(request, "The selected PDF assignment could not be found.")
+            return redirect(redirect_url)
+
+        allowed_statuses = {
+            OnboardingPDFTask.STATUS_PENDING,
+            OnboardingPDFTask.STATUS_APPROVED,
+            OnboardingPDFTask.STATUS_NEEDS_REVISION,
+        }
+        if new_status not in allowed_statuses:
+            messages.error(request, "Invalid status for PDF assignment.")
+            return redirect(redirect_url)
+
+        if new_status == OnboardingPDFTask.STATUS_APPROVED and not task.completed_file:
+            messages.error(
+                request,
+                f"{task.pdf_form.title} has no uploaded PDF to approve."
+            )
+            return redirect(redirect_url)
+
+        updates = set()
+        if task.status != new_status:
+            task.status = new_status
+            updates.add('status')
+
+        if task.review_notes != review_notes:
+            task.review_notes = review_notes
+            updates.add('review_notes')
+
+        if new_status in [OnboardingPDFTask.STATUS_APPROVED, OnboardingPDFTask.STATUS_NEEDS_REVISION]:
+            if task.reviewed_by_id != request.user.id:
+                task.reviewed_by = request.user
+                updates.add('reviewed_by')
+            task.reviewed_at = timezone.now()
+            updates.add('reviewed_at')
+        else:
+            if task.reviewed_by_id is not None:
+                task.reviewed_by = None
+                updates.add('reviewed_by')
+            if task.reviewed_at is not None:
+                task.reviewed_at = None
+                updates.add('reviewed_at')
+
+        if updates:
+            task.save(update_fields=list(updates))
+
+        if new_status == OnboardingPDFTask.STATUS_APPROVED:
+            messages.success(request, f"{task.pdf_form.title} marked as approved.")
+        elif new_status == OnboardingPDFTask.STATUS_NEEDS_REVISION:
+            messages.warning(request, f"{task.pdf_form.title} flagged for revision.")
+        else:
+            messages.info(request, f"{task.pdf_form.title} reset to pending.")
+
+        return redirect(redirect_url)
+
     if action == 'save_offer_letter':
         if submission.review_status != 'approved':
             messages.error(request, "Offer letters can only be created once an application is approved.")
             return redirect(redirect_url)
+
+        # Fix: define job_postings for this scope
+        job_postings_qs = JobPosting.objects.filter(is_active=True).order_by('-created_at')
+        job_postings = list(job_postings_qs)
 
         job_posting_id = request.POST.get('job_posting_id', '').strip()
         job_posting = JobPosting.objects.filter(id=job_posting_id).first() if job_posting_id else None
@@ -319,6 +448,15 @@ def hr_onboarding_dashboard(request):
         'total_invitations': OnboardingInvitation.objects.count(),
         'pending_submissions': OnboardingSubmission.objects.filter(review_status='pending').count(),
         'active_prospects': ProspectiveEmployee.objects.filter(is_active=True).count(),
+        'pdf_forms': OnboardingPDFForm.objects.filter(is_active=True).count(),
+        'pdf_pending_review': OnboardingPDFTask.objects.filter(
+            status=OnboardingPDFTask.STATUS_SUBMITTED,
+            is_active=True,
+        ).count(),
+        'pdf_waiting_upload': OnboardingPDFTask.objects.filter(
+            status=OnboardingPDFTask.STATUS_PENDING,
+            is_active=True,
+        ).count(),
     }
     
     # Recent activity
@@ -358,13 +496,25 @@ def hr_onboarding_dashboard(request):
         invitation_count=Count('onboardinginvitation'),
         submission_count=Count('onboardinginvitation__onboardingsubmission')
     ).order_by('-created_at')
-    
+
+    recent_pdf_tasks = OnboardingPDFTask.objects.filter(
+        status__in=[
+            OnboardingPDFTask.STATUS_SUBMITTED,
+            OnboardingPDFTask.STATUS_NEEDS_REVISION,
+        ],
+        is_active=True,
+    ).select_related(
+        'pdf_form',
+        'invitation__prospective_employee',
+    ).order_by('-completed_at', '-assigned_at')[:5]
+
     context = {
         'stats': stats,
         'recent_submissions': recent_submissions,
         'recent_invitations': recent_invitations,
         'applicant_reviews': applicant_reviews,
         'forms': forms,
+        'recent_pdf_tasks': recent_pdf_tasks,
     }
     
     return render(request, 'hr/onboarding/dashboard.html', context)
@@ -384,6 +534,7 @@ def create_onboarding_employee(request):
         return redirect('employee_dashboard')
 
     forms = OnboardingForm.objects.filter(is_active=True).order_by('title')
+    pdf_forms = list(OnboardingPDFForm.objects.filter(is_active=True).order_by('title'))
     job_postings_qs = JobPosting.objects.filter(is_active=True).order_by('-created_at')[:25]
     job_postings = list(job_postings_qs)
 
@@ -402,6 +553,7 @@ def create_onboarding_employee(request):
         custom_message = request.POST.get('custom_message', '').strip()
         send_email = request.POST.get('send_email') == 'on'
         selected_form_ids = request.POST.getlist('form_ids')
+        selected_pdf_ids = request.POST.getlist('pdf_form_ids')
 
         form_state = {
             'email': email,
@@ -424,6 +576,11 @@ def create_onboarding_employee(request):
         if invalid_forms:
             errors.append("One or more selected forms are unavailable. Please refresh and try again.")
 
+        pdf_form_lookup = {str(pdf_form.id): pdf_form for pdf_form in pdf_forms}
+        invalid_pdf_forms = [form_id for form_id in selected_pdf_ids if form_id not in pdf_form_lookup]
+        if invalid_pdf_forms:
+            errors.append("One or more selected PDF forms are unavailable. Please refresh and try again.")
+
         job_posting = None
         if job_posting_id:
             job_posting = JobPosting.objects.filter(id=job_posting_id).first()
@@ -433,16 +590,18 @@ def create_onboarding_employee(request):
         if errors:
             for error in errors:
                 messages.error(request, error)
-            return render(
-                request,
-                'hr/onboarding/create_employee_wizard.html',
-                {
-                    'forms': forms,
-                    'job_postings': job_postings,
-                    'form_state': form_state,
-                    'selected_forms': selected_form_ids,
-                },
-            )
+                return render(
+                    request,
+                    'hr/onboarding/create_employee_wizard.html',
+                    {
+                        'forms': forms,
+                        'pdf_forms': pdf_forms,
+                        'job_postings': job_postings,
+                        'form_state': form_state,
+                        'selected_forms': selected_form_ids,
+                        'selected_pdf_forms': selected_pdf_ids,
+                    },
+                )
 
         try:
             with transaction.atomic():
@@ -492,6 +651,14 @@ def create_onboarding_employee(request):
                             update_fields.append('status')
                         invitation.save(update_fields=update_fields)
                         updated_count += 1
+
+                    selected_pdf_form_objects = [pdf_form_lookup[form_id] for form_id in selected_pdf_ids if form_id in pdf_form_lookup]
+                    _assign_pdf_tasks(
+                        invitation,
+                        selected_pdf_form_objects,
+                        request.user,
+                        deactivate_missing=True,
+                    )
 
                     if send_email:
                         success = OnboardingEmailService.send_onboarding_invitation(invitation, request)
@@ -546,15 +713,18 @@ def create_onboarding_employee(request):
             'send_email': _parse_bool(request.GET.get('send_email'), True),
         }
         selected_forms = [form_id for form_id in request.GET.getlist('form_ids') if form_id]
+        selected_pdf_forms = [form_id for form_id in request.GET.getlist('pdf_form_ids') if form_id]
 
         return render(
             request,
             'hr/onboarding/create_employee_wizard.html',
             {
                 'forms': forms,
+                'pdf_forms': pdf_forms,
                 'job_postings': job_postings,
                 'form_state': form_state,
                 'selected_forms': selected_forms,
+                'selected_pdf_forms': selected_pdf_forms,
             },
         )
 
@@ -563,6 +733,7 @@ def create_onboarding_employee(request):
         'hr/onboarding/create_employee_wizard.html',
         {
             'forms': forms,
+            'pdf_forms': pdf_forms,
             'job_postings': job_postings,
             'form_state': {
                 'first_name': '',
@@ -574,6 +745,7 @@ def create_onboarding_employee(request):
                 'send_email': True,
             },
             'selected_forms': [],
+            'selected_pdf_forms': [],
         },
     )
 
@@ -640,6 +812,160 @@ def create_onboarding_form(request):
     return render(request, 'hr/onboarding/create_form.html', {
         'field_types': field_types
     })
+
+
+@login_required
+def manage_onboarding_pdf_forms(request):
+    """Upload, update, and monitor PDF-based onboarding forms."""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin']:
+            messages.error(request, "Access denied. HR permissions required.")
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, "Employee profile not found.")
+        return redirect('employee_dashboard')
+
+    if request.method == 'POST':
+        action = request.POST.get('action', 'create')
+        if action == 'create':
+            title = request.POST.get('title', '').strip()
+            description = request.POST.get('description', '').strip()
+            default_instructions = request.POST.get('default_instructions', '').strip()
+            template_file = request.FILES.get('template_file')
+
+            errors = []
+            if not title:
+                errors.append("Provide a title for the PDF form.")
+            if not template_file:
+                errors.append("Upload a PDF template file.")
+            elif template_file.content_type not in ['application/pdf', 'application/x-pdf'] and not template_file.name.lower().endswith('.pdf'):
+                errors.append("Only PDF documents are supported.")
+
+            if errors:
+                for error in errors:
+                    messages.error(request, error)
+            else:
+                OnboardingPDFForm.objects.create(
+                    title=title,
+                    description=description,
+                    default_instructions=default_instructions,
+                    template_file=template_file,
+                    created_by=request.user,
+                )
+                messages.success(request, f"{title} uploaded successfully.")
+            return redirect('manage_onboarding_pdf_forms')
+
+        pdf_form_id = request.POST.get('pdf_form_id')
+        pdf_form = get_object_or_404(OnboardingPDFForm, id=pdf_form_id)
+
+        if action == 'update':
+            title = request.POST.get('title', '').strip()
+            description = request.POST.get('description', '').strip()
+            default_instructions = request.POST.get('default_instructions', '').strip()
+            template_file = request.FILES.get('template_file')
+
+            update_fields = []
+            if title and title != pdf_form.title:
+                pdf_form.title = title
+                update_fields.append('title')
+            if description != pdf_form.description:
+                pdf_form.description = description
+                update_fields.append('description')
+            if default_instructions != pdf_form.default_instructions:
+                pdf_form.default_instructions = default_instructions
+                update_fields.append('default_instructions')
+            if template_file:
+                if template_file.content_type not in ['application/pdf', 'application/x-pdf'] and not template_file.name.lower().endswith('.pdf'):
+                    messages.error(request, "Only PDF documents are supported.")
+                    return redirect('manage_onboarding_pdf_forms')
+                if pdf_form.template_file:
+                    try:
+                        pdf_form.template_file.delete(save=False)
+                    except Exception:
+                        pass
+                pdf_form.template_file = template_file
+                update_fields.append('template_file')
+
+            if update_fields:
+                pdf_form.save(update_fields=update_fields)
+                messages.success(request, f"{pdf_form.title} updated.")
+            else:
+                messages.info(request, "No changes detected to update.")
+            return redirect('manage_onboarding_pdf_forms')
+
+        if action == 'toggle':
+            pdf_form.is_active = not pdf_form.is_active
+            pdf_form.save(update_fields=['is_active'])
+            state = "activated" if pdf_form.is_active else "archived"
+            messages.success(request, f"{pdf_form.title} {state}.")
+            return redirect('manage_onboarding_pdf_forms')
+
+        if action == 'delete':
+            if pdf_form.tasks.exists():
+                pdf_form.is_active = False
+                pdf_form.save(update_fields=['is_active'])
+                messages.warning(
+                    request,
+                    f"{pdf_form.title} is linked to existing invitations and was archived instead of deleted."
+                )
+            else:
+                try:
+                    if pdf_form.template_file:
+                        pdf_form.template_file.delete(save=False)
+                except Exception:
+                    pass
+                pdf_form.delete()
+                messages.success(request, "PDF form removed.")
+            return redirect('manage_onboarding_pdf_forms')
+
+        messages.error(request, "Unsupported action for PDF forms.")
+        return redirect('manage_onboarding_pdf_forms')
+
+    pdf_forms = OnboardingPDFForm.objects.annotate(
+        total_tasks=Count('tasks', distinct=True),
+        pending_uploads=Count(
+            'tasks',
+            filter=Q(
+                tasks__status=OnboardingPDFTask.STATUS_PENDING,
+                tasks__is_active=True,
+            ),
+            distinct=True,
+        ),
+        awaiting_review=Count(
+            'tasks',
+            filter=Q(
+                tasks__status=OnboardingPDFTask.STATUS_SUBMITTED,
+                tasks__is_active=True,
+            ),
+            distinct=True,
+        ),
+        needs_revision=Count(
+            'tasks',
+            filter=Q(
+                tasks__status=OnboardingPDFTask.STATUS_NEEDS_REVISION,
+                tasks__is_active=True,
+            ),
+            distinct=True,
+        ),
+    ).order_by('title')
+
+    pending_reviews = OnboardingPDFTask.objects.filter(
+        status=OnboardingPDFTask.STATUS_SUBMITTED,
+        is_active=True,
+    ).select_related(
+        'pdf_form',
+        'invitation__prospective_employee',
+    ).order_by('-completed_at', '-assigned_at')[:20]
+
+    return render(
+        request,
+        'hr/onboarding/pdf_forms.html',
+        {
+            'pdf_forms': pdf_forms,
+            'pending_reviews': pending_reviews,
+        },
+    )
 
 
 @login_required
@@ -756,6 +1082,8 @@ def send_onboarding_invitation(request):
             last_name = request.POST.get('last_name', '').strip()
             phone = request.POST.get('phone', '').strip()
             custom_message = request.POST.get('custom_message', '').strip()
+            selected_pdf_ids = [value for value in request.POST.getlist('pdf_form_ids') if value]
+            pdf_form_queryset = list(OnboardingPDFForm.objects.filter(id__in=selected_pdf_ids, is_active=True))
             
             # Get onboarding form
             onboarding_form = get_object_or_404(OnboardingForm, id=form_id, is_active=True)
@@ -801,6 +1129,8 @@ def send_onboarding_invitation(request):
                     sent_by=request.user,
                     custom_message=custom_message
                 )
+
+            _assign_pdf_tasks(invitation, pdf_form_queryset, request.user, deactivate_missing=True)
             
             # Send email
             if OnboardingEmailService.send_onboarding_invitation(invitation, request):
@@ -816,9 +1146,11 @@ def send_onboarding_invitation(request):
     
     # GET request - show invitation form
     forms = OnboardingForm.objects.filter(is_active=True).order_by('title')
+    pdf_forms = OnboardingPDFForm.objects.filter(is_active=True).order_by('title')
     
     return render(request, 'hr/onboarding/send_invitation.html', {
-        'forms': forms
+        'forms': forms,
+        'pdf_forms': pdf_forms,
     })
 
 
@@ -955,6 +1287,13 @@ def submission_detail(request, submission_id):
         'submission': submission.id,
     })
     management_url = f"{reverse('onboarding_submissions')}?{management_query}"
+    pdf_tasks = submission.invitation.pdf_tasks.filter(
+        is_active=True,
+    ).select_related(
+        'pdf_form',
+        'submitted_by',
+        'reviewed_by',
+    ).order_by('pdf_form__title')
 
     context = {
         'submission': submission,
@@ -970,6 +1309,8 @@ def submission_detail(request, submission_id):
         'offer_letter_management_url': management_url,
         'job_postings_script_id': f"job-postings-data-{submission.id}",
         'offer_letter_preview_url': offer_letter_context.get('preview_url', ''),
+        'pdf_tasks': pdf_tasks,
+        'pdf_status_choices': OnboardingPDFTask.STATUS_CHOICES,
     }
     context.update(offer_letter_context)
     
@@ -1025,6 +1366,70 @@ def download_submission_file(request, submission_id, field_name):
     filename = file_info.get('original_name') or os.path.basename(file_path)
 
     response = FileResponse(stored_file, as_attachment=True, filename=filename)
+    return response
+
+
+@login_required
+def download_onboarding_pdf_template(request, form_id):
+    """Download the original blank PDF template for an onboarding assignment."""
+    pdf_form = get_object_or_404(OnboardingPDFForm, id=form_id)
+
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin'] and not request.user.is_superuser:
+            messages.error(request, "Access denied. HR permissions required.")
+            return redirect('manage_onboarding_pdf_forms')
+    except Employee.DoesNotExist:
+        if not request.user.is_superuser:
+            messages.error(request, "Employee profile not found.")
+            return redirect('employee_dashboard')
+
+    if not pdf_form.template_file:
+        messages.error(request, "This PDF template is not available for download.")
+        return redirect('manage_onboarding_pdf_forms')
+
+    try:
+        download = pdf_form.template_file.open('rb')
+    except Exception as exc:
+        messages.error(request, f"Unable to open the PDF template: {exc}")
+        return redirect('manage_onboarding_pdf_forms')
+
+    filename = os.path.basename(pdf_form.template_file.name) or f"{pdf_form.title}.pdf"
+    response = FileResponse(download, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+def download_onboarding_pdf_submission(request, task_id):
+    """Download the completed PDF uploaded by a prospect."""
+    task = get_object_or_404(OnboardingPDFTask, id=task_id)
+
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin'] and not request.user.is_superuser:
+            messages.error(request, "Access denied. HR permissions required.")
+            return redirect('manage_onboarding_pdf_forms')
+    except Employee.DoesNotExist:
+        if not request.user.is_superuser:
+            messages.error(request, "Employee profile not found.")
+            return redirect('employee_dashboard')
+
+    if not task.completed_file:
+        messages.error(request, "No completed PDF has been uploaded for this assignment yet.")
+        redirect_target = request.GET.get('next') or 'manage_onboarding_pdf_forms'
+        return redirect(redirect_target)
+
+    try:
+        download = task.completed_file.open('rb')
+    except Exception as exc:
+        messages.error(request, f"Unable to open the uploaded PDF: {exc}")
+        redirect_target = request.GET.get('next') or 'manage_onboarding_pdf_forms'
+        return redirect(redirect_target)
+
+    filename = os.path.basename(task.completed_file.name) or f"{task.pdf_form.title}-completed.pdf"
+    response = FileResponse(download, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
 

@@ -229,6 +229,78 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
+
+        .pdf-task-list {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 18px;
+            margin-top: 20px;
+        }
+
+        .pdf-task-item {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
+        }
+
+        .pdf-task-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .pdf-task-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .pdf-task-status.pending {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .pdf-task-status.review {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .pdf-task-status.approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .pdf-task-status.revision {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .pdf-task-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .pdf-upload-form input[type="file"] {
+            max-width: 240px;
+        }
+
+        .pdf-upload-form button {
+            border-radius: 999px;
+            padding: 6px 18px;
+            font-weight: 600;
+        }
+
+        .pdf-upload-note {
+            font-size: 0.75rem;
+            color: #475569;
+        }
     </style>
 </head>
 <body>
@@ -267,6 +339,27 @@
                         <div class="stat-item">
                             <span class="stat-number">{{ pending_invitations|length|add:completed_invitations|length }}</span>
                             <span class="stat-label">Total Forms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row stats-row mt-3">
+                    <div class="col-md-4">
+                        <div class="stat-item">
+                            <span class="stat-number">{{ pdf_task_stats.awaiting_upload }}</span>
+                            <span class="stat-label">PDFs Need Upload</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-item">
+                            <span class="stat-number">{{ pdf_task_stats.awaiting_review }}</span>
+                            <span class="stat-label">PDFs Under Review</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-item">
+                            <span class="stat-number">{{ pdf_task_stats.total }}</span>
+                            <span class="stat-label">Total PDF Tasks</span>
                         </div>
                     </div>
                 </div>
@@ -334,6 +427,70 @@
                                     </a>
                                 {% endif %}
                             </div>
+
+                            {% if item.pdf_tasks %}
+                            <div class="pdf-task-list">
+                                <h6 class="text-white mb-3">
+                                    <i class="fas fa-file-pdf me-2 text-danger"></i>PDF Documents
+                                </h6>
+                                {% for pdf_task in item.pdf_tasks %}
+                                <div class="pdf-task-item">
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                        <div>
+                                            <div class="fw-semibold">{{ pdf_task.pdf_form.title }}</div>
+                                            {% if pdf_task.instructions %}
+                                            <div class="small text-muted">{{ pdf_task.instructions }}</div>
+                                            {% endif %}
+                                            {% if pdf_task.status == 'needs_revision' and pdf_task.review_notes %}
+                                            <div class="alert alert-warning mt-2 mb-1 py-2 px-3">
+                                                <strong>Revision requested:</strong> {{ pdf_task.review_notes }}
+                                            </div>
+                                            {% elif pdf_task.status == 'submitted' and pdf_task.completed_at %}
+                                            <div class="small text-muted mt-1">
+                                                Submitted {{ pdf_task.completed_at|timesince }} ago. Waiting on HR review.
+                                            </div>
+                                            {% elif pdf_task.status == 'approved' and pdf_task.reviewed_at %}
+                                            <div class="small text-success mt-1">
+                                                Approved {{ pdf_task.reviewed_at|date:"M j, Y" }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <span class="pdf-task-status {% if pdf_task.status == 'approved' %}approved{% elif pdf_task.status == 'needs_revision' %}revision{% elif pdf_task.status == 'submitted' %}review{% else %}pending{% endif %}">
+                                            {% if pdf_task.status == 'approved' %}
+                                                <i class="fas fa-check-circle"></i>Approved
+                                            {% elif pdf_task.status == 'needs_revision' %}
+                                                <i class="fas fa-exclamation-circle"></i>Needs Revision
+                                            {% elif pdf_task.status == 'submitted' %}
+                                                <i class="fas fa-hourglass-half"></i>Under Review
+                                            {% else %}
+                                                <i class="fas fa-upload"></i>Awaiting Upload
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="pdf-task-actions">
+                                        <a class="btn btn-sm btn-outline-dark rounded-pill" href="{% url 'onboarding_pdf_template_download' pdf_task.id %}">
+                                            <i class="fas fa-file-download me-1"></i>Blank PDF
+                                        </a>
+                                        {% if pdf_task.completed_file %}
+                                        <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{% url 'onboarding_pdf_submission_download' pdf_task.id %}">
+                                            <i class="fas fa-file-signature me-1"></i>Your Upload
+                                        </a>
+                                        {% endif %}
+                                        {% if pdf_task.status != 'approved' %}
+                                        <form method="post" action="{% url 'onboarding_pdf_upload' pdf_task.id %}" enctype="multipart/form-data" class="pdf-upload-form d-flex flex-wrap gap-2 align-items-center">
+                                            {% csrf_token %}
+                                            <input type="file" name="completed_pdf" accept="application/pdf" required class="form-control form-control-sm">
+                                            <button type="submit" class="btn btn-sm btn-primary rounded-pill">
+                                                <i class="fas fa-cloud-upload-alt me-1"></i>{% if pdf_task.completed_file %}Re-upload{% else %}Upload{% endif %}
+                                            </button>
+                                        </form>
+                                        <div class="pdf-upload-note">PDF only, max 15 MB.</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     {% else %}
@@ -400,7 +557,71 @@
                                     </button>
                                 {% endif %}
                             </div>
-                            
+
+                            {% if item.pdf_tasks %}
+                            <div class="pdf-task-list" style="background: rgba(99, 102, 241, 0.08);">
+                                <h6 class="mb-3 text-dark">
+                                    <i class="fas fa-file-pdf me-2 text-danger"></i>PDF Documents
+                                </h6>
+                                {% for pdf_task in item.pdf_tasks %}
+                                <div class="pdf-task-item">
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                        <div>
+                                            <div class="fw-semibold">{{ pdf_task.pdf_form.title }}</div>
+                                            {% if pdf_task.instructions %}
+                                            <div class="small text-muted">{{ pdf_task.instructions }}</div>
+                                            {% endif %}
+                                            {% if pdf_task.status == 'needs_revision' and pdf_task.review_notes %}
+                                            <div class="alert alert-warning mt-2 mb-1 py-2 px-3">
+                                                <strong>Revision requested:</strong> {{ pdf_task.review_notes }}
+                                            </div>
+                                            {% elif pdf_task.status == 'submitted' and pdf_task.completed_at %}
+                                            <div class="small text-muted mt-1">
+                                                Submitted {{ pdf_task.completed_at|timesince }} ago. Waiting on HR review.
+                                            </div>
+                                            {% elif pdf_task.status == 'approved' and pdf_task.reviewed_at %}
+                                            <div class="small text-success mt-1">
+                                                Approved {{ pdf_task.reviewed_at|date:"M j, Y" }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <span class="pdf-task-status {% if pdf_task.status == 'approved' %}approved{% elif pdf_task.status == 'needs_revision' %}revision{% elif pdf_task.status == 'submitted' %}review{% else %}pending{% endif %}">
+                                            {% if pdf_task.status == 'approved' %}
+                                                <i class="fas fa-check-circle"></i>Approved
+                                            {% elif pdf_task.status == 'needs_revision' %}
+                                                <i class="fas fa-exclamation-circle"></i>Needs Revision
+                                            {% elif pdf_task.status == 'submitted' %}
+                                                <i class="fas fa-hourglass-half"></i>Under Review
+                                            {% else %}
+                                                <i class="fas fa-upload"></i>Awaiting Upload
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="pdf-task-actions">
+                                        <a class="btn btn-sm btn-outline-dark rounded-pill" href="{% url 'onboarding_pdf_template_download' pdf_task.id %}">
+                                            <i class="fas fa-file-download me-1"></i>Blank PDF
+                                        </a>
+                                        {% if pdf_task.completed_file %}
+                                        <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{% url 'onboarding_pdf_submission_download' pdf_task.id %}">
+                                            <i class="fas fa-file-signature me-1"></i>Your Upload
+                                        </a>
+                                        {% endif %}
+                                        {% if pdf_task.status != 'approved' %}
+                                        <form method="post" action="{% url 'onboarding_pdf_upload' pdf_task.id %}" enctype="multipart/form-data" class="pdf-upload-form d-flex flex-wrap gap-2 align-items-center">
+                                            {% csrf_token %}
+                                            <input type="file" name="completed_pdf" accept="application/pdf" required class="form-control form-control-sm">
+                                            <button type="submit" class="btn btn-sm btn-primary rounded-pill">
+                                                <i class="fas fa-cloud-upload-alt me-1"></i>{% if pdf_task.completed_file %}Re-upload{% else %}Upload{% endif %}
+                                            </button>
+                                        </form>
+                                        <div class="pdf-upload-note">PDF only, max 15 MB.</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
                             {% if item.submission.review_notes %}
                             <div class="mt-3 p-3" style="background: #f8f9fa; border-radius: 8px;">
                                 <strong>Review Notes:</strong>
