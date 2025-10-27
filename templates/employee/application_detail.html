@@ -604,6 +604,10 @@
                                 <i class="fas fa-arrow-left me-2"></i>Back to Job Details
                             </a>
                             <div>
+                                <a href="{% url 'create_onboarding_employee' %}?first_name={{ application.first_name|default_if_none:''|urlencode }}&last_name={{ application.last_name|default_if_none:''|urlencode }}&email={{ application.email|default_if_none:''|urlencode }}&phone={{ application.phone|default_if_none:''|urlencode }}{% if application.job_posting_id %}&job_posting={{ application.job_posting_id }}{% endif %}"
+                                   class="btn btn-success me-2">
+                                    <i class="fas fa-user-plus me-1"></i>Onboard Applicant
+                                </a>
                                 <a href="#" class="btn btn-outline-primary me-2">
                                     <i class="fas fa-envelope me-1"></i>Contact Applicant
                                 </a>

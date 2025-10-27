@@ -224,6 +224,10 @@
 
             <!-- Action Buttons -->
             <div class="action-buttons">
+                <a href="{% url 'create_onboarding_employee' %}?first_name={{ career.first_name|default_if_none:''|urlencode }}&last_name={{ career.last_name|default_if_none:''|urlencode }}&email={{ career.email|default_if_none:''|urlencode }}&phone={{ career.phone|default_if_none:''|urlencode }}{% if career.job_posting_id %}&job_posting={{ career.job_posting_id }}{% endif %}" 
+                   class="btn btn-success">
+                    <i class="fas fa-user-plus me-2"></i>Onboard Applicant
+                </a>
                 <a href="mailto:{{ career.email }}?subject=Regarding your application for {{ career.position_applied }}" 
                    class="btn btn-primary">
                     <i class="fas fa-envelope me-2"></i>Send Email

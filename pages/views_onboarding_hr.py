@@ -123,6 +123,8 @@ def _handle_submission_post(request, submission, default_redirect_url):
 
         job_posting_id = request.POST.get('job_posting_id', '').strip()
         job_posting = JobPosting.objects.filter(id=job_posting_id).first() if job_posting_id else None
+        if job_posting and all(job.id != job_posting.id for job in job_postings):
+            job_postings.append(job_posting)
 
         position_title = request.POST.get('position_title', '').strip()
         employment_type = request.POST.get('employment_type', '').strip()
@@ -382,7 +384,14 @@ def create_onboarding_employee(request):
         return redirect('employee_dashboard')
 
     forms = OnboardingForm.objects.filter(is_active=True).order_by('title')
-    job_postings = JobPosting.objects.filter(is_active=True).order_by('-created_at')[:25]
+    job_postings_qs = JobPosting.objects.filter(is_active=True).order_by('-created_at')[:25]
+    job_postings = list(job_postings_qs)
+
+    def _parse_bool(value, default=True):
+        if value is None:
+            return default
+        value = str(value).strip().lower()
+        return value in ['1', 'true', 'yes', 'on']
 
     if request.method == 'POST':
         email = request.POST.get('email', '').strip().lower()
@@ -520,13 +529,50 @@ def create_onboarding_employee(request):
         except Exception as exc:
             messages.error(request, f"Could not create onboarding record: {exc}")
 
+    else:
+        job_prefill_id = request.GET.get('job_posting', '').strip()
+        if job_prefill_id:
+            job_prefill = JobPosting.objects.filter(id=job_prefill_id).first()
+            if job_prefill and all(job.id != job_prefill.id for job in job_postings):
+                job_postings.append(job_prefill)
+
+        form_state = {
+            'first_name': request.GET.get('first_name', '').strip(),
+            'last_name': request.GET.get('last_name', '').strip(),
+            'email': request.GET.get('email', '').strip().lower(),
+            'phone': request.GET.get('phone', '').strip(),
+            'job_posting': job_prefill_id,
+            'custom_message': request.GET.get('custom_message', '').strip(),
+            'send_email': _parse_bool(request.GET.get('send_email'), True),
+        }
+        selected_forms = [form_id for form_id in request.GET.getlist('form_ids') if form_id]
+
+        return render(
+            request,
+            'hr/onboarding/create_employee_wizard.html',
+            {
+                'forms': forms,
+                'job_postings': job_postings,
+                'form_state': form_state,
+                'selected_forms': selected_forms,
+            },
+        )
+
     return render(
         request,
         'hr/onboarding/create_employee_wizard.html',
         {
             'forms': forms,
             'job_postings': job_postings,
-            'form_state': {'send_email': True},
+            'form_state': {
+                'first_name': '',
+                'last_name': '',
+                'email': '',
+                'phone': '',
+                'job_posting': '',
+                'custom_message': '',
+                'send_email': True,
+            },
             'selected_forms': [],
         },
     )
