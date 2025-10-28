@@ -674,7 +674,7 @@ def employee_dashboard(request):
         
         # Get online employees (simplified - last 15 minutes activity)
         online_employees = Employee.objects.filter(
-            user__last_login__gte=timezone.now() - timezone.timedelta(minutes=15)
+            user__last_login__gte=timezone.now() - datetime.timedelta(minutes=15)
         ).exclude(id=employee.id)[:5]
         
         chat_stats = {

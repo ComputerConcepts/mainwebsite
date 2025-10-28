@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 import json
+from datetime import timedelta
 from .models import (
     Employee, ChatChannel, ChatChannelMembership, ChatMessage, 
     ChatMessageRead, ChatNotification, ChatBoardShare, ChatFileShare,
@@ -70,7 +71,7 @@ def chat_dashboard(request):
     
     # Get online employees (simplified - could be enhanced with WebSockets)
     online_employees = Employee.objects.filter(
-        user__last_login__gte=timezone.now() - timezone.timedelta(minutes=15)
+        user__last_login__gte=timezone.now() - timedelta(minutes=15)
     ).exclude(id=employee.id)[:20]
     
     # Get all employees for DM selection
@@ -170,11 +171,18 @@ def chat_direct_message(request, recipient_id):
     # Get initial message from URL parameter (if any)
     initial_message = request.GET.get('msg', '')
     
+    recipient_last_seen = recipient.user.last_login
+    is_recipient_online = False
+    if recipient_last_seen:
+        is_recipient_online = recipient_last_seen >= timezone.now() - timedelta(minutes=15)
+    
     context = {
         'employee': employee,
         'recipient': recipient,
         'messages': messages_page,
         'initial_message': initial_message,
+        'recipient_last_seen': recipient_last_seen,
+        'is_recipient_online': is_recipient_online,
     }
     
     return render(request, 'employee/chat/direct_message.html', context)

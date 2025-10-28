@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from datetime import timedelta
 import os
 import uuid
 
@@ -1063,7 +1064,7 @@ class ChatChannel(models.Model):
     def get_activity_summary(self):
         """Get recent activity summary for this channel"""
         from django.db.models import Count
-        recent_messages = self.messages.filter(created_at__gte=timezone.now() - timezone.timedelta(days=7))
+        recent_messages = self.messages.filter(created_at__gte=timezone.now() - timedelta(days=7))
         
         return {
             'recent_message_count': recent_messages.count(),

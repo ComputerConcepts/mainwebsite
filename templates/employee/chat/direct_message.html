@@ -9,71 +9,196 @@
         height: calc(100vh - 120px);
         display: flex;
         flex-direction: column;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        margin: 20px;
     }
     
     .chat-header {
-        padding: 15px 20px;
-        border-bottom: 1px solid #e0e0e0;
-        background-color: #f8f9fa;
+        padding: 20px 25px;
+        background: linear-gradient(135deg, #6f42c1 0%, #4e2a99 100%);
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 15px rgba(111, 66, 193, 0.25);
+    }
+    
+    .channel-title {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .channel-title .btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        transition: all 0.3s ease;
+    }
+    
+    .channel-title .btn:hover {
+        transform: translateY(-2px);
+        background: rgba(255, 255, 255, 0.35);
+        color: white;
+    }
+    
+    .channel-icon {
+        width: 50px;
+        height: 50px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .channel-info h3 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1.35rem;
+    }
+    
+    .channel-info p {
+        margin: 0;
+        opacity: 0.9;
+        font-size: 0.95rem;
+    }
+    
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 16px;
+        border-radius: 25px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        font-size: 0.9rem;
+        backdrop-filter: blur(10px);
+    }
+    
+    .status-pill.online {
+        background: rgba(40, 167, 69, 0.25);
+        border-color: rgba(40, 167, 69, 0.3);
+    }
+    
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: radial-gradient(circle at center, #28a745 0%, #20c997 100%);
+        box-shadow: 0 0 10px rgba(40, 167, 69, 0.6);
     }
     
     .chat-messages {
         flex: 1;
         overflow-y: auto;
-        padding: 20px;
-        background-color: #fff;
+        padding: 25px;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #ffffff 100%);
+        position: relative;
     }
     
-    .chat-input {
-        padding: 15px 20px;
-        border-top: 1px solid #e0e0e0;
-        background-color: #f8f9fa;
+    .chat-messages::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 20px;
+        background: linear-gradient(180deg, rgba(248, 249, 250, 0.8) 0%, transparent 100%);
+        pointer-events: none;
     }
     
     .message {
-        margin-bottom: 15px;
+        margin-bottom: 20px;
         display: flex;
         align-items: flex-start;
+        animation: slideInUp 0.3s ease;
+    }
+    
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
     
     .message-avatar {
-        width: 40px;
-        height: 40px;
+        width: 48px;
+        height: 48px;
         border-radius: 50%;
-        background-color: #007bff;
+        background: linear-gradient(135deg, #6f42c1 0%, #4e2a99 100%);
         color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: bold;
-        margin-right: 12px;
+        font-weight: 600;
+        margin-right: 15px;
         flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(111, 66, 193, 0.2);
+        font-size: 18px;
     }
     
     .message-content {
         flex: 1;
         min-width: 0;
+        background: white;
+        padding: 15px 18px;
+        border-radius: 15px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        position: relative;
+    }
+    
+    .message-content::before {
+        content: '';
+        position: absolute;
+        left: -8px;
+        top: 20px;
+        width: 0;
+        height: 0;
+        border-top: 8px solid transparent;
+        border-bottom: 8px solid transparent;
+        border-right: 8px solid white;
     }
     
     .message-header {
         display: flex;
         align-items: baseline;
-        margin-bottom: 4px;
+        margin-bottom: 8px;
     }
     
     .message-sender {
-        font-weight: bold;
-        margin-right: 8px;
+        font-weight: 600;
+        margin-right: 12px;
+        color: #2c3e50;
+        font-size: 1rem;
     }
     
     .message-time {
         font-size: 12px;
         color: #6c757d;
+        opacity: 0.8;
     }
     
     .message-text {
-        color: #333;
+        color: #495057;
         word-wrap: break-word;
+        line-height: 1.5;
+        font-size: 0.95rem;
+    }
+    
+    .message-attachment .card {
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
     }
     
     .message.own {
@@ -81,26 +206,83 @@
     }
     
     .message.own .message-avatar {
-        margin-left: 12px;
+        margin-left: 15px;
         margin-right: 0;
-        background-color: #28a745;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
     }
     
     .message.own .message-content {
-        text-align: right;
+        background: linear-gradient(135deg, #6f42c1 0%, #4e2a99 100%);
+        color: white;
     }
     
-    .user-status {
-        display: flex;
-        align-items: center;
+    .message.own .message-content::before {
+        left: auto;
+        right: -8px;
+        border-right: none;
+        border-left: 8px solid #6f42c1;
     }
     
-    .status-indicator {
-        width: 8px;
-        height: 8px;
-        background-color: #28a745;
-        border-radius: 50%;
-        margin-left: 8px;
+    .message.own .message-sender {
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .message.own .message-text {
+        color: white;
+    }
+    
+    .chat-input {
+        padding: 20px 25px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.05);
+    }
+    
+    .chat-input .input-group-text {
+        background: white;
+        border: 1px solid rgba(111, 66, 193, 0.3);
+        border-right: none;
+        border-radius: 12px 0 0 12px;
+        color: #6f42c1;
+    }
+    
+    .chat-input .form-control {
+        border: 1px solid rgba(111, 66, 193, 0.3);
+        border-left: none;
+        border-right: none;
+        padding: 14px;
+        font-size: 1rem;
+    }
+    
+    .chat-input .btn-primary {
+        border-radius: 0 12px 12px 0;
+        padding: 0 24px;
+        background: linear-gradient(135deg, #6f42c1 0%, #4e2a99 100%);
+        border: none;
+        box-shadow: 0 4px 12px rgba(111, 66, 193, 0.2);
+        transition: transform 0.15s ease;
+    }
+    
+    .chat-input .btn-primary:hover {
+        transform: translateY(-1px);
+    }
+    
+    @media (max-width: 768px) {
+        .chat-container {
+            margin: 12px;
+            height: calc(100vh - 100px);
+        }
+        
+        .chat-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+        }
+        
+        .status-pill {
+            width: 100%;
+            justify-content: center;
+        }
     }
 </style>
 {% endblock %}
@@ -109,25 +291,30 @@
 <div class="chat-container">
     <!-- Chat Header -->
     <div class="chat-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                <a href="{% url 'chat_dashboard' %}" class="btn btn-sm btn-outline-secondary me-3">
-                    <i class="fas fa-arrow-left"></i>
-                </a>
-                <div class="d-flex align-items-center">
-                    <div class="message-avatar me-3">
-                        {{ recipient.user.first_name|first|upper }}
-                    </div>
-                    <div>
-                        <h5 class="mb-0">{{ recipient.user.get_full_name }}</h5>
-                        <small class="text-muted">{{ recipient.department }}</small>
-                    </div>
-                </div>
+        <div class="channel-title">
+            <a href="{% url 'chat_dashboard' %}" class="btn btn-sm">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="channel-icon">
+                <i class="fas fa-user"></i>
             </div>
-            <div class="user-status">
-                <span class="text-muted">Online</span>
-                <div class="status-indicator"></div>
+            <div class="channel-info">
+                <h3>{{ recipient.user.get_full_name }}</h3>
+                <p>Direct message{% if recipient.department %} · {{ recipient.department }}{% endif %}</p>
             </div>
+        </div>
+        <div>
+            {% if is_recipient_online %}
+                <span class="status-pill online">
+                    <span class="status-indicator"></span>
+                    Online now
+                </span>
+            {% elif recipient_last_seen %}
+                <span class="status-pill">
+                    <i class="far fa-clock"></i>
+                    <span>Last seen {{ recipient_last_seen|date:"M d, H:i" }}</span>
+                </span>
+            {% endif %}
         </div>
     </div>
     
@@ -144,8 +331,66 @@
                     <span class="message-time">{{ message.created_at|date:"M d, H:i" }}</span>
                 </div>
                 <div class="message-text">{{ message.content|linebreaks }}</div>
+                
+                {% if message.shared_board %}
+                <div class="message-attachment mt-2">
+                    <div class="card border-primary">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-clipboard text-primary fa-2x me-3"></i>
+                                <div>
+                                    <h6 class="card-title mb-1">{{ message.shared_board.title }}</h6>
+                                    <p class="card-text text-muted small mb-1">{{ message.shared_board.description|truncatechars:100 }}</p>
+                                    <a href="{% url 'board_detail' message.shared_board.id %}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-external-link-alt me-1"></i>Open Board
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if message.shared_file %}
+                <div class="message-attachment mt-2">
+                    <div class="card border-success">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-folder-open text-success fa-2x me-3"></i>
+                                <div>
+                                    <h6 class="card-title mb-1">{{ message.shared_file.name }}</h6>
+                                    <p class="card-text text-muted small mb-1">{{ message.shared_file.description|truncatechars:100 }}</p>
+                                    <a href="{{ message.shared_file.get_download_url }}" class="btn btn-sm btn-success">
+                                        <i class="fas fa-download me-1"></i>Download
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if message.file_attachment %}
+                <div class="message-attachment mt-2">
+                    <div class="card border-info">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-paperclip text-info fa-2x me-3"></i>
+                                <div>
+                                    <h6 class="card-title mb-1">{{ message.file_attachment.original_name }}</h6>
+                                    <small class="text-muted d-block">{{ message.file_attachment.file.size|filesizeformat }}</small>
+                                    <a href="{{ message.file_attachment.file.url }}" class="btn btn-sm btn-info text-white mt-2">
+                                        <i class="fas fa-download me-1"></i>Download Attachment
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
                 {% if message.is_edited %}
-                <small class="text-muted">(edited)</small>
+                <small class="text-muted d-block mt-2">(edited)</small>
                 {% endif %}
             </div>
         </div>
@@ -162,9 +407,12 @@
     <div class="chat-input">
         <form id="messageForm" onsubmit="sendMessage(event)">
             <div class="input-group">
-                <input type="text" class="form-control" id="messageInput" placeholder="Type a message to {{ recipient.user.first_name }}..." maxlength="2000" value="{{ initial_message }}" required>
+                <span class="input-group-text">
+                    <i class="fas fa-comment"></i>
+                </span>
+                <input type="text" class="form-control" id="messageInput" placeholder="Message {{ recipient.user.first_name }}..." maxlength="2000" value="{{ initial_message }}" required>
                 <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-paper-plane"></i>
+                    <i class="fas fa-paper-plane me-1"></i>Send
                 </button>
             </div>
         </form>
@@ -235,7 +483,7 @@ function addMessageToChat(messageData) {
         <div class="message-avatar">{{ employee.user.first_name|first|upper }}</div>
         <div class="message-content">
             <div class="message-header">
-                <span class="message-sender">{{ employee.user.get_full_name }}</span>
+                <span class="message-sender">{{ employee.user.get_full_name|escapejs }}</span>
                 <span class="message-time">${timeString}</span>
             </div>
             <div class="message-text">${messageData.content.replace(/\n/g, '<br>')}</div>

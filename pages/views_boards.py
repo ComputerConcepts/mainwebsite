@@ -358,100 +358,109 @@ def move_card(request):
         data = json.loads(request.body)
         card_id = data.get('card_id')
         new_list_id = data.get('new_list_id')
-        new_position = data.get('new_position', 1)
+        new_position_raw = data.get('new_position', 1)
         
-        card = Card.objects.get(id=card_id)
+        if not card_id or not new_list_id:
+            return JsonResponse({'error': 'Missing card_id or new_list_id'}, status=400)
+        
+        try:
+            new_position = int(new_position_raw)
+        except (TypeError, ValueError):
+            new_position = 1
+        
         employee = Employee.objects.get(user=request.user)
         
-        # Check access to board
-        board = card.board_list.board
-        if board.created_by != employee and employee not in board.members.all():
-            return JsonResponse({'error': 'Access denied'}, status=403)
-        
-        # Validate and sanitize position
-        new_list = BoardList.objects.get(id=new_list_id)
-        max_position = new_list.cards.count()
-        
-        # If moving to the same list, don't count the card itself
-        if card.board_list.id == new_list.id:
-            max_position -= 1
-            
-        # Ensure position is within valid range
-        new_position = max(1, min(new_position, max_position + 1))
-        
         with transaction.atomic():
+            card = Card.objects.select_for_update().select_related('board_list__board').get(id=card_id)
             old_list = card.board_list
-            new_list = BoardList.objects.get(id=new_list_id)
+            board = old_list.board
             
-            if old_list.id == new_list.id:
-                # Moving within the same list - just reorder
-                old_position = card.position
-                if new_position < old_position:
-                    # Moving up - shift cards down
-                    old_list.cards.filter(
-                        position__gte=new_position,
-                        position__lt=old_position
-                    ).update(position=models.F('position') + 1)
-                elif new_position > old_position:
-                    # Moving down - shift cards up
-                    old_list.cards.filter(
-                        position__gt=old_position,
-                        position__lte=new_position
-                    ).update(position=models.F('position') - 1)
-                    
-                card.position = new_position
-                card.save()
+            if board.created_by != employee and employee not in board.members.all():
+                return JsonResponse({'error': 'Access denied'}, status=403)
+            
+            new_list = BoardList.objects.select_for_update().select_related('board').get(id=new_list_id)
+            
+            if new_list.board_id != board.id:
+                return JsonResponse({'error': 'Cannot move cards between different boards'}, status=400)
+            
+            moving_within_same_list = old_list.id == new_list.id
+            
+            if moving_within_same_list:
+                target_cards = list(
+                    Card.objects.select_for_update()
+                    .filter(board_list=new_list)
+                    .exclude(id=card.id)
+                    .order_by('position', 'created_at')
+                )
             else:
-                # Moving between different lists
-                # Step 1: Remove card from old list and compact positions
-                old_list.cards.filter(position__gt=card.position).update(
-                    position=models.F('position') - 1
+                target_cards = list(
+                    Card.objects.select_for_update()
+                    .filter(board_list=new_list)
+                    .order_by('position', 'created_at')
+                )
+            
+            max_position = len(target_cards)
+            desired_index = max(0, min(new_position - 1, max_position))
+            
+            if moving_within_same_list:
+                ordered_cards = target_cards
+                ordered_cards.insert(desired_index, card)
+                
+                bulk_updates = []
+                for idx, item in enumerate(ordered_cards, start=1):
+                    if item.id == card.id:
+                        target_position = idx
+                    elif item.position != idx:
+                        item.position = idx
+                        bulk_updates.append(item)
+                
+                if bulk_updates:
+                    Card.objects.bulk_update(bulk_updates, ['position'])
+                
+                if card.position != target_position:
+                    card.position = target_position
+                    card.save(update_fields=['position'])
+            else:
+                old_siblings = list(
+                    Card.objects.select_for_update()
+                    .filter(board_list=old_list)
+                    .exclude(id=card.id)
+                    .order_by('position', 'created_at')
                 )
                 
-                # Step 2: Make space in new list
-                new_list.cards.filter(position__gte=new_position).update(
-                    position=models.F('position') + 1
-                )
+                old_updates = []
+                for idx, item in enumerate(old_siblings, start=1):
+                    if item.position != idx:
+                        item.position = idx
+                        old_updates.append(item)
                 
-                # Step 3: Move card to new list
-                card.board_list = new_list
-                card.position = new_position
-                card.save()
+                if old_updates:
+                    Card.objects.bulk_update(old_updates, ['position'])
+                
+                target_cards.insert(desired_index, card)
+                
+                new_list_updates = []
+                for idx, item in enumerate(target_cards, start=1):
+                    if item.id == card.id:
+                        target_position = idx
+                    elif item.position != idx:
+                        item.position = idx
+                        new_list_updates.append(item)
+                
+                if new_list_updates:
+                    Card.objects.bulk_update(new_list_updates, ['position'])
+                
+                if card.board_list_id != new_list.id or card.position != target_position:
+                    card.board_list = new_list
+                    card.position = target_position
+                    card.save(update_fields=['board_list', 'position'])
         
         return JsonResponse({'success': True, 'message': 'Card moved successfully'})
         
     except (Card.DoesNotExist, BoardList.DoesNotExist):
         return JsonResponse({'error': 'Card or list not found'}, status=404)
     except Exception as e:
-        # If we get a position conflict, try to fix it and retry
-        if 'unique constraint' in str(e).lower() and 'position' in str(e).lower():
-            try:
-                with transaction.atomic():
-                    # Fix positions in both lists
-                    old_list = card.board_list
-                    new_list = BoardList.objects.get(id=new_list_id)
-                    
-                    reorder_cards_in_list(old_list)
-                    if old_list.id != new_list.id:
-                        reorder_cards_in_list(new_list)
-                    
-                    # Now try the move again with position at end
-                    max_position = new_list.cards.count()
-                    if old_list.id == new_list.id:
-                        max_position -= 1
-                    
-                    card.board_list = new_list
-                    card.position = max_position + 1
-                    card.save()
-                    
-                    # Reorder again to clean up
-                    reorder_cards_in_list(new_list)
-                    
-                return JsonResponse({'success': True, 'message': 'Card moved successfully (position corrected)'})
-            except Exception as retry_error:
-                return JsonResponse({'error': f'Failed to move card after position correction: {str(retry_error)}'}, status=500)
-        else:
-            return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required

@@ -42,15 +42,19 @@ def ai_dashboard(request):
     
     # Get recent file analyses (completed)
     recent_analyses = AIFileAnalysis.objects.filter(
-        document__uploaded_by=employee,
+        Q(document__uploaded_by=employee) |
+        Q(document__shared_with=employee) |
+        Q(document__shares__shared_with=employee),
         status='completed'
-    ).order_by('-analysis_completed_at')[:5]
+    ).select_related('document').distinct().order_by('-analysis_completed_at')[:5]
     
     # Get pending analyses (queued or processing)
     pending_analyses = AIFileAnalysis.objects.filter(
-        document__uploaded_by=employee,
+        Q(document__uploaded_by=employee) |
+        Q(document__shared_with=employee) |
+        Q(document__shares__shared_with=employee),
         status__in=['queued', 'processing']
-    ).order_by('-queued_at')[:5]
+    ).select_related('document').distinct().order_by('-queued_at')[:5]
     
     # Get workflow suggestions
     suggestions = ai_service.suggest_workflow_optimizations(employee)
@@ -73,9 +77,11 @@ def ai_dashboard(request):
             'workflows_active': analytics['active_rules'],
             'total_executions': analytics.get('user_workflow_executions', 0),
             'files_analyzed': AIFileAnalysis.objects.filter(
-                document__uploaded_by=employee,
+                Q(document__uploaded_by=employee) |
+                Q(document__shared_with=employee) |
+                Q(document__shares__shared_with=employee),
                 status='completed'
-            ).count(),
+            ).distinct().count(),
             'notifications_sent': analytics.get('user_notifications', 0)
         }
     }

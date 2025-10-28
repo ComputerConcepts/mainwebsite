@@ -761,7 +761,9 @@ def search_files(request):
         
         # Base queryset - user's files and shared files
         files = FileDocument.objects.filter(
-            Q(uploaded_by=employee) | Q(shared_with=employee) | Q(is_public=True)
+            Q(uploaded_by=employee) |
+            Q(shared_with=employee) |
+            Q(shares__shared_with=employee)
         ).select_related('ai_analysis').distinct()
         
         search_query = request.GET.get('query', '').strip()
@@ -933,9 +935,11 @@ def _generate_search_suggestions(query, employee):
     
     # Get files with AI analysis
     analyzed_files = FileDocument.objects.filter(
-        Q(uploaded_by=employee) | Q(shared_with=employee),
+        Q(uploaded_by=employee) |
+        Q(shared_with=employee) |
+        Q(shares__shared_with=employee),
         ai_analysis__isnull=False
-    ).select_related('ai_analysis')
+    ).select_related('ai_analysis').distinct()
     
     # Collect relevant topics, categories, and entities
     topics_set = set()
@@ -1110,7 +1114,9 @@ def ai_chat(request):
             
             # Get user's files
             user_files = FileDocument.objects.filter(
-                Q(uploaded_by=employee) | Q(shared_with=employee)
+                Q(uploaded_by=employee) |
+                Q(shared_with=employee) |
+                Q(shares__shared_with=employee)
             ).distinct()
             
             # Create AI assistant
