@@ -11,7 +11,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from django.db.models import Prefetch
 from django.conf import settings
 import json
 import os
@@ -277,42 +276,33 @@ def onboarding_dashboard(request):
         messages.error(request, "Session expired. Please log in again.")
         return redirect('onboarding_login')
     
-    pdf_task_prefetch = Prefetch(
-        'pdf_tasks',
-        queryset=OnboardingPDFTask.objects.filter(is_active=True).select_related('pdf_form'),
-        to_attr='active_pdf_tasks'
-    )
+    # Get all invitations (regular forms)
     invitations = OnboardingInvitation.objects.filter(
         prospective_employee=prospective_employee
-    ).select_related('onboarding_form').prefetch_related(pdf_task_prefetch).order_by('-sent_at')
-    
-    # Check for completed submissions and those needing revision
+    ).select_related('onboarding_form').order_by('-sent_at')
+
+    # Get all PDF tasks linked to this prospect (treat them as first-class tasks)
+    pdf_tasks = OnboardingPDFTask.objects.filter(
+        invitation__prospective_employee=prospective_employee,
+        is_active=True
+    ).select_related('pdf_form', 'invitation').order_by('-assigned_at')
+
     completed_invitations = []
     pending_invitations = []
     total_pdf_tasks = 0
     awaiting_pdf_upload = 0
     awaiting_pdf_review = 0
-    
+
+    # Process regular invitations (forms)
     for invitation in invitations:
-        pdf_tasks = list(getattr(invitation, 'active_pdf_tasks', []))
-        invite_pdf_summary = {
-            'needs_upload': 0,
-            'awaiting_review': 0,
-            'all_approved': True,
-        }
-        for task in pdf_tasks:
-            total_pdf_tasks += 1
-            if task.status in [OnboardingPDFTask.STATUS_PENDING, OnboardingPDFTask.STATUS_NEEDS_REVISION]:
-                awaiting_pdf_upload += 1
-                invite_pdf_summary['needs_upload'] += 1
-                invite_pdf_summary['all_approved'] = False
-            elif task.status == OnboardingPDFTask.STATUS_SUBMITTED:
-                awaiting_pdf_review += 1
-                invite_pdf_summary['awaiting_review'] += 1
-                invite_pdf_summary['all_approved'] = False
-            elif task.status != OnboardingPDFTask.STATUS_APPROVED:
-                invite_pdf_summary['all_approved'] = False
-        
+        form_meta = invitation.onboarding_form.form_fields
+        is_pdf_only_invitation = False
+        if isinstance(form_meta, dict):
+            if form_meta.get('pdf_only') or form_meta.get('pdf_primary_id'):
+                is_pdf_only_invitation = True
+        if is_pdf_only_invitation:
+            continue
+
         try:
             submission = OnboardingSubmission.objects.get(invitation=invitation)
             if submission.review_status == 'approved':
@@ -320,13 +310,13 @@ def onboarding_dashboard(request):
                     offer_letter = submission.offer_letter
                 except OnboardingOfferLetter.DoesNotExist:
                     offer_letter = None
-                
                 completed_invitations.append({
                     'invitation': invitation,
                     'submission': submission,
                     'offer_letter': offer_letter,
-                    'pdf_tasks': pdf_tasks,
-                    'pdf_summary': invite_pdf_summary,
+                    'is_pdf_task': False,
+                    'needs_revision': False,
+                    'review_notes': None,
                 })
             else:
                 pending_invitations.append({
@@ -334,8 +324,7 @@ def onboarding_dashboard(request):
                     'submission': submission,
                     'needs_revision': submission.review_status == 'needs_revision',
                     'review_notes': submission.review_notes if submission.review_status == 'needs_revision' else None,
-                    'pdf_tasks': pdf_tasks,
-                    'pdf_summary': invite_pdf_summary,
+                    'is_pdf_task': False,
                 })
         except OnboardingSubmission.DoesNotExist:
             pending_invitations.append({
@@ -343,10 +332,34 @@ def onboarding_dashboard(request):
                 'submission': None,
                 'needs_revision': False,
                 'review_notes': None,
-                'pdf_tasks': pdf_tasks,
-                'pdf_summary': invite_pdf_summary,
+                'is_pdf_task': False,
             })
-    
+
+    # Process PDF tasks as top-level items
+    for pdf_task in pdf_tasks:
+        total_pdf_tasks += 1
+        pdf_status = pdf_task.status
+        task_payload = {
+            'pdf_task': pdf_task,
+            'is_pdf_task': True,
+            'submission': None,
+            'needs_revision': pdf_status == OnboardingPDFTask.STATUS_NEEDS_REVISION,
+            'review_notes': pdf_task.review_notes if pdf_status == OnboardingPDFTask.STATUS_NEEDS_REVISION else None,
+        }
+        if pdf_status in [OnboardingPDFTask.STATUS_PENDING, OnboardingPDFTask.STATUS_NEEDS_REVISION]:
+            awaiting_pdf_upload += 1
+            pending_invitations.append(task_payload)
+        elif pdf_status == OnboardingPDFTask.STATUS_SUBMITTED:
+            awaiting_pdf_review += 1
+            pending_invitations.append(task_payload)
+        elif pdf_status == OnboardingPDFTask.STATUS_APPROVED:
+            completed_invitations.append(task_payload)
+        else:
+            pending_invitations.append(task_payload)
+
+    pending_task_count = len(pending_invitations)
+    completed_task_count = len(completed_invitations)
+
     context = {
         'prospective_employee': prospective_employee,
         'pending_invitations': pending_invitations,
@@ -356,8 +369,11 @@ def onboarding_dashboard(request):
             'awaiting_upload': awaiting_pdf_upload,
             'awaiting_review': awaiting_pdf_review,
         },
+        'pending_task_count': pending_task_count,
+        'completed_task_count': completed_task_count,
+        'total_task_count': pending_task_count + completed_task_count,
     }
-    
+
     return render(request, 'onboarding/dashboard.html', context)
 
 

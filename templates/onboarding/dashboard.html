@@ -325,19 +325,19 @@
                 <div class="row stats-row">
                     <div class="col-md-4">
                         <div class="stat-item">
-                            <span class="stat-number">{{ pending_invitations|length }}</span>
+                            <span class="stat-number">{{ pending_task_count }}</span>
                             <span class="stat-label">Pending Forms</span>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="stat-item">
-                            <span class="stat-number">{{ completed_invitations|length }}</span>
+                            <span class="stat-number">{{ completed_task_count }}</span>
                             <span class="stat-label">Completed Forms</span>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="stat-item">
-                            <span class="stat-number">{{ pending_invitations|length|add:completed_invitations|length }}</span>
+                            <span class="stat-number">{{ total_task_count }}</span>
                             <span class="stat-label">Total Forms</span>
                         </div>
                     </div>
@@ -375,121 +375,140 @@
                     {% if pending_invitations %}
                         {% for item in pending_invitations %}
                         <div class="status-card pending-form {% if item.needs_revision %}revision-required{% endif %}">
-                            <div class="form-title">
-                                {{ item.invitation.onboarding_form.title }}
-                            </div>
-                            <div class="form-description">
-                                {{ item.invitation.onboarding_form.description|default:"Complete this onboarding form to proceed." }}
-                            </div>
-                            
-                            {% if item.needs_revision and item.review_notes %}
-                            <div class="revision-notice">
-                                <div class="alert alert-warning mb-3">
-                                    <div class="d-flex align-items-start">
-                                        <i class="fas fa-exclamation-triangle me-2 mt-1"></i>
-                                        <div>
-                                            <strong>Revision Required</strong>
-                                            <p class="mb-0 mt-1">{{ item.review_notes }}</p>
+                            {% if item.is_pdf_task %}
+                                <div class="form-title">
+                                    <i class="fas fa-file-pdf me-2 text-danger"></i>{{ item.pdf_task.pdf_form.title }}
+                                </div>
+                                <div class="form-description">
+                                {{ item.pdf_task.instructions|default:item.pdf_task.pdf_form.description|default:"Download, complete, and upload this document to proceed." }}
+                                </div>
+
+                                {% if item.needs_revision and item.review_notes %}
+                                <div class="revision-notice">
+                                    <div class="alert alert-warning mb-3">
+                                        <div class="d-flex align-items-start">
+                                            <i class="fas fa-exclamation-triangle me-2 mt-1"></i>
+                                            <div>
+                                                <strong>Revision Required</strong>
+                                                <p class="mb-0 mt-1">{{ item.review_notes }}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            {% endif %}
-                            
-                            <div class="form-meta">
-                                <span class="form-date">
-                                    <i class="fas fa-calendar-alt me-1"></i>
-                                    Sent {{ item.invitation.sent_at|date:"M j, Y" }}
-                                </span>
-                                {% if item.needs_revision %}
-                                    <span class="status-badge status-revision">
-                                        <i class="fas fa-edit me-1"></i>Needs Revision
-                                    </span>
-                                {% elif item.submission %}
-                                    <span class="status-badge status-review">
-                                        <i class="fas fa-eye me-1"></i>Under Review
-                                    </span>
-                                {% else %}
-                                    <span class="status-badge status-pending">
-                                        <i class="fas fa-hourglass-half me-1"></i>Pending
-                                    </span>
                                 {% endif %}
-                            </div>
-                            <div class="text-end">
-                                {% if item.submission and not item.needs_revision %}
-                                    <span class="text-muted">
-                                        <i class="fas fa-clock me-1"></i>Submitted - awaiting review
-                                    </span>
-                                {% else %}
-                                    <a href="{% url 'onboarding_form' item.invitation.id %}" class="action-btn {% if item.needs_revision %}btn-warning{% endif %}">
-                                        <i class="fas fa-edit me-2"></i>
-                                        {% if item.needs_revision %}Update Form{% else %}Complete Form{% endif %}
-                                    </a>
-                                {% endif %}
-                            </div>
 
-                            {% if item.pdf_tasks %}
-                            <div class="pdf-task-list">
-                                <h6 class="text-white mb-3">
-                                    <i class="fas fa-file-pdf me-2 text-danger"></i>PDF Documents
-                                </h6>
-                                {% for pdf_task in item.pdf_tasks %}
-                                <div class="pdf-task-item">
-                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-                                        <div>
-                                            <div class="fw-semibold">{{ pdf_task.pdf_form.title }}</div>
-                                            {% if pdf_task.instructions %}
-                                            <div class="small text-muted">{{ pdf_task.instructions }}</div>
-                                            {% endif %}
-                                            {% if pdf_task.status == 'needs_revision' and pdf_task.review_notes %}
-                                            <div class="alert alert-warning mt-2 mb-1 py-2 px-3">
-                                                <strong>Revision requested:</strong> {{ pdf_task.review_notes }}
-                                            </div>
-                                            {% elif pdf_task.status == 'submitted' and pdf_task.completed_at %}
-                                            <div class="small text-muted mt-1">
-                                                Submitted {{ pdf_task.completed_at|timesince }} ago. Waiting on HR review.
-                                            </div>
-                                            {% elif pdf_task.status == 'approved' and pdf_task.reviewed_at %}
-                                            <div class="small text-success mt-1">
-                                                Approved {{ pdf_task.reviewed_at|date:"M j, Y" }}
-                                            </div>
-                                            {% endif %}
-                                        </div>
-                                        <span class="pdf-task-status {% if pdf_task.status == 'approved' %}approved{% elif pdf_task.status == 'needs_revision' %}revision{% elif pdf_task.status == 'submitted' %}review{% else %}pending{% endif %}">
-                                            {% if pdf_task.status == 'approved' %}
-                                                <i class="fas fa-check-circle"></i>Approved
-                                            {% elif pdf_task.status == 'needs_revision' %}
-                                                <i class="fas fa-exclamation-circle"></i>Needs Revision
-                                            {% elif pdf_task.status == 'submitted' %}
-                                                <i class="fas fa-hourglass-half"></i>Under Review
-                                            {% else %}
-                                                <i class="fas fa-upload"></i>Awaiting Upload
-                                            {% endif %}
+                                <div class="form-meta">
+                                    <span class="form-date">
+                                        <i class="fas fa-calendar-alt me-1"></i>
+                                        Assigned {{ item.pdf_task.assigned_at|date:"M j, Y" }}
+                                        {% if item.pdf_task.due_date %}
+                                            - Due {{ item.pdf_task.due_date|date:"M j, Y" }}
+                                        {% endif %}
+                                    </span>
+                                    {% if item.pdf_task.status == 'needs_revision' %}
+                                        <span class="status-badge status-revision">
+                                            <i class="fas fa-edit me-1"></i>Needs Revision
                                         </span>
-                                    </div>
-                                    <div class="pdf-task-actions">
-                                        <a class="btn btn-sm btn-outline-dark rounded-pill" href="{% url 'onboarding_pdf_template_download' pdf_task.id %}">
+                                    {% elif item.pdf_task.status == 'submitted' %}
+                                        <span class="status-badge status-review">
+                                            <i class="fas fa-eye me-1"></i>Under Review
+                                        </span>
+                                    {% elif item.pdf_task.status == 'approved' %}
+                                        <span class="status-badge status-completed">
+                                            <i class="fas fa-check me-1"></i>Approved
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge status-pending">
+                                            <i class="fas fa-upload me-1"></i>Awaiting Upload
+                                        </span>
+                                    {% endif %}
+                                </div>
+
+                                {% if item.pdf_task.status == 'submitted' and item.pdf_task.completed_at %}
+                                <div class="alert alert-info py-2 px-3 mt-2 mb-0">
+                                    <i class="fas fa-info-circle me-2"></i>Uploaded {{ item.pdf_task.completed_at|timesince }} ago - awaiting review
+                                </div>
+                                {% elif item.pdf_task.status == 'approved' and item.pdf_task.reviewed_at %}
+                                <div class="small text-success mt-2">
+                                    <i class="fas fa-check-circle me-1"></i>Approved {{ item.pdf_task.reviewed_at|date:"M j, Y" }}
+                                </div>
+                                {% endif %}
+
+                                <div class="pdf-task-actions d-flex flex-wrap gap-2 align-items-center justify-content-between mt-3">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a class="btn btn-sm btn-outline-dark rounded-pill" href="{% url 'onboarding_pdf_template_download' item.pdf_task.id %}">
                                             <i class="fas fa-file-download me-1"></i>Blank PDF
                                         </a>
-                                        {% if pdf_task.completed_file %}
-                                        <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{% url 'onboarding_pdf_submission_download' pdf_task.id %}">
+                                        {% if item.pdf_task.completed_file %}
+                                        <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{% url 'onboarding_pdf_submission_download' item.pdf_task.id %}">
                                             <i class="fas fa-file-signature me-1"></i>Your Upload
                                         </a>
                                         {% endif %}
-                                        {% if pdf_task.status != 'approved' %}
-                                        <form method="post" action="{% url 'onboarding_pdf_upload' pdf_task.id %}" enctype="multipart/form-data" class="pdf-upload-form d-flex flex-wrap gap-2 align-items-center">
-                                            {% csrf_token %}
-                                            <input type="file" name="completed_pdf" accept="application/pdf" required class="form-control form-control-sm">
-                                            <button type="submit" class="btn btn-sm btn-primary rounded-pill">
-                                                <i class="fas fa-cloud-upload-alt me-1"></i>{% if pdf_task.completed_file %}Re-upload{% else %}Upload{% endif %}
-                                            </button>
-                                        </form>
-                                        <div class="pdf-upload-note">PDF only, max 15 MB.</div>
-                                        {% endif %}
+                                    </div>
+                                    {% if item.pdf_task.status != 'approved' %}
+                                    <form method="post" action="{% url 'onboarding_pdf_upload' item.pdf_task.id %}" enctype="multipart/form-data" class="pdf-upload-form d-flex flex-wrap gap-2 align-items-center">
+                                        {% csrf_token %}
+                                        <input type="file" name="completed_pdf" accept="application/pdf" required class="form-control form-control-sm">
+                                        <button type="submit" class="btn btn-sm btn-primary rounded-pill">
+                                            <i class="fas fa-cloud-upload-alt me-1"></i>{% if item.pdf_task.completed_file %}Re-upload{% else %}Upload PDF{% endif %}
+                                        </button>
+                                    </form>
+                                    <div class="pdf-upload-note mt-2">PDF only, max 15 MB.</div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <div class="form-title">
+                                    {{ item.invitation.onboarding_form.title }}
+                                </div>
+                                <div class="form-description">
+                                    {{ item.invitation.onboarding_form.description|default:"Complete this onboarding form to proceed." }}
+                                </div>
+
+                                {% if item.needs_revision and item.review_notes %}
+                                <div class="revision-notice">
+                                    <div class="alert alert-warning mb-3">
+                                        <div class="d-flex align-items-start">
+                                            <i class="fas fa-exclamation-triangle me-2 mt-1"></i>
+                                            <div>
+                                                <strong>Revision Required</strong>
+                                                <p class="mb-0 mt-1">{{ item.review_notes }}</p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                {% endfor %}
-                            </div>
+                                {% endif %}
+
+                                <div class="form-meta">
+                                    <span class="form-date">
+                                        <i class="fas fa-calendar-alt me-1"></i>
+                                        Sent {{ item.invitation.sent_at|date:"M j, Y" }}
+                                    </span>
+                                    {% if item.needs_revision %}
+                                        <span class="status-badge status-revision">
+                                            <i class="fas fa-edit me-1"></i>Needs Revision
+                                        </span>
+                                    {% elif item.submission %}
+                                        <span class="status-badge status-review">
+                                            <i class="fas fa-eye me-1"></i>Under Review
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge status-pending">
+                                            <i class="fas fa-hourglass-half me-1"></i>Pending
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    {% if item.submission and not item.needs_revision %}
+                                        <span class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>Submitted - awaiting review
+                                        </span>
+                                    {% else %}
+                                        <a href="{% url 'onboarding_form' item.invitation.id %}" class="action-btn {% if item.needs_revision %}btn-warning{% endif %}">
+                                            <i class="fas fa-edit me-2"></i>
+                                            {% if item.needs_revision %}Update Form{% else %}Complete Form{% endif %}
+                                        </a>
+                                    {% endif %}
+                                </div>
                             {% endif %}
                         </div>
                         {% endfor %}
@@ -513,173 +532,147 @@
                     {% if completed_invitations %}
                         {% for item in completed_invitations %}
                         <div class="status-card completed-form">
-                            <div class="form-title">
-                                {{ item.invitation.onboarding_form.title }}
-                            </div>
-                            <div class="form-description">
-                                {{ item.invitation.onboarding_form.description|default:"Onboarding form completed." }}
-                            </div>
-                            <div class="form-meta">
-                                <span class="form-date">
-                                    <i class="fas fa-calendar-check me-1"></i>
-                                    Completed {{ item.submission.submitted_at|date:"M j, Y" }}
-                                </span>
-                                {% if item.submission.review_status == 'pending' %}
-                                    <span class="status-badge status-pending">
-                                        <i class="fas fa-hourglass-half me-1"></i>Under Review
+                            {% if item.is_pdf_task %}
+                                <div class="form-title">
+                                    <i class="fas fa-file-pdf me-2 text-danger"></i>{{ item.pdf_task.pdf_form.title }}
+                                </div>
+                                <div class="form-description">
+                                    {{ item.pdf_task.instructions|default:item.pdf_task.pdf_form.description|default:"PDF document uploaded successfully." }}
+                                </div>
+                                <div class="form-meta">
+                                    <span class="form-date">
+                                        <i class="fas fa-calendar-check me-1"></i>
+                                        {% if item.pdf_task.reviewed_at %}
+                                            Reviewed {{ item.pdf_task.reviewed_at|date:"M j, Y" }}
+                                        {% elif item.pdf_task.completed_at %}
+                                            Submitted {{ item.pdf_task.completed_at|date:"M j, Y" }}
+                                        {% else %}
+                                            Completed
+                                        {% endif %}
                                     </span>
-                                {% elif item.submission.review_status == 'under_review' %}
-                                    <span class="status-badge status-under-review">
-                                        <i class="fas fa-eye me-1"></i>Under Review
-                                    </span>
-                                {% elif item.submission.review_status == 'approved' %}
                                     <span class="status-badge status-completed">
                                         <i class="fas fa-check me-1"></i>Approved
                                     </span>
-                                {% elif item.submission.review_status == 'rejected' %}
-                                    <span class="status-badge" style="background: #f8d7da; color: #721c24;">
-                                        <i class="fas fa-times me-1"></i>Needs Revision
-                                    </span>
-                                {% else %}
-                                    <span class="status-badge status-completed">
-                                        <i class="fas fa-check me-1"></i>Submitted
-                                    </span>
-                                {% endif %}
-                            </div>
-                            <div class="text-end">
-                                {% if item.submission.review_status == 'rejected' %}
-                                    <a href="{% url 'onboarding_form' item.invitation.id %}" class="action-btn">
-                                        <i class="fas fa-edit me-2"></i>Revise Form
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <a class="btn btn-sm btn-outline-dark rounded-pill" href="{% url 'onboarding_pdf_template_download' item.pdf_task.id %}">
+                                        <i class="fas fa-file-download me-1"></i>Blank PDF
                                     </a>
-                                {% else %}
-                                    <button class="action-btn completed-btn" disabled>
-                                        <i class="fas fa-check me-2"></i>Completed
-                                    </button>
-                                {% endif %}
-                            </div>
-
-                            {% if item.pdf_tasks %}
-                            <div class="pdf-task-list" style="background: rgba(99, 102, 241, 0.08);">
-                                <h6 class="mb-3 text-dark">
-                                    <i class="fas fa-file-pdf me-2 text-danger"></i>PDF Documents
-                                </h6>
-                                {% for pdf_task in item.pdf_tasks %}
-                                <div class="pdf-task-item">
-                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-                                        <div>
-                                            <div class="fw-semibold">{{ pdf_task.pdf_form.title }}</div>
-                                            {% if pdf_task.instructions %}
-                                            <div class="small text-muted">{{ pdf_task.instructions }}</div>
-                                            {% endif %}
-                                            {% if pdf_task.status == 'needs_revision' and pdf_task.review_notes %}
-                                            <div class="alert alert-warning mt-2 mb-1 py-2 px-3">
-                                                <strong>Revision requested:</strong> {{ pdf_task.review_notes }}
-                                            </div>
-                                            {% elif pdf_task.status == 'submitted' and pdf_task.completed_at %}
-                                            <div class="small text-muted mt-1">
-                                                Submitted {{ pdf_task.completed_at|timesince }} ago. Waiting on HR review.
-                                            </div>
-                                            {% elif pdf_task.status == 'approved' and pdf_task.reviewed_at %}
-                                            <div class="small text-success mt-1">
-                                                Approved {{ pdf_task.reviewed_at|date:"M j, Y" }}
-                                            </div>
-                                            {% endif %}
-                                        </div>
-                                        <span class="pdf-task-status {% if pdf_task.status == 'approved' %}approved{% elif pdf_task.status == 'needs_revision' %}revision{% elif pdf_task.status == 'submitted' %}review{% else %}pending{% endif %}">
-                                            {% if pdf_task.status == 'approved' %}
-                                                <i class="fas fa-check-circle"></i>Approved
-                                            {% elif pdf_task.status == 'needs_revision' %}
-                                                <i class="fas fa-exclamation-circle"></i>Needs Revision
-                                            {% elif pdf_task.status == 'submitted' %}
-                                                <i class="fas fa-hourglass-half"></i>Under Review
-                                            {% else %}
-                                                <i class="fas fa-upload"></i>Awaiting Upload
-                                            {% endif %}
+                                    {% if item.pdf_task.completed_file %}
+                                    <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{% url 'onboarding_pdf_submission_download' item.pdf_task.id %}">
+                                        <i class="fas fa-file-signature me-1"></i>Your Upload
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <div class="form-title">
+                                    {{ item.invitation.onboarding_form.title }}
+                                </div>
+                                <div class="form-description">
+                                    {{ item.invitation.onboarding_form.description|default:"Onboarding form completed." }}
+                                </div>
+                                <div class="form-meta">
+                                    <span class="form-date">
+                                        <i class="fas fa-calendar-check me-1"></i>
+                                        {% if item.submission %}
+                                            Completed {{ item.submission.submitted_at|date:"M j, Y" }}
+                                        {% else %}
+                                            Completed
+                                        {% endif %}
+                                    </span>
+                                    {% if item.submission and item.submission.review_status == 'pending' %}
+                                        <span class="status-badge status-pending">
+                                            <i class="fas fa-hourglass-half me-1"></i>Under Review
                                         </span>
-                                    </div>
-                                    <div class="pdf-task-actions">
-                                        <a class="btn btn-sm btn-outline-dark rounded-pill" href="{% url 'onboarding_pdf_template_download' pdf_task.id %}">
-                                            <i class="fas fa-file-download me-1"></i>Blank PDF
-                                        </a>
-                                        {% if pdf_task.completed_file %}
-                                        <a class="btn btn-sm btn-outline-secondary rounded-pill" href="{% url 'onboarding_pdf_submission_download' pdf_task.id %}">
-                                            <i class="fas fa-file-signature me-1"></i>Your Upload
-                                        </a>
-                                        {% endif %}
-                                        {% if pdf_task.status != 'approved' %}
-                                        <form method="post" action="{% url 'onboarding_pdf_upload' pdf_task.id %}" enctype="multipart/form-data" class="pdf-upload-form d-flex flex-wrap gap-2 align-items-center">
-                                            {% csrf_token %}
-                                            <input type="file" name="completed_pdf" accept="application/pdf" required class="form-control form-control-sm">
-                                            <button type="submit" class="btn btn-sm btn-primary rounded-pill">
-                                                <i class="fas fa-cloud-upload-alt me-1"></i>{% if pdf_task.completed_file %}Re-upload{% else %}Upload{% endif %}
-                                            </button>
-                                        </form>
-                                        <div class="pdf-upload-note">PDF only, max 15 MB.</div>
-                                        {% endif %}
-                                    </div>
+                                    {% elif item.submission and item.submission.review_status == 'under_review' %}
+                                        <span class="status-badge status-under-review">
+                                            <i class="fas fa-eye me-1"></i>Under Review
+                                        </span>
+                                    {% elif item.submission and item.submission.review_status == 'approved' %}
+                                        <span class="status-badge status-completed">
+                                            <i class="fas fa-check me-1"></i>Approved
+                                        </span>
+                                    {% elif item.submission and item.submission.review_status == 'rejected' %}
+                                        <span class="status-badge" style="background: #f8d7da; color: #721c24;">
+                                            <i class="fas fa-times me-1"></i>Needs Revision
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge status-completed">
+                                            <i class="fas fa-check me-1"></i>Submitted
+                                        </span>
+                                    {% endif %}
                                 </div>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-
-                            {% if item.submission.review_notes %}
-                            <div class="mt-3 p-3" style="background: #f8f9fa; border-radius: 8px;">
-                                <strong>Review Notes:</strong>
-                                <p class="mb-0 mt-1">{{ item.submission.review_notes }}</p>
-                            </div>
-                            {% endif %}
-
-                            {% if item.offer_letter %}
-                            <div class="mt-3 p-3" style="background: #eef2ff; border-radius: 8px; border-left: 4px solid #667eea;">
-                                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-                                    <div>
-                                        <strong><i class="fas fa-file-signature me-2"></i>Offer Letter:</strong>
-                                        {% if item.offer_letter.status == 'pending_employee' %}
-                                            Awaiting your signature.
-                                        {% elif item.offer_letter.status == 'signed' %}
-                                            Fully signed. Welcome aboard!
-                                        {% elif item.offer_letter.status == 'draft' %}
-                                            HR is preparing your offer letter.
-                                        {% else %}
-                                            Status: {{ item.offer_letter.get_status_display }}.
-                                        {% endif %}
-                                        {% if item.offer_letter.job_posting %}
-                                        <div class="mt-1 text-muted small">
-                                            {% with job=item.offer_letter.job_posting %}
-                                                {{ job.title }}{% if job.department %} | {{ job.department }}{% endif %}{% if job.location %} | {{ job.location }}{% endif %}{% if job.salary_range %} | Salary: {{ job.salary_range }}{% endif %}
-                                            {% endwith %}
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="text-end">
-                                        {% if item.offer_letter.status == 'pending_employee' %}
-                                        <a href="{% url 'onboarding_offer_letter' item.offer_letter.id %}" class="action-btn">
-                                            <i class="fas fa-pen-nib me-2"></i>Review &amp; Sign
+                                <div class="text-end">
+                                    {% if item.submission and item.submission.review_status == 'rejected' %}
+                                        <a href="{% url 'onboarding_form' item.invitation.id %}" class="action-btn">
+                                            <i class="fas fa-edit me-2"></i>Revise Form
                                         </a>
-                                        {% elif item.offer_letter.status == 'signed' and item.offer_letter.offer_pdf_path %}
-                                        <a href="{% url 'onboarding_offer_letter_download' item.offer_letter.id %}" class="action-btn">
-                                            <i class="fas fa-file-pdf me-2"></i>Download Offer
-                                        </a>
-                                        {% else %}
-                                        <a href="{% url 'onboarding_offer_letter' item.offer_letter.id %}" class="action-btn completed-btn">
-                                            <i class="fas fa-eye me-2"></i>View Offer Letter
-                                        </a>
-                                        {% endif %}
-                                    </div>
+                                    {% else %}
+                                        <button class="action-btn completed-btn" disabled>
+                                            <i class="fas fa-check me-2"></i>Completed
+                                        </button>
+                                    {% endif %}
                                 </div>
-                                {% if item.offer_letter.job_posting %}
-                                <div class="mt-3 small">
-                                    {% with job=item.offer_letter.job_posting %}
-                                        {% if job.description %}
-                                        <div><strong>Description:</strong> {{ job.description|truncatewords:35 }}</div>
-                                        {% endif %}
-                                        {% if job.requirements %}
-                                        <div class="mt-1"><strong>Requirements:</strong> {{ job.requirements|truncatewords:25 }}</div>
-                                        {% endif %}
-                                    {% endwith %}
+
+                                {% if item.submission and item.submission.review_notes %}
+                                <div class="mt-3 p-3" style="background: #f8f9fa; border-radius: 8px;">
+                                    <strong>Review Notes:</strong>
+                                    <p class="mb-0 mt-1">{{ item.submission.review_notes }}</p>
                                 </div>
                                 {% endif %}
-                            </div>
+
+                                {% if item.offer_letter %}
+                                <div class="mt-3 p-3" style="background: #eef2ff; border-radius: 8px; border-left: 4px solid #667eea;">
+                                    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                                        <div>
+                                            <strong><i class="fas fa-file-signature me-2"></i>Offer Letter:</strong>
+                                            {% if item.offer_letter.status == 'pending_employee' %}
+                                                Awaiting your signature.
+                                            {% elif item.offer_letter.status == 'signed' %}
+                                                Fully signed. Welcome aboard!
+                                            {% elif item.offer_letter.status == 'draft' %}
+                                                HR is preparing your offer letter.
+                                            {% else %}
+                                                Status: {{ item.offer_letter.get_status_display }}.
+                                            {% endif %}
+                                            {% if item.offer_letter.job_posting %}
+                                            <div class="mt-1 text-muted small">
+                                                {% with job=item.offer_letter.job_posting %}
+                                                    {{ job.title }}{% if job.department %} | {{ job.department }}{% endif %}{% if job.location %} | {{ job.location }}{% endif %}{% if job.salary_range %} | Salary: {{ job.salary_range }}{% endif %}
+                                                {% endwith %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-end">
+                                            {% if item.offer_letter.status == 'pending_employee' %}
+                                            <a href="{% url 'onboarding_offer_letter' item.offer_letter.id %}" class="action-btn">
+                                                <i class="fas fa-pen-nib me-2"></i>Review &amp; Sign
+                                            </a>
+                                            {% elif item.offer_letter.status == 'signed' and item.offer_letter.offer_pdf_path %}
+                                            <a href="{% url 'onboarding_offer_letter_download' item.offer_letter.id %}" class="action-btn">
+                                                <i class="fas fa-file-pdf me-2"></i>Download Offer
+                                            </a>
+                                            {% else %}
+                                            <a href="{% url 'onboarding_offer_letter' item.offer_letter.id %}" class="action-btn completed-btn">
+                                                <i class="fas fa-eye me-2"></i>View Offer Letter
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% if item.offer_letter.job_posting %}
+                                    <div class="mt-3 small">
+                                        {% with job=item.offer_letter.job_posting %}
+                                            {% if job.description %}
+                                            <div><strong>Description:</strong> {{ job.description|truncatewords:35 }}</div>
+                                            {% endif %}
+                                            {% if job.requirements %}
+                                            <div class="mt-1"><strong>Requirements:</strong> {{ job.requirements|truncatewords:25 }}</div>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                             {% endif %}
                         </div>
                         {% endfor %}

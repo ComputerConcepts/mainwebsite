@@ -81,6 +81,21 @@
         font-size: 0.85rem;
         color: #64748b;
     }
+
+    .pdf-option.selected-primary {
+        border-color: #f093fb;
+        background: #fff0fb;
+        box-shadow: 0 10px 20px rgba(240, 147, 251, 0.15);
+    }
+
+    #pdf-selection-notice {
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+
+    #pdf-selection-notice .badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
 </style>
 {% endblock %}
 
@@ -102,9 +117,20 @@
                     <div class="form-floating">
                         <select class="form-control" id="form_id" name="form_id" required>
                             <option value="">Choose an onboarding form...</option>
-                            {% for form in forms %}
-                            <option value="{{ form.id }}">{{ form.title }}</option>
-                            {% endfor %}
+                            {% if forms %}
+                            <optgroup label="Interactive Forms">
+                                {% for form in forms %}
+                                <option value="{{ form.id }}">{{ form.title }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
+                            {% if pdf_forms %}
+                            <optgroup label="PDF Documents">
+                                {% for pdf in pdf_forms %}
+                                <option value="pdf:{{ pdf.id }}">{{ pdf.title }} (PDF)</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
                         </select>
                         <label for="form_id">
                             <i class="fas fa-clipboard-list me-2"></i>Onboarding Form
@@ -113,38 +139,6 @@
                 </div>
             </div>
 
-            <div class="mb-4">
-                <label class="form-label fw-semibold text-muted">
-                    <i class="fas fa-file-pdf me-2 text-danger"></i>Attach PDF Templates (optional)
-                </label>
-                {% if pdf_forms %}
-                <div class="row g-3">
-                    {% for pdf in pdf_forms %}
-                    <div class="col-md-6">
-                        <label class="pdf-option">
-                            <input type="checkbox" name="pdf_form_ids" value="{{ pdf.id }}">
-                            <div>
-                                <div class="fw-semibold">{{ pdf.title }}</div>
-                                <div class="pdf-meta">
-                                    {{ pdf.description|default:"No description provided." }}
-                                </div>
-                                {% if pdf.default_instructions %}
-                                <div class="pdf-meta mt-1">
-                                    <i class="fas fa-info-circle me-1"></i>{{ pdf.default_instructions|truncatechars:90 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                        </label>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="alert alert-light border mt-2">
-                    <i class="fas fa-info-circle me-1"></i>No PDF templates are currently active. Use the PDF manager to upload one.
-                </div>
-                {% endif %}
-            </div>
-            
             <div class="row mb-3">
                 <div class="col-md-6">
                     <div class="form-floating">
@@ -213,6 +207,51 @@
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
     const sendBtn = document.querySelector('.send-btn');
+    const formSelect = document.getElementById('form_id');
+    const pdfNotice = document.getElementById('pdf-selection-notice');
+    const pdfNameTarget = pdfNotice ? pdfNotice.querySelector('[data-role="pdf-name"]') : null;
+    const pdfCheckboxes = document.querySelectorAll('input[name="pdf_form_ids"]');
+
+    const updatePdfSelectionState = () => {
+        if (!formSelect) {
+            return;
+        }
+        const selectedValue = formSelect.value || '';
+        const isPdfSelection = selectedValue.startsWith('pdf:');
+        const primaryId = isPdfSelection ? selectedValue.split(':', 1)[1] : null;
+
+        if (pdfNotice) {
+            pdfNotice.classList.toggle('d-none', !isPdfSelection);
+            if (isPdfSelection && pdfNameTarget && formSelect.selectedIndex >= 0) {
+                let label = formSelect.options[formSelect.selectedIndex].text || '';
+                label = label.replace(/\s*\(PDF\)\s*$/, '');
+                pdfNameTarget.textContent = label;
+            } else if (pdfNameTarget) {
+                pdfNameTarget.textContent = '';
+            }
+        }
+
+        pdfCheckboxes.forEach((checkbox) => {
+            checkbox.disabled = false;
+            const optionCard = typeof checkbox.closest === 'function' ? checkbox.closest('.pdf-option') : null;
+            if (optionCard) {
+                optionCard.classList.remove('selected-primary');
+            }
+
+            if (isPdfSelection && checkbox.value === primaryId) {
+                checkbox.checked = true;
+                checkbox.disabled = true;
+                if (optionCard) {
+                    optionCard.classList.add('selected-primary');
+                }
+            }
+        });
+    };
+
+    if (formSelect) {
+        formSelect.addEventListener('change', updatePdfSelectionState);
+        updatePdfSelectionState();
+    }
     
     form.addEventListener('submit', function() {
         sendBtn.disabled = true;

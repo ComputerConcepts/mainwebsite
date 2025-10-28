@@ -156,9 +156,20 @@
                 <label class="form-label">Form</label>
                 <select class="form-control" name="form">
                     <option value="">All Forms</option>
-                    {% for form in forms %}
-                    <option value="{{ form.id }}" {% if form_filter == form.id|stringformat:"s" %}selected{% endif %}>{{ form.title }}</option>
-                    {% endfor %}
+                    {% if forms %}
+                    <optgroup label="Interactive Forms">
+                        {% for form in forms %}
+                        <option value="{{ form.id }}" {% if form_filter == form.id|stringformat:"s" %}selected{% endif %}>{{ form.title }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endif %}
+                    {% if pdf_filter_options %}
+                    <optgroup label="PDF Documents">
+                        {% for option in pdf_filter_options %}
+                        <option value="{{ option.value }}" {% if form_filter == option.value %}selected{% endif %}>{{ option.title }} (PDF)</option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endif %}
                 </select>
             </div>
             <div class="col-md-4">
@@ -199,32 +210,100 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for submission in page_obj.object_list %}
-                    <tr>
-                        <td>
-                            <div>
-                                <strong>{{ submission.get_applicant_name }}</strong>
-                                <br>
-                                <small class="text-muted">{{ submission.invitation.prospective_employee.email }}</small>
-                            </div>
-                        </td>
-                        <td>{{ submission.invitation.onboarding_form.title }}</td>
-                        <td>
-                            {{ submission.submitted_at|date:"M j, Y" }}
-                            <br>
-                            <small class="text-muted">{{ submission.submitted_at|time:"g:i A" }}</small>
-                        </td>
-                        <td>
-                            <span class="status-badge status-{{ submission.review_status }}">
-                                {{ submission.get_review_status_display }}
-                            </span>
-                        </td>
-                        <td>
-                            <a href="{% url 'hr_submission_detail' submission.id %}" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-eye"></i> Review
-                            </a>
-                        </td>
-                    </tr>
+                    {% for item in page_obj.object_list %}
+                        {% if item.record_type == 'form' %}
+                            {% with submission=item.submission %}
+                            <tr>
+                                <td class="align-middle">
+                                    <div>
+                                        <strong>{{ submission.get_applicant_name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ submission.invitation.prospective_employee.email }}</small>
+                                    </div>
+                                </td>
+                                <td class="align-middle">{{ submission.invitation.onboarding_form.title }}</td>
+                                <td class="align-middle">
+                                    {{ submission.submitted_at|date:"M j, Y" }}
+                                    <br>
+                                    <small class="text-muted">{{ submission.submitted_at|time:"g:i A" }}</small>
+                                </td>
+                                <td class="align-middle">
+                                    <span class="status-badge {{ item.status_class }}">
+                                        {{ item.status_label }}
+                                    </span>
+                                </td>
+                                <td class="align-middle">
+                                    <a href="{% url 'hr_submission_detail' submission.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i> Review
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                        {% elif item.record_type == 'pdf' %}
+                            {% with task=item.pdf_task %}
+                            <tr class="align-middle">
+                                <td>
+                                    <div>
+                                        <strong>{{ item.applicant_name }}</strong>
+                                        {% if item.applicant_email %}
+                                        <br>
+                                        <small class="text-muted">{{ item.applicant_email }}</small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-start gap-2">
+                                        <i class="fas fa-file-pdf text-danger mt-1"></i>
+                                        <div>
+                                            <strong>{{ task.pdf_form.title }}</strong>
+                                            {% if item.invitation_form_title %}
+                                            <div class="small text-muted">Invitation: {{ item.invitation_form_title }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if item.completed_at %}
+                                        {{ item.completed_at|date:"M j, Y" }}
+                                        <br>
+                                        <small class="text-muted">{{ item.completed_at|time:"g:i A" }}</small>
+                                    {% else %}
+                                        <span class="text-muted">Awaiting upload</span>
+                                        {% if item.assigned_at %}
+                                        <br>
+                                        <small class="text-muted">Assigned {{ item.assigned_at|date:"M j, Y" }}</small>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="status-badge {{ item.status_class }}">
+                                        {{ item.status_label }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column flex-md-row gap-2">
+                                        <a href="{% url 'hr_pdf_task_detail' task.id %}?return_path={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> Review PDF
+                                        </a>
+                                        {% if item.linked_submission_id %}
+                                        <a href="{% url 'hr_submission_detail' item.linked_submission_id %}?return_path={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-list-alt"></i> Linked Submission
+                                        </a>
+                                        {% endif %}
+                                        {% if item.completed_file_url %}
+                                        <a href="{{ item.completed_file_url }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">
+                                            <i class="fas fa-file-download"></i> Download Upload
+                                        </a>
+                                        {% elif item.template_file_url %}
+                                        <a href="{{ item.template_file_url }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">
+                                            <i class="fas fa-file-pdf"></i> Blank PDF
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                        {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
