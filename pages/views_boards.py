@@ -29,17 +29,17 @@ def _apply_card_order(cards, board_list, update_board_list=False):
     if not cards:
         return
 
-    # First pass: assign all cards a unique temporary position (negative values)
+    # First pass: assign all cards a unique temporary position (use a large negative value + card id)
     for idx, card in enumerate(cards, start=1):
-        card.position = -1000 - idx
+        card.position = -1000000 - idx
         if update_board_list:
             card.board_list = board_list
-    Card.objects.bulk_update(cards, ['position'] + (['board_list'] if update_board_list else []))
+        card.save(update_fields=['position'] + (['board_list'] if update_board_list else []))
 
     # Second pass: assign the correct sequential positions
     for idx, card in enumerate(cards, start=1):
         card.position = idx
-    Card.objects.bulk_update(cards, ['position'])
+        card.save(update_fields=['position'])
 
 
 def reorder_lists(board):
