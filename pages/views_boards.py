@@ -4,7 +4,7 @@ from django.http import JsonResponse, Http404
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from django.db import transaction, IntegrityError
+from django.db import transaction
 from django.db import models
 from django.core.paginator import Paginator
 from django.utils import timezone
@@ -21,13 +21,25 @@ def reorder_cards_in_list(board_list):
         .filter(board_list=board_list)
         .order_by('position', 'created_at')
     )
-    updates = []
-    for index, card in enumerate(cards, 1):
-        if card.position != index:
-            card.position = index
-            updates.append(card)
-    if updates:
-        Card.objects.bulk_update(updates, ['position'])
+    _apply_card_order(cards, board_list)
+
+
+def _apply_card_order(cards, board_list, update_board_list=False):
+    """Assign sequential positions using a temporary offset to avoid constraint conflicts."""
+    if not cards:
+        return
+
+    # First pass: assign all cards a unique temporary position (negative values)
+    for idx, card in enumerate(cards, start=1):
+        card.position = -1000 - idx
+        if update_board_list:
+            card.board_list = board_list
+    Card.objects.bulk_update(cards, ['position'] + (['board_list'] if update_board_list else []))
+
+    # Second pass: assign the correct sequential positions
+    for idx, card in enumerate(cards, start=1):
+        card.position = idx
+    Card.objects.bulk_update(cards, ['position'])
 
 
 def reorder_lists(board):
@@ -391,12 +403,6 @@ def move_card(request):
                 return JsonResponse({'error': 'Cannot move cards between different boards'}, status=400)
             
             moving_within_same_list = old_list.id == new_list.id
-
-            # Normalize positions before applying move to avoid stale duplicates
-            reorder_cards_in_list(old_list)
-            if not moving_within_same_list:
-                reorder_cards_in_list(new_list)
-            card.refresh_from_db(fields=['position'])
             
             if moving_within_same_list:
                 target_cards = list(
@@ -418,25 +424,7 @@ def move_card(request):
             if moving_within_same_list:
                 ordered_cards = target_cards
                 ordered_cards.insert(desired_index, card)
-                
-                bulk_updates = []
-                for idx, item in enumerate(ordered_cards, start=1):
-                    if item.id == card.id:
-                        target_position = idx
-                    elif item.position != idx:
-                        item.position = idx
-                        bulk_updates.append(item)
-                
-                if bulk_updates:
-                    Card.objects.bulk_update(bulk_updates, ['position'])
-                
-                if card.position != target_position:
-                    card.position = target_position
-                    try:
-                        card.save(update_fields=['position'])
-                    except IntegrityError:
-                        reorder_cards_in_list(new_list)
-                        card.save(update_fields=['position'])
+                _apply_card_order(ordered_cards, new_list)
             else:
                 old_siblings = list(
                     Card.objects.select_for_update()
@@ -445,36 +433,11 @@ def move_card(request):
                     .order_by('position', 'created_at')
                 )
                 
-                old_updates = []
-                for idx, item in enumerate(old_siblings, start=1):
-                    if item.position != idx:
-                        item.position = idx
-                        old_updates.append(item)
-                
-                if old_updates:
-                    Card.objects.bulk_update(old_updates, ['position'])
+                _apply_card_order(old_siblings, old_list)
                 
                 target_cards.insert(desired_index, card)
                 
-                new_list_updates = []
-                for idx, item in enumerate(target_cards, start=1):
-                    if item.id == card.id:
-                        target_position = idx
-                    elif item.position != idx:
-                        item.position = idx
-                        new_list_updates.append(item)
-                
-                if new_list_updates:
-                    Card.objects.bulk_update(new_list_updates, ['position'])
-                
-                if card.board_list_id != new_list.id or card.position != target_position:
-                    card.board_list = new_list
-                    card.position = target_position
-                    try:
-                        card.save(update_fields=['board_list', 'position'])
-                    except IntegrityError:
-                        reorder_cards_in_list(new_list)
-                        card.save(update_fields=['board_list', 'position'])
+                _apply_card_order(target_cards, new_list, update_board_list=True)
         
         return JsonResponse({'success': True, 'message': 'Card moved successfully'})
         
