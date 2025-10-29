@@ -4,7 +4,7 @@ from django.http import JsonResponse, Http404
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db import models
 from django.core.paginator import Paginator
 from django.utils import timezone
@@ -16,11 +16,18 @@ import json
 
 def reorder_cards_in_list(board_list):
     """Utility function to fix position conflicts in a list"""
-    cards = board_list.cards.all().order_by('position', 'created_at')
+    cards = list(
+        Card.objects.select_for_update()
+        .filter(board_list=board_list)
+        .order_by('position', 'created_at')
+    )
+    updates = []
     for index, card in enumerate(cards, 1):
         if card.position != index:
             card.position = index
-            card.save()
+            updates.append(card)
+    if updates:
+        Card.objects.bulk_update(updates, ['position'])
 
 
 def reorder_lists(board):
@@ -419,7 +426,11 @@ def move_card(request):
                 
                 if card.position != target_position:
                     card.position = target_position
-                    card.save(update_fields=['position'])
+                    try:
+                        card.save(update_fields=['position'])
+                    except IntegrityError:
+                        reorder_cards_in_list(new_list)
+                        card.save(update_fields=['position'])
             else:
                 old_siblings = list(
                     Card.objects.select_for_update()
@@ -453,7 +464,11 @@ def move_card(request):
                 if card.board_list_id != new_list.id or card.position != target_position:
                     card.board_list = new_list
                     card.position = target_position
-                    card.save(update_fields=['board_list', 'position'])
+                    try:
+                        card.save(update_fields=['board_list', 'position'])
+                    except IntegrityError:
+                        reorder_cards_in_list(new_list)
+                        card.save(update_fields=['board_list', 'position'])
         
         return JsonResponse({'success': True, 'message': 'Card moved successfully'})
         
