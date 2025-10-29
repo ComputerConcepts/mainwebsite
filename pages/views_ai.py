@@ -14,6 +14,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from datetime import timedelta, datetime
 import json
+from django.contrib.messages import constants as message_constants
 
 from .models import (
     Employee, AIWorkflowRule, AIWorkflowExecution, AINotification, 
@@ -395,6 +396,20 @@ def ai_settings(request):
         }
     )
     
+    # Ensure quiet hours have sensible defaults (can be missing in legacy rows)
+    if preferences.quiet_hours_start is None or preferences.quiet_hours_end is None:
+        default_start = datetime.strptime('22:00', '%H:%M').time()
+        default_end = datetime.strptime('08:00', '%H:%M').time()
+        updates = {}
+        if preferences.quiet_hours_start is None:
+            preferences.quiet_hours_start = default_start
+            updates['quiet_hours_start'] = default_start
+        if preferences.quiet_hours_end is None:
+            preferences.quiet_hours_end = default_end
+            updates['quiet_hours_end'] = default_end
+        if updates:
+            preferences.save(update_fields=list(updates.keys()))
+    
     if request.method == 'POST':
         # Update preferences
         preferences.email_notifications = request.POST.get('email_notifications') == 'on'
@@ -433,43 +448,20 @@ def ai_settings(request):
         
         # Update notification engine preferences
         ai_service = get_ai_workflow_service()
-        
-        # Safely format time fields
-        start_time = preferences.quiet_hours_start
-        end_time = preferences.quiet_hours_end
-        
-        # Handle both time objects and string values
-        if hasattr(start_time, 'strftime'):
-            start_str = start_time.strftime('%H:%M')
-        else:
-            start_str = str(start_time) if start_time else '22:00'
-            
-        if hasattr(end_time, 'strftime'):
-            end_str = end_time.strftime('%H:%M')
-        else:
-            end_str = str(end_time) if end_time else '08:00'
-        
-        ai_service.notification_engine.set_user_preferences(
-            employee.user.username,
-            {
-                'email_notifications': preferences.email_notifications,
-                'push_notifications': preferences.push_notifications,
-                'quiet_hours': {
-                    'start': start_str,
-                    'end': end_str
-                },
-                'priority_threshold': preferences.priority_threshold,
-                'categories': preferences.get_category_preferences()
-            }
-        )
+        ai_service.load_user_notification_preferences(employee)
         
         messages.success(request, 'AI preferences updated successfully.')
         return redirect('ai_settings')
+    
+    # Ensure notification engine is aware of stored preferences when the page is viewed
+    ai_service = get_ai_workflow_service()
+    ai_service.load_user_notification_preferences(employee)
     
     context = {
         'employee': employee,
         'preferences': preferences,
         'priority_choices': AINotification.PRIORITY_CHOICES,
+        'DEFAULT_MESSAGE_LEVELS': message_constants.DEFAULT_LEVELS,
     }
     
     return render(request, 'employee/ai_settings.html', context)

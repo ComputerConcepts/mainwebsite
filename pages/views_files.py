@@ -22,6 +22,7 @@ from .forms import FolderForm, FileUploadForm, FileShareForm, FileSearchForm
 from .ai_assistant import create_free_ai_assistant
 import json
 from datetime import datetime, timedelta
+from copy import deepcopy
 
 
 @login_required
@@ -1089,6 +1090,172 @@ def search_employees_by_email(request):
         return JsonResponse({'results': [], 'error': str(e)})
 
 
+def _normalize_string_list(values):
+    """Convert raw topic/tag structures into a clean list of strings."""
+    if not values:
+        return []
+    normalized = []
+    if isinstance(values, (list, tuple, set)):
+        for item in values:
+            if isinstance(item, str):
+                value = item.strip()
+                if value:
+                    normalized.append(value)
+            elif isinstance(item, dict):
+                for key in ('topic', 'text', 'name', 'label', 'value'):
+                    val = item.get(key)
+                    if isinstance(val, str) and val.strip():
+                        normalized.append(val.strip())
+                        break
+    elif isinstance(values, str):
+        value = values.strip()
+        if value:
+            normalized.append(value)
+    return normalized
+
+
+def _store_analysis_result(document, analysis_model, analysis_result):
+    """Persist analysis data to the database."""
+    sanitized = deepcopy(analysis_result)
+    sanitized.pop('file_path', None)  # Avoid leaking filesystem paths
+
+    analysis_model.status = 'completed'
+    analysis_model.analysis_completed = True
+    analysis_model.analysis_completed_at = timezone.now()
+    analysis_model.analysis_data = sanitized
+    analysis_model.word_count = analysis_result.get('word_count')
+    analysis_model.page_count = analysis_result.get('line_count')
+    analysis_model.language = analysis_result.get('language') or analysis_model.language
+    analysis_model.category = analysis_result.get('category') or analysis_model.category
+    analysis_model.key_topics = _normalize_string_list(analysis_result.get('key_topics'))
+    analysis_model.entities = analysis_result.get('entities') or analysis_model.entities
+
+    sentiment = analysis_result.get('sentiment') or {}
+    analysis_model.sentiment_score = sentiment.get('score')
+    analysis_model.sentiment_label = sentiment.get('label') or analysis_model.sentiment_label
+
+    analysis_model.readability_score = analysis_result.get('readability_score')
+    analysis_model.complexity_score = analysis_result.get('complexity_score')
+
+    security = analysis_result.get('security_check') or {}
+    analysis_model.contains_sensitive_info = security.get('has_sensitive_info', False)
+    analysis_model.sensitive_info_types = security.get('sensitive_types', [])
+    analysis_model.security_risk_level = security.get('risk_level', 'low')
+
+    if 'suggested_tags' in analysis_result:
+        analysis_model.suggested_tags = analysis_result.get('suggested_tags') or []
+        analysis_model.tags = analysis_result.get('suggested_tags') or []
+
+    if 'ai_recommendations' in analysis_result:
+        analysis_model.ai_recommendations = analysis_result.get('ai_recommendations') or []
+
+    if 'processing_time_ms' in analysis_result:
+        analysis_model.processing_time_ms = analysis_result.get('processing_time_ms')
+
+    analysis_model.save()
+    return sanitized
+
+
+def _build_analysis_payload(document, analysis_model=None, analysis_data=None, analyzer=None, fallback_only=False):
+    """Prepare analysis information in the structure expected by the chatbot."""
+    if fallback_only:
+        fallback_date = document.updated_at or document.created_at or timezone.now()
+        return {
+            'file_id': str(document.id),
+            'filename': document.name,
+            'summary': '',
+            'key_topics': [],
+            'category': 'general',
+            'extracted_text': '',
+            'text_length': 0,
+            'word_count': 0,
+            'analysis_date': fallback_date.isoformat(),
+            'has_text': False,
+            'from_cache': True,
+        }
+
+    data = dict(analysis_data or {})
+    if not data and analysis_model and isinstance(analysis_model.analysis_data, dict):
+        data = dict(analysis_model.analysis_data)
+
+    data.pop('file_path', None)
+
+    key_topics = _normalize_string_list(data.get('key_topics') or (analysis_model.key_topics if analysis_model else []))
+    summary = data.get('summary') or ''
+    extracted_text = data.get('extracted_text', '')
+    text_length = data.get('text_length')
+    word_count = data.get('word_count')
+
+    if text_length is None:
+        if extracted_text:
+            text_length = len(extracted_text)
+        elif word_count:
+            text_length = word_count
+        else:
+            text_length = 0
+
+    if word_count is None and analysis_model and analysis_model.word_count is not None:
+        word_count = analysis_model.word_count
+
+    analysis_date = data.get('analysis_date')
+    if not analysis_date and analysis_model:
+        timestamp = analysis_model.analysis_completed_at or analysis_model.analysis_started_at
+        if timestamp:
+            analysis_date = timestamp.isoformat()
+
+    if not analysis_date:
+        fallback_date = document.updated_at or document.created_at or timezone.now()
+        analysis_date = fallback_date.isoformat()
+
+    payload = {
+        'file_id': str(document.id),
+        'filename': document.name,
+        'summary': summary,
+        'key_topics': key_topics,
+        'category': data.get('category') or (analysis_model.category if analysis_model else 'general') or 'general',
+        'extracted_text': extracted_text,
+        'text_length': text_length,
+        'word_count': word_count or 0,
+        'analysis_date': analysis_date,
+        'has_text': data.get('has_text'),
+        'from_cache': data.get('from_cache', True if analysis_model else False),
+        'language': data.get('language') or (analysis_model.language if analysis_model else ''),
+        'tone_analysis': data.get('tone_analysis', {}),
+        'document_structure': data.get('document_structure', {}),
+        'content_quality': data.get('content_quality', {}),
+        'language_complexity': data.get('language_complexity', {}),
+        'file_insights': data.get('file_insights', {}),
+        'security_check': data.get('security_check') or {
+            'has_sensitive_info': getattr(analysis_model, 'contains_sensitive_info', False),
+            'sensitive_types': getattr(analysis_model, 'sensitive_info_types', []),
+            'risk_level': getattr(analysis_model, 'security_risk_level', 'low'),
+        },
+        'sentiment': data.get('sentiment') or {
+            'label': getattr(analysis_model, 'sentiment_label', ''),
+            'score': getattr(analysis_model, 'sentiment_score', None),
+        },
+        'ai_recommendations': data.get('ai_recommendations', getattr(analysis_model, 'ai_recommendations', [])),
+        'suggested_tags': data.get('suggested_tags', getattr(analysis_model, 'suggested_tags', [])),
+    }
+
+    if payload['has_text'] is None:
+        payload['has_text'] = bool(payload['text_length'])
+
+    # If we have no extracted text but do have access to the file and analyzer, grab a short preview
+    if not payload['extracted_text'] and analyzer and getattr(document.file, 'path', None):
+        file_path = document.file.path
+        if os.path.exists(file_path):
+            try:
+                preview_text = analyzer.extract_text_from_file(file_path)
+                payload['extracted_text'] = preview_text[:2000]
+                payload['text_length'] = len(payload['extracted_text'])
+                payload['has_text'] = payload['has_text'] or bool(payload['text_length'])
+            except Exception:
+                pass
+
+    return payload
+
+
 @login_required
 def ai_chat(request):
     """AI Assistant chat endpoint with conversation memory"""
@@ -1112,25 +1279,65 @@ def ai_chat(request):
                     'user_context': {}
                 }
             
-            # Get user's files
-            user_files = FileDocument.objects.filter(
+            # Get user's files (including shared access)
+            accessible_files_qs = FileDocument.objects.filter(
                 Q(uploaded_by=employee) |
                 Q(shared_with=employee) |
                 Q(shares__shared_with=employee)
-            ).distinct()
+            ).distinct().select_related('ai_analysis')
+            file_documents = list(accessible_files_qs)
             
             # Create AI assistant
             analyzer, bot = create_free_ai_assistant()
             
             # Prepare file analyses for the bot
             file_analyses = []
-            for file_doc in user_files:
+            pending_documents = []
+            analyzed_ids = set()
+            processed_pending_ids = set()
+            
+            # Use cached analyses when available
+            for file_doc in file_documents:
+                ai_analysis = getattr(file_doc, 'ai_analysis', None)
+                if ai_analysis and ai_analysis.status == 'completed' and isinstance(ai_analysis.analysis_data, dict):
+                    file_analyses.append(_build_analysis_payload(file_doc, ai_analysis, analyzer=analyzer))
+                    analyzed_ids.add(file_doc.id)
+                else:
+                    pending_documents.append(file_doc)
+            
+            # Analyze a limited number of pending files per request and store results
+            MAX_NEW_ANALYSES = 3
+            new_analyses_count = 0
+            for file_doc in pending_documents:
+                if new_analyses_count >= MAX_NEW_ANALYSES:
+                    break
+                
+                file_path = None
                 try:
-                    analysis = analyzer.analyze_file(file_doc.file.path, file_doc.name)
-                    analysis['file_id'] = str(file_doc.id)
-                    file_analyses.append(analysis)
-                except Exception as e:
+                    file_path = file_doc.file.path
+                except Exception:
+                    file_path = None
+                
+                if not file_path or not os.path.exists(file_path):
                     continue
+                
+                try:
+                    analysis_result = analyzer.analyze_file(file_path, file_doc.name)
+                except Exception:
+                    continue
+                
+                ai_analysis, _ = AIFileAnalysis.objects.get_or_create(document=file_doc)
+                sanitized_result = _store_analysis_result(file_doc, ai_analysis, analysis_result)
+                file_analyses.append(_build_analysis_payload(file_doc, ai_analysis, analysis_data=sanitized_result, analyzer=analyzer))
+                analyzed_ids.add(file_doc.id)
+                processed_pending_ids.add(file_doc.id)
+                new_analyses_count += 1
+            
+            # Add fallback entries for any remaining documents so the assistant is aware of their existence
+            for file_doc in pending_documents:
+                if file_doc.id in processed_pending_ids:
+                    continue
+                file_analyses.append(_build_analysis_payload(file_doc, analyzer=analyzer, fallback_only=True))
             
             # Load analyses into bot
             bot.load_analyses(file_analyses)
@@ -1174,13 +1381,22 @@ def ai_chat(request):
             }
             request.session.modified = True
             
+            total_files = len(file_documents)
+            analyzed_count = len(analyzed_ids)
+            pending_analysis_count = max(total_files - analyzed_count, 0)
+            
             return JsonResponse({
                 'response': response,
                 'query': query,
                 'timestamp': datetime.now().isoformat(),
                 'conversation_context': {
                     'awaiting_clarification': bot.awaiting_clarification,
-                    'has_results': len(bot.last_search_results) > 0
+                    'has_results': len(bot.last_search_results) > 0,
+                    'total_files': total_files,
+                    'analyzed_files': analyzed_count,
+                    'pending_analysis': pending_analysis_count,
+                    'new_analyses': new_analyses_count,
+                    'loaded_analyses': len(file_analyses)
                 }
             })
             
@@ -1229,15 +1445,49 @@ def ai_assistant_page(request):
     try:
         employee = Employee.objects.get(user=request.user)
         
-        # Get user's files for context
-        user_files = FileDocument.objects.filter(
-            Q(uploaded_by=employee) | Q(shared_with=employee)
+        # Get user's files for context (including shares)
+        accessible_files = FileDocument.objects.filter(
+            Q(uploaded_by=employee) |
+            Q(shared_with=employee) |
+            Q(shares__shared_with=employee)
         ).distinct()
+        
+        file_count = accessible_files.count()
+        analyzed_file_count = AIFileAnalysis.objects.filter(
+            document__in=accessible_files.values('id'),
+            status='completed'
+        ).count()
+        pending_analysis_count = max(file_count - analyzed_file_count, 0)
+        
+        recent_docs = accessible_files.select_related('ai_analysis').order_by('-updated_at')[:5]
+        recent_files = []
+        for doc in recent_docs:
+            ai_analysis = getattr(doc, 'ai_analysis', None)
+            status = ai_analysis.status if ai_analysis else 'pending'
+            if status == 'completed':
+                badge_class = 'success'
+                status_label = 'Analyzed'
+            elif status == 'failed':
+                badge_class = 'danger'
+                status_label = 'Failed'
+            else:
+                badge_class = 'warning'
+                status_label = 'Pending'
+            
+            recent_files.append({
+                'id': str(doc.id),
+                'name': doc.name,
+                'updated_at': doc.updated_at,
+                'status_label': status_label,
+                'badge_class': badge_class,
+            })
         
         context = {
             'employee': employee,
-            'file_count': user_files.count(),
-            'recent_files': user_files[:5]
+            'file_count': file_count,
+            'analyzed_file_count': analyzed_file_count,
+            'pending_analysis_count': pending_analysis_count,
+            'recent_files': recent_files,
         }
         
         return render(request, 'employee/ai_assistant.html', context)

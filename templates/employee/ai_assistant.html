@@ -148,6 +148,15 @@
         margin-right: 15px;
     }
     
+    .stat-icon.success {
+        background: #28a745;
+    }
+    
+    .stat-icon.warning {
+        background: #ffc107;
+        color: #212529;
+    }
+    
     .typing-indicator {
         display: none;
         padding: 10px;
@@ -223,8 +232,26 @@
                         <i class="fas fa-file"></i>
                     </div>
                     <div>
-                        <strong>{{ file_count }}</strong><br>
+                        <strong id="ai-total-files">{{ file_count }}</strong><br>
                         <small class="text-muted">Total Files</small>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon success">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div>
+                        <strong id="ai-analyzed-files">{{ analyzed_file_count }}</strong><br>
+                        <small class="text-muted">Analyzed</small>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <div>
+                        <strong id="ai-pending-analysis">{{ pending_analysis_count }}</strong><br>
+                        <small class="text-muted">Awaiting Analysis</small>
                     </div>
                 </div>
             </div>
@@ -247,6 +274,27 @@
                     </div>
                 </div>
             </div>
+        
+        {% if recent_files %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">\U0001f4c2 Recent Files</h6>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for file in recent_files %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <div>{{ file.name }}</div>
+                        {% if file.updated_at %}
+                        <small class="text-muted">{{ file.updated_at|date:"M d, H:i" }}</small>
+                        {% endif %}
+                    </div>
+                    <span class="badge bg-{{ file.badge_class }} rounded-pill">{{ file.status_label }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
         </div>
         
         <div class="col-md-9">
@@ -373,8 +421,16 @@ function sendMessage() {
         } else {
             addMessage(data.response, 'bot');
             
-            // Update suggestions based on context
-            updateSuggestions(data.conversation_context);
+            const context = data.conversation_context || {};
+            updateSuggestions(context);
+            updateStats(context);
+            
+            if (context.new_analyses && context.new_analyses > 0) {
+                const analysisMsg = context.new_analyses === 1
+                    ? 'I analyzed 1 additional file to provide better answers next time.'
+                    : `I analyzed ${context.new_analyses} additional files to provide better answers next time.`;
+                addMessage(analysisMsg, 'bot');
+            }
         }
     })
     .catch(error => {
@@ -428,7 +484,7 @@ function updateSuggestions(context) {
                 Never mind
             </div>
         `;
-    } else if (context && context.has_results) {
+    } else if (context && context.analyzed_files > 0) {
         // Show contextual follow-up suggestions
         suggestionsDiv.innerHTML = `
             <div class="suggestion-chip" onclick="sendSuggestion('Yes')">
@@ -447,7 +503,10 @@ function updateSuggestions(context) {
     } else {
         // Reset to default suggestions
         setTimeout(() => {
-            suggestionsDiv.innerHTML = `
+            const pendingNote = context && typeof context.pending_analysis === "number" && context.pending_analysis > 0
+                ? `<div class="text-muted small mb-2">Analyzing ${context.pending_analysis} more file${context.pending_analysis === 1 ? '' : 's'} in the background...</div>`
+                : '';
+            suggestionsDiv.innerHTML = pendingNote + `
                 <div class="suggestion-chip" onclick="sendSuggestion('Find all PDF files')">
                     Find all PDF files
                 </div>
@@ -467,6 +526,30 @@ function updateSuggestions(context) {
         }, 5000);
     }
 }
+function updateStats(context) {
+    if (!context) {
+        return;
+    }
+    if (typeof context.total_files === "number") {
+        const totalEl = document.getElementById("ai-total-files");
+        if (totalEl) {
+            totalEl.textContent = context.total_files;
+        }
+    }
+    if (typeof context.analyzed_files === "number") {
+        const analyzedEl = document.getElementById("ai-analyzed-files");
+        if (analyzedEl) {
+            analyzedEl.textContent = context.analyzed_files;
+        }
+    }
+    if (typeof context.pending_analysis === "number") {
+        const pendingEl = document.getElementById("ai-pending-analysis");
+        if (pendingEl) {
+            pendingEl.textContent = context.pending_analysis;
+        }
+    }
+}
+
 
 function addMessage(content, sender) {
     // Remove welcome message if it exists
@@ -529,3 +612,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+
+
+
+
+
+

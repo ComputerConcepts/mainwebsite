@@ -852,7 +852,8 @@ class AINotification(models.Model):
         """Mark notification as read"""
         if not self.is_read:
             self.is_read = True
-            self.read_at = models.timezone.now()
+            from django.utils import timezone
+            self.read_at = timezone.now()
             self.save(update_fields=['is_read', 'read_at'])
 
 
