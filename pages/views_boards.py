@@ -391,6 +391,12 @@ def move_card(request):
                 return JsonResponse({'error': 'Cannot move cards between different boards'}, status=400)
             
             moving_within_same_list = old_list.id == new_list.id
+
+            # Normalize positions before applying move to avoid stale duplicates
+            reorder_cards_in_list(old_list)
+            if not moving_within_same_list:
+                reorder_cards_in_list(new_list)
+            card.refresh_from_db(fields=['position'])
             
             if moving_within_same_list:
                 target_cards = list(
