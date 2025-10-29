@@ -6,22 +6,43 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from django.db import models
+from django.db.models import Case, When, Value, IntegerField
 from django.core.paginator import Paginator
 from django.utils import timezone
 from .models import Board, BoardList, Card, CardComment, CardAttachment, Employee, BoardShare, BoardActivity
 from .forms import BoardShareForm
 from .views import is_employee_authenticated
 import json
+import logging
+import traceback
+
+# Simple logger for debugging move_card issues
+logger = logging.getLogger(__name__)
+handler = logging.FileHandler('move_card_debug.log')
+handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 
 def reorder_cards_in_list(board_list):
     """Utility function to fix position conflicts in a list"""
-    cards = list(
-        Card.objects.select_for_update()
-        .filter(board_list=board_list)
-        .order_by('position', 'created_at')
-    )
-    _apply_card_order(cards, board_list)
+    from django.db import transaction
+    with transaction.atomic():
+        cards = list(
+            Card.objects.select_for_update()
+            .filter(board_list=board_list)
+            .order_by('position', 'created_at')
+        )
+        try:
+            logger.debug('reorder_cards_in_list: before reorder for list %s -> %s', board_list.id, [(str(c.id), c.position) for c in cards])
+        except Exception:
+            logger.exception('Failed logging before reorder')
+        _apply_card_order(cards, board_list)
+        try:
+            post = list(Card.objects.filter(board_list=board_list).order_by('position').values_list('id', 'position'))
+            logger.debug('reorder_cards_in_list: after reorder for list %s -> %s', board_list.id, post)
+        except Exception:
+            logger.exception('Failed logging after reorder')
 
 
 def _apply_card_order(cards, board_list, update_board_list=False):
@@ -29,17 +50,73 @@ def _apply_card_order(cards, board_list, update_board_list=False):
     if not cards:
         return
 
-    # First pass: assign all cards a unique temporary position (use a large negative value + card id)
-    for idx, card in enumerate(cards, start=1):
-        card.position = -1000000 - idx
-        if update_board_list:
-            card.board_list = board_list
-        card.save(update_fields=['position'] + (['board_list'] if update_board_list else []))
+    # To avoid transient unique constraint violations, first shift all affected
+    # cards to a high temporary position in a single statement, then assign
+    # final sequential positions.
+    from django.db import transaction
 
-    # Second pass: assign the correct sequential positions
-    for idx, card in enumerate(cards, start=1):
-        card.position = idx
-        card.save(update_fields=['position'])
+    with transaction.atomic():
+        # Collect ids for the provided cards
+        ids = [c.id for c in cards]
+
+        try:
+            logger.debug('_apply_card_order: ids=%s, update_board_list=%s, board_list=%s', [str(i) for i in ids], update_board_list, getattr(board_list, 'id', None))
+        except Exception:
+            logger.exception('Failed logging apply_card_order start')
+
+        # Choose a large positive offset based on the target list to avoid
+        # colliding with temporary positions already present in other lists.
+        # Using a per-list max ensures the temporary range is unique within
+        # the destination list (the unique constraint is per board_list).
+        per_list_max = Card.objects.filter(board_list=board_list).aggregate(models.Max('position')).get('position__max') or 0
+        offset = per_list_max + 1000000
+
+        # Build a CASE expression to assign a unique temporary position to
+        # each affected card in a single UPDATE statement. This avoids any
+        # transient duplicates that can occur when two cards from different
+        # lists have the same original position value (e.g. both were pos=2).
+        # The CASE maps each id to offset + index (unique per-card).
+        when_clauses = []
+        for idx, cid in enumerate(ids, start=1):
+            when_clauses.append(When(id=cid, then=Value(offset + idx)))
+
+        position_case = Case(*when_clauses, output_field=IntegerField())
+
+        # Perform a single UPDATE that assigns the temporary positions and
+        # (optionally) updates the board_list for cross-list moves. Using a
+        # single DB statement guarantees there's no intermediate state with
+        # duplicate (board_list, position) pairs.
+        if update_board_list:
+            Card.objects.filter(id__in=ids).update(
+                position=position_case,
+                board_list=board_list,
+            )
+        else:
+            Card.objects.filter(id__in=ids).update(position=position_case)
+
+        # Now assign final sequential positions following the order of the
+        # provided 'cards' list (this is the desired order from the caller).
+        # Update the Python objects and perform a bulk_update to write final positions.
+        fields = ['position']
+        if update_board_list:
+            fields.append('board_list')
+
+        for idx, card in enumerate(cards, start=1):
+            card.position = idx
+            if update_board_list:
+                card.board_list = board_list
+
+        try:
+            logger.debug('_apply_card_order: writing final positions for ids=%s with fields=%s', [str(c.id) for c in cards], fields)
+        except Exception:
+            logger.exception('Failed logging before bulk_update')
+
+        Card.objects.bulk_update(cards, fields)
+
+        try:
+            logger.debug('_apply_card_order: final positions written for ids=%s', [str(c.id) for c in cards])
+        except Exception:
+            logger.exception('Failed logging after bulk_update')
 
 
 def reorder_lists(board):
@@ -365,15 +442,18 @@ def update_card(request, card_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def move_card(request):
     """Move card between lists or change position"""
-    if not is_employee_authenticated(request):
-        return JsonResponse({'error': 'Authentication required'}, status=401)
-    
+    # Return JSON responses for API consumers. Use internal auth check to avoid
+    # redirects from Django's login_required which cause fetch() to behave oddly.
     try:
+        logger.debug('move_card called; raw body: %s', request.body)
+        if not is_employee_authenticated(request):
+            logger.debug('Authentication failed for move_card')
+            return JsonResponse({'error': 'Authentication required'}, status=401)
+
         data = json.loads(request.body)
         card_id = data.get('card_id')
         new_list_id = data.get('new_list_id')
@@ -388,63 +468,95 @@ def move_card(request):
             new_position = 1
         
         employee = Employee.objects.get(user=request.user)
-        
+
         with transaction.atomic():
+            # Lock the moving card row and involved lists' rows to avoid races
             card = Card.objects.select_for_update().select_related('board_list__board').get(id=card_id)
             old_list = card.board_list
             board = old_list.board
-            
+
             if board.created_by != employee and employee not in board.members.all():
                 return JsonResponse({'error': 'Access denied'}, status=403)
-            
+
             new_list = BoardList.objects.select_for_update().select_related('board').get(id=new_list_id)
-            
+
             if new_list.board_id != board.id:
                 return JsonResponse({'error': 'Cannot move cards between different boards'}, status=400)
-            
+
             moving_within_same_list = old_list.id == new_list.id
-            
+
             if moving_within_same_list:
-                target_cards = list(
-                    Card.objects.select_for_update()
-                    .filter(board_list=new_list)
-                    .exclude(id=card.id)
-                    .order_by('position', 'created_at')
-                )
+                # Moving within same list: build the desired final ordering in memory
+                # and delegate to _apply_card_order which uses a safe two-phase
+                # offset+bulk_update strategy to avoid transient unique constraint
+                # violations. This keeps the implementation ORM-only and
+                # transactional.
+                old_pos = card.position
+                new_pos = max(1, int(new_position))
+
+                if new_pos == old_pos:
+                    logger.debug('No-op move within same list for card %s', card_id)
+                else:
+                    # Lock and fetch all cards for the list in a deterministic order
+                    cards = list(Card.objects.select_for_update().filter(
+                        board_list=new_list
+                    ).order_by('position', 'created_at'))
+
+                    # Remove the moving card from the list ordering (it will be reinserted)
+                    cards = [c for c in cards if c.id != card.id]
+
+                    # Clamp insertion position and insert the card instance
+                    insert_at = min(new_pos - 1, len(cards))
+                    cards.insert(insert_at, card)
+
+                    # Apply final ordering safely
+                    _apply_card_order(cards, new_list)
             else:
-                target_cards = list(
-                    Card.objects.select_for_update()
-                    .filter(board_list=new_list)
-                    .order_by('position', 'created_at')
-                )
-            
-            max_position = len(target_cards)
-            desired_index = max(0, min(new_position - 1, max_position))
-            
-            if moving_within_same_list:
-                ordered_cards = target_cards
-                ordered_cards.insert(desired_index, card)
-                _apply_card_order(ordered_cards, new_list)
-            else:
-                old_siblings = list(
-                    Card.objects.select_for_update()
-                    .filter(board_list=old_list)
-                    .exclude(id=card.id)
-                    .order_by('position', 'created_at')
-                )
-                
-                _apply_card_order(old_siblings, old_list)
-                
-                target_cards.insert(desired_index, card)
-                
+                # Moving across lists: make space in target list, move card, then close gap in old list
+                old_pos = card.position
+                new_pos = new_position
+
+                # Moving across lists: build desired final orderings for both
+                # source and target lists and delegate to _apply_card_order.
+                old_pos = card.position
+                new_pos = max(1, int(new_position))
+
+                # Lock and fetch cards for both lists
+                target_cards = list(Card.objects.select_for_update().filter(
+                    board_list=new_list
+                ).order_by('position', 'created_at'))
+
+                source_cards = list(Card.objects.select_for_update().filter(
+                    board_list=old_list
+                ).order_by('position', 'created_at'))
+
+                # Remove moving card from source_cards ordering
+                source_cards = [c for c in source_cards if c.id != card.id]
+
+                # Insert moving card into target ordering at the requested position
+                insert_at = min(new_pos - 1, len(target_cards))
+                # Ensure the in-memory card instance reflects the new board_list
+                card.board_list = new_list
+                target_cards.insert(insert_at, card)
+
+                # Apply safe reorder on both lists. For target, allow board_list
+                # to be updated for the provided ids (this will set the moved
+                # card's board_list correctly; existing target cards already
+                # have that value).
                 _apply_card_order(target_cards, new_list, update_board_list=True)
+                _apply_card_order(source_cards, old_list)
         
+        logger.debug('Card move completed successfully: card_id=%s, new_list_id=%s, new_position=%s', card_id, new_list_id, new_position)
         return JsonResponse({'success': True, 'message': 'Card moved successfully'})
-        
-    except (Card.DoesNotExist, BoardList.DoesNotExist):
+
+    except (Card.DoesNotExist, BoardList.DoesNotExist) as e:
+        logger.exception('Card or list not found during move_card')
         return JsonResponse({'error': 'Card or list not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        # Log full traceback to file for debugging; return a safe JSON error to client
+        tb = traceback.format_exc()
+        logger.error('Unexpected error in move_card: %s\n%s', str(e), tb)
+        return JsonResponse({'error': 'Internal server error'}, status=500)
 
 
 @login_required
