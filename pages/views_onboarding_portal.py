@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.conf import settings
+from django.db.models import Prefetch
 import json
 import os
 import uuid
@@ -28,10 +29,52 @@ from .models import (
     OnboardingFormField,
     OnboardingOfferLetter,
     OnboardingPDFTask,
+    OnboardingAssessment,
+    OnboardingAssessmentQuestion,
+    OnboardingAssessmentAttempt,
+    OnboardingAssessmentResponse,
 )
 from .onboarding_emails import OnboardingEmailService
 
 logger = logging.getLogger(__name__)
+
+
+def _invitation_display_meta(invitation, assessments):
+    """Derive friendly titles/descriptions for assessment-only invitations."""
+    form = invitation.onboarding_form
+    active_fields = getattr(form, 'active_fields', None)
+    has_active_fields = bool(active_fields)
+
+    title = form.title or ''
+    description = form.description or ''
+    title_lower = title.lower()
+    assessments = assessments or []
+    assessment_names = [a.title for a in assessments if getattr(a, 'title', None)]
+
+    is_assessment_only = bool(assessments) and (not has_active_fields or 'assessment packet' in title_lower)
+
+    if is_assessment_only:
+        if len(assessments) == 1:
+            assessment = assessments[0]
+            title = assessment.title or "Assessment"
+            description = assessment.description or "Please complete this assessment to proceed."
+        else:
+            title = "Assigned Assessments"
+            if assessment_names:
+                description = "Complete the following assessments: " + ", ".join(assessment_names)
+            else:
+                description = "Complete the assigned assessments to proceed."
+    else:
+        if not title:
+            title = "Onboarding Form"
+        if not description:
+            description = "Complete this onboarding form to proceed."
+
+    return {
+        'display_title': title,
+        'display_description': description,
+        'is_assessment_only': is_assessment_only,
+    }
 
 
 def onboarding_info(request):
@@ -275,11 +318,25 @@ def onboarding_dashboard(request):
     except ProspectiveEmployee.DoesNotExist:
         messages.error(request, "Session expired. Please log in again.")
         return redirect('onboarding_login')
-    
+
+    assessment_prefetch = Prefetch(
+        'assessments',
+        queryset=OnboardingAssessment.objects.filter(is_active=True),
+        to_attr='active_assessments',
+    )
+    form_fields_prefetch = Prefetch(
+        'onboarding_form__fields',
+        queryset=OnboardingFormField.objects.filter(is_active=True),
+        to_attr='active_fields',
+    )
+
     # Get all invitations (regular forms)
     invitations = OnboardingInvitation.objects.filter(
         prospective_employee=prospective_employee
-    ).select_related('onboarding_form').order_by('-sent_at')
+    ).select_related('onboarding_form').prefetch_related(
+        assessment_prefetch,
+        form_fields_prefetch,
+    ).order_by('-sent_at')
 
     # Get all PDF tasks linked to this prospect (treat them as first-class tasks)
     pdf_tasks = OnboardingPDFTask.objects.filter(
@@ -310,29 +367,41 @@ def onboarding_dashboard(request):
                     offer_letter = submission.offer_letter
                 except OnboardingOfferLetter.DoesNotExist:
                     offer_letter = None
+                assessments = list(getattr(invitation, 'active_assessments', []))
+                display_meta = _invitation_display_meta(invitation, assessments)
                 completed_invitations.append({
                     'invitation': invitation,
                     'submission': submission,
                     'offer_letter': offer_letter,
                     'is_pdf_task': False,
                     'needs_revision': False,
+                    'assessments': assessments,
                     'review_notes': None,
+                    **display_meta,
                 })
             else:
+                assessments = list(getattr(invitation, 'active_assessments', []))
+                display_meta = _invitation_display_meta(invitation, assessments)
                 pending_invitations.append({
                     'invitation': invitation,
                     'submission': submission,
                     'needs_revision': submission.review_status == 'needs_revision',
+                    'assessments': assessments,
                     'review_notes': submission.review_notes if submission.review_status == 'needs_revision' else None,
                     'is_pdf_task': False,
+                    **display_meta,
                 })
         except OnboardingSubmission.DoesNotExist:
+            assessments = list(getattr(invitation, 'active_assessments', []))
+            display_meta = _invitation_display_meta(invitation, assessments)
             pending_invitations.append({
                 'invitation': invitation,
                 'submission': None,
                 'needs_revision': False,
+                'assessments': assessments,
                 'review_notes': None,
                 'is_pdf_task': False,
+                **display_meta,
             })
 
     # Process PDF tasks as top-level items
@@ -611,6 +680,135 @@ def onboarding_form(request, invitation_id):
     }
     
     return render(request, 'onboarding/form.html', context)
+
+
+@require_http_methods(["GET", "POST"])
+def onboarding_assessment(request, invitation_id, assessment_id):
+    """Present an assigned assessment and collect/save an attempt."""
+    prospect_id = request.session.get('onboarding_prospect_id')
+    if not prospect_id:
+        messages.error(request, "Please log in to access assessments.")
+        return redirect('onboarding_login')
+
+    try:
+        prospective_employee = ProspectiveEmployee.objects.get(id=prospect_id, is_active=True)
+    except ProspectiveEmployee.DoesNotExist:
+        messages.error(request, "Session expired. Please log in again.")
+        return redirect('onboarding_login')
+
+    invitation = get_object_or_404(OnboardingInvitation, id=invitation_id, prospective_employee=prospective_employee)
+    assessment = get_object_or_404(OnboardingAssessment, id=assessment_id, is_active=True)
+
+    # Ensure assessment is assigned to this invitation
+    if not invitation.assessments.filter(id=assessment.id).exists():
+        messages.error(request, "This assessment is not assigned to your onboarding invitation.")
+        return redirect('onboarding_dashboard')
+
+    if request.method == 'GET':
+        # If multiple attempts are not allowed, prevent creating a new attempt
+        # when a submitted attempt already exists for this invitation.
+        if not assessment.allow_multiple_attempts:
+            already = OnboardingAssessmentAttempt.objects.filter(
+                assessment=assessment,
+                invitation=invitation,
+                is_submitted=True,
+            ).exists()
+            if already:
+                messages.error(request, "You have already submitted this assessment and multiple attempts are not allowed.")
+                return redirect('onboarding_dashboard')
+
+        # Create an attempt record to track timing
+        attempt = OnboardingAssessmentAttempt.objects.create(
+            assessment=assessment,
+            invitation=invitation,
+        )
+
+        questions = assessment.questions.filter(is_active=True).order_by('order')
+        return render(request, 'onboarding/assessment.html', {
+            'invitation': invitation,
+            'assessment': assessment,
+            'questions': questions,
+            'attempt': attempt,
+        })
+
+    # POST: save answers
+    attempt_id = request.POST.get('attempt_id')
+    attempt = get_object_or_404(OnboardingAssessmentAttempt, id=attempt_id, assessment=assessment, invitation=invitation)
+    # Prevent submitting if this attempt is already submitted
+    if attempt.is_submitted and not assessment.allow_multiple_attempts:
+        messages.error(request, "You have already submitted this assessment.")
+        return redirect('onboarding_dashboard')
+
+    # Additionally, if multiple attempts are not allowed, ensure there is no
+    # other previously submitted attempt for this invitation (race-safety).
+    if not assessment.allow_multiple_attempts:
+        other_submitted = OnboardingAssessmentAttempt.objects.filter(
+            assessment=assessment,
+            invitation=invitation,
+            is_submitted=True,
+        ).exclude(id=attempt.id).exists()
+        if other_submitted:
+            messages.error(request, "You have already submitted this assessment and cannot submit again.")
+            return redirect('onboarding_dashboard')
+
+    # Save responses
+    questions = assessment.questions.filter(is_active=True)
+    total_saved = 0
+    for q in questions:
+        key = f"q_{q.id}"
+        if q.question_type == 'mcq':
+            raw_values = request.POST.getlist(key)
+            if q.allow_multiple_answers:
+                parsed_values = []
+                for v in raw_values:
+                    val = (v or '').strip()
+                    if val == '':
+                        continue
+                    try:
+                        parsed_values.append(int(val))
+                    except ValueError:
+                        parsed_values.append(val)
+                value = parsed_values
+            else:
+                selected = raw_values[0] if raw_values else ''
+                selected = (selected or '').strip()
+                if selected == '':
+                    value = ''
+                else:
+                    try:
+                        value = int(selected)
+                    except ValueError:
+                        value = selected
+        else:
+            value = request.POST.get(key, '').strip()
+
+        resp, created = OnboardingAssessmentResponse.objects.update_or_create(
+            attempt=attempt,
+            question=q,
+            defaults={'answer': value}
+        )
+        total_saved += 1
+
+    attempt.completed_at = timezone.now()
+    if attempt.started_at:
+        attempt.duration_seconds = int((attempt.completed_at - attempt.started_at).total_seconds())
+    attempt.is_submitted = True
+    attempt.save()
+
+    # Auto-grade MCQs
+    try:
+        attempt.grade()
+    except Exception:
+        # grading should not block submission
+        pass
+
+    if assessment.is_timed and assessment.time_limit_minutes:
+        limit_seconds = assessment.time_limit_minutes * 60
+        if attempt.duration_seconds and attempt.duration_seconds > limit_seconds:
+            messages.warning(request, "Assessment submitted, but the time limit was exceeded.")
+
+    messages.success(request, f"Assessment submitted ({total_saved} responses saved).")
+    return redirect('onboarding_dashboard')
 
 
 @require_http_methods(["GET", "POST"])

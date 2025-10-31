@@ -226,11 +226,30 @@
 
 {% block content %}
 <div class="form-builder">
+    {% if assessment %}
+    <div class="mb-3 p-3" style="border-left:4px solid #667eea; background:#f8f9ff; border-radius:6px;">
+        <strong>Building questions for assessment:</strong>
+        <span class="ms-2">{{ assessment.title }}</span>
+        {% if assessment.description %}
+            <div class="text-muted small mt-1">{{ assessment.description }}</div>
+        {% endif %}
+        <div class="mt-2">
+            <a href="{% url 'create_onboarding_assessment' %}" class="btn btn-sm btn-outline-secondary">Back to assessment list</a>
+        </div>
+    </div>
+    {% endif %}
     <div class="builder-header">
+        {% if assessment %}
+        <h2 class="mb-3">
+            <i class="fas fa-clipboard-check"></i> Create Assessment Questions
+        </h2>
+        <p class="mb-0 opacity-90">Author questions for assessment: <strong>{{ assessment.title }}</strong></p>
+        {% else %}
         <h2 class="mb-3">
             <i class="fas fa-magic"></i> Create Onboarding Form
         </h2>
         <p class="mb-0 opacity-90">Build custom onboarding forms with drag-and-drop fields</p>
+        {% endif %}
     </div>
     
     <div class="row">
@@ -238,25 +257,39 @@
         <div class="col-lg-8">
             <!-- Form Settings -->
             <div class="form-settings">
-                <h4 class="mb-3">Form Settings</h4>
+                <h4 class="mb-3">{% if assessment %}Assessment Settings{% else %}Form Settings{% endif %}</h4>
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="form-label">Form Title *</label>
-                            <input type="text" class="form-control" id="formTitle" placeholder="e.g., Software Developer Onboarding" required>
+                            <label class="form-label">{% if assessment %}Assessment Title{% else %}Form Title *{% endif %}</label>
+                            {% if assessment %}
+                                <!-- When editing an assessment, show the passed title and keep a hidden input for scripts -->
+                                <div class="p-2 bg-white border rounded">{{ assessment.title }}</div>
+                                <input type="hidden" id="formTitle" value="{{ assessment.title|escape }}">
+                            {% else %}
+                                <input type="text" class="form-control" id="formTitle" placeholder="e.g., Software Developer Onboarding" required>
+                            {% endif %}
                         </div>
                     </div>
+                    {% if not assessment %}
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label">PIN Expiry (hours)</label>
                             <input type="number" class="form-control" id="pinExpiryHours" value="48" min="1" max="168">
                         </div>
                     </div>
+                    {% endif %}
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <textarea class="form-control" id="formDescription" rows="2" placeholder="Brief description of this onboarding form"></textarea>
+                    <label class="form-label">{% if assessment %}Assessment Description{% else %}Description{% endif %}</label>
+                    {% if assessment %}
+                        <div class="p-2 bg-white border rounded small text-muted">{{ assessment.description }}</div>
+                        <input type="hidden" id="formDescription" value="{{ assessment.description|escape }}">
+                    {% else %}
+                        <textarea class="form-control" id="formDescription" rows="2" placeholder="Brief description of this onboarding form"></textarea>
+                    {% endif %}
                 </div>
+                {% if not assessment %}
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-check">
@@ -275,18 +308,48 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
             </div>
             
             <!-- Form Preview -->
             <div class="form-preview">
-                <h4 class="mb-4">Form Preview</h4>
+                <h4 class="mb-4">{% if assessment %}Assessment Preview{% else %}Form Preview{% endif %}</h4>
                 <div id="formPreview">
-                    <div class="drop-zone" id="dropZone">
-                        <div class="text-center">
-                            <i class="fas fa-plus-circle fa-3x mb-3"></i>
-                            <p class="mb-0">Drag fields here to build your form</p>
+                    {% if assessment and assessment_active_questions %}
+                        {% for q in assessment_active_questions %}
+                            <div class="field-preview">
+                                <div class="mb-2">
+                                    <label class="form-label">{{ q.question_text }}</label>
+                                </div>
+                                {% if q.question_type == 'mcq' %}
+                                    {% for choice in q.choices %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" disabled>
+                                            <label class="form-check-label">{{ choice }}</label>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <textarea class="form-control" rows="3" disabled></textarea>
+                                {% endif %}
+                                {% if q.points %}
+                                    <div class="form-text small text-muted mt-2">Points: {{ q.points }}</div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        <div class="drop-zone" id="dropZone">
+                            <div class="text-center">
+                                <i class="fas fa-plus-circle fa-2x mb-2"></i>
+                                <p class="mb-0">Drag more fields here</p>
+                            </div>
                         </div>
-                    </div>
+                    {% else %}
+                        <div class="drop-zone" id="dropZone">
+                            <div class="text-center">
+                                <i class="fas fa-plus-circle fa-3x mb-3"></i>
+                                <p class="mb-0">Drag fields here to build your form</p>
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -398,6 +461,13 @@
                             </button>
                         </div>
                     </div>
+                    {% if assessment %}
+                    <div class="mt-3" id="assessmentPointsContainer">
+                        <label class="form-label">Points</label>
+                        <input type="number" class="form-control" id="configPoints" value="1" min="0" step="0.5">
+                        <div class="form-text">Points awarded when grading this question.</div>
+                    </div>
+                    {% endif %}
                 </form>
             </div>
             <div class="modal-footer">
@@ -428,7 +498,23 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Server-provided assessment JSON inserted as separate script elements -->
+{% if assessment_questions_json %}
+    {{ assessment_questions_json|json_script:"assessment_questions" }}
+{% else %}
+    <script id="assessment_questions" type="application/json">[]</script>
+{% endif %}
+
+{% if assessment %}
+    <script id="assessment_meta" type="application/json">{"id":"{{ assessment.id }}"}</script>
+{% else %}
+    <script id="assessment_meta" type="application/json">{"id":null}</script>
+{% endif %}
+
 <script>
+const ASSESSMENT_QUESTIONS = JSON.parse(document.getElementById('assessment_questions').textContent);
+const ASSESSMENT_ID = JSON.parse(document.getElementById('assessment_meta').textContent).id;
+const IS_ASSESSMENT = Boolean(ASSESSMENT_ID);
 let formFields = [];
 let draggedFieldType = null;
 let editingFieldIndex = null;
@@ -436,6 +522,34 @@ let currentFieldType = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeFormBuilder();
+    // If we're editing an assessment, populate builder with existing questions
+    if (ASSESSMENT_QUESTIONS && Array.isArray(ASSESSMENT_QUESTIONS)) {
+        // Map assessment questions to builder field format
+        formFields = ASSESSMENT_QUESTIONS.map((q, idx) => {
+            const fieldType = q.field_type || (q.question_type === 'mcq'
+                ? (q.allow_multiple_answers ? 'checkbox' : 'radio')
+                : 'textarea');
+            return {
+                field_type: fieldType,
+                field_name: `q_${q.id}`,
+                field_label: q.question_text,
+                placeholder: '',
+                help_text: '',
+                is_required: false,
+                min_length: null,
+                max_length: null,
+                validation_regex: '',
+                field_options: q.choices || [],
+                order: q.order || idx,
+                // Custom metadata for assessment mapping
+                assessment_question_id: q.id,
+                assessment_points: q.points || 1,
+                assessment_correct_answer: q.correct_answer || null,
+                allow_multiple_answers: !!q.allow_multiple_answers,
+            };
+        });
+        renderFormPreview();
+    }
 });
 
 function initializeFormBuilder() {
@@ -517,29 +631,34 @@ function configureModalForFieldType(fieldType) {
     const lengthValidation = document.getElementById('lengthValidation');
     const regexValidation = document.getElementById('regexValidation');
     const optionsContainer = document.getElementById('fieldOptionsContainer');
-    
-    // Show/hide validation fields based on type
-    if (['text', 'textarea', 'email', 'phone'].includes(fieldType)) {
-        lengthValidation.style.display = 'block';
-        regexValidation.style.display = 'block';
-    } else {
-        lengthValidation.style.display = 'none';
-        regexValidation.style.display = 'none';
-    }
-    
-    // Show options for select/radio/checkbox
-    if (['select', 'radio', 'checkbox'].includes(fieldType)) {
-        optionsContainer.style.display = 'block';
-        if (editingFieldIndex === null) {
-            // Add default options for new fields
-            clearOptions();
-            addOption();
-            addOption();
+
+    if (lengthValidation && regexValidation) {
+        // Show/hide validation fields based on type
+        if (['text', 'textarea', 'email', 'phone'].includes(fieldType)) {
+            lengthValidation.style.display = 'block';
+            regexValidation.style.display = 'block';
+        } else {
+            lengthValidation.style.display = 'none';
+            regexValidation.style.display = 'none';
         }
-    } else {
-        optionsContainer.style.display = 'none';
     }
-    
+
+    if (optionsContainer) {
+        // Show options for select/radio/checkbox
+        if (['select', 'radio', 'checkbox'].includes(fieldType)) {
+            optionsContainer.style.display = 'block';
+            if (editingFieldIndex === null) {
+                // Add default options for new fields
+                clearOptions();
+                addOption();
+                addOption();
+            }
+        } else {
+            optionsContainer.style.display = 'none';
+            clearOptions();
+        }
+    }
+
     // Set field type in hidden input
     document.getElementById('fieldConfigModal').setAttribute('data-field-type', fieldType);
 }
@@ -553,13 +672,43 @@ function populateFieldConfig(field) {
     document.getElementById('configMinLength').value = field.min_length || '';
     document.getElementById('configMaxLength').value = field.max_length || '';
     document.getElementById('configValidationRegex').value = field.validation_regex || '';
-    
+    const pointsInput = document.getElementById('configPoints');
+    // Populate points if available (for assessment questions)
+    if (pointsInput) {
+        if (typeof field.assessment_points !== 'undefined' && field.assessment_points !== null) {
+            pointsInput.value = field.assessment_points;
+        } else {
+            pointsInput.value = 1;
+        }
+    }
+
     // Populate options for select/radio/checkbox
     if (field.field_options && field.field_options.length > 0) {
         clearOptions();
         field.field_options.forEach(option => {
             addOption(option);
         });
+        // If the field contains assessment_correct_answer metadata, mark correct boxes
+        let existingCorrect = null;
+        if (field.assessment_correct_answer !== undefined && field.assessment_correct_answer !== null) {
+            existingCorrect = field.assessment_correct_answer;
+        } else if (field.correct_answer !== undefined && field.correct_answer !== null) {
+            existingCorrect = field.correct_answer;
+        }
+        if (existingCorrect !== null) {
+            // normalize to array of indices
+            let correct = existingCorrect;
+            if (!Array.isArray(correct)) {
+                correct = [correct];
+            }
+            const optionElems = document.querySelectorAll('#optionsList .option-item');
+            optionElems.forEach((optEl, idx) => {
+                const checkbox = optEl.querySelector('.option-correct');
+                if (checkbox && correct.includes(idx)) {
+                    checkbox.checked = true;
+                }
+            });
+        }
     }
 }
 
@@ -602,8 +751,31 @@ function saveFieldConfig() {
         field_options: getFieldOptions(),
         order: editingFieldIndex !== null ? formFields[editingFieldIndex].order : formFields.length
     };
-    
+    // If options exist, capture which are marked correct
+    const optionElems = document.querySelectorAll('#optionsList .option-item');
+    if (optionElems.length > 0) {
+        const correctIndices = [];
+        optionElems.forEach((optEl, idx) => {
+            const checkbox = optEl.querySelector('.option-correct');
+            if (checkbox && checkbox.checked) correctIndices.push(idx);
+        });
+        // Store correct answer metadata on the field config
+        fieldConfig.correct_answer = correctIndices.length === 0 ? null : (correctIndices.length === 1 ? correctIndices[0] : correctIndices);
+        fieldConfig.assessment_correct_answer = fieldConfig.correct_answer;
+    }
+    // capture points for assessment
+    const pointsInput = document.getElementById('configPoints');
+    if (pointsInput) {
+        const rawPoints = parseFloat(pointsInput.value);
+        fieldConfig.assessment_points = Number.isFinite(rawPoints) ? rawPoints : 1;
+    }
+    fieldConfig.allow_multiple_answers = (fieldType === 'checkbox');
+
     if (editingFieldIndex !== null) {
+        const existing = formFields[editingFieldIndex] || {};
+        if (existing.assessment_question_id) {
+            fieldConfig.assessment_question_id = existing.assessment_question_id;
+        }
         formFields[editingFieldIndex] = fieldConfig;
     } else {
         formFields.push(fieldConfig);
@@ -616,16 +788,16 @@ function saveFieldConfig() {
 }
 
 function getFieldOptions() {
-    const optionInputs = document.querySelectorAll('#optionsList .option-item input');
+    const optionInputs = document.querySelectorAll('#optionsList .option-item .option-text');
     const options = [];
-    
+
     optionInputs.forEach(input => {
         const value = input.value.trim();
         if (value) {
             options.push(value);
         }
     });
-    
+
     return options;
 }
 
@@ -634,10 +806,13 @@ function addOption(value = '') {
     const optionDiv = document.createElement('div');
     optionDiv.className = 'option-item';
     optionDiv.innerHTML = `
-        <input type="text" class="form-control" placeholder="Option text" value="${value}">
-        <button type="button" class="remove-option" onclick="removeOption(this)">
-            <i class="fas fa-times"></i>
-        </button>
+        <div class="d-flex align-items-center gap-2">
+            <input type="checkbox" class="form-check-input option-correct" title="Mark as correct">
+            <input type="text" class="form-control option-text" placeholder="Option text" value="${value}">
+            <button type="button" class="remove-option btn btn-sm btn-outline-danger" onclick="removeOption(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
     `;
     optionsList.appendChild(optionDiv);
 }
@@ -647,7 +822,10 @@ function removeOption(button) {
 }
 
 function clearOptions() {
-    document.getElementById('optionsList').innerHTML = '';
+    const list = document.getElementById('optionsList');
+    if (list) {
+        list.innerHTML = '';
+    }
 }
 
 function renderFormPreview() {
@@ -751,7 +929,13 @@ function renderFieldPreview(field, index) {
             fieldHtml = `<div class="text-center p-4 border border-dashed rounded"><i class="fas fa-signature fa-2x text-muted"></i><br><small class="text-muted">Digital Signature</small></div>`;
             break;
     }
-    
+    let helperText = '';
+    if (IS_ASSESSMENT) {
+        const pointsDisplay = typeof field.assessment_points !== 'undefined' ? `<div class="form-text small text-muted mt-2">Points: ${field.assessment_points ?? 1}</div>` : '';
+        const multiDisplay = field.field_type === 'checkbox' ? '<div class="form-text small text-muted">Candidate may select more than one option.</div>' : '';
+        helperText = pointsDisplay + multiDisplay;
+    }
+
     return `
         <div class="field-preview" data-field-index="${index}">
             <div class="field-controls">
@@ -776,6 +960,7 @@ function renderFieldPreview(field, index) {
             </div>
             ${fieldHtml}
             ${field.help_text ? `<div class="form-text">${field.help_text}</div>` : ''}
+            ${helperText}
         </div>
     `;
 }
@@ -814,6 +999,32 @@ function deleteField(index) {
 }
 
 function previewForm() {
+    // If we're previewing an assessment, create a temporary invitation and open the candidate view
+    if (ASSESSMENT_ID) {
+        const endpoint = `/employee/hr/onboarding/assessments/${ASSESSMENT_ID}/preview/`;
+        fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.preview_url) {
+                window.open(data.preview_url, '_blank');
+            } else {
+                alert('Could not create preview: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error creating preview.');
+        });
+        return;
+    }
+
     const formTitle = document.getElementById('formTitle').value.trim();
     const formDescription = document.getElementById('formDescription').value.trim();
     
@@ -899,9 +1110,12 @@ function renderFieldForPreview(field) {
 function saveForm() {
     const formTitle = document.getElementById('formTitle').value.trim();
     const formDescription = document.getElementById('formDescription').value.trim();
-    const pinExpiryHours = parseInt(document.getElementById('pinExpiryHours').value) || 48;
-    const allowMultipleSubmissions = document.getElementById('allowMultipleSubmissions').checked;
-    const sendConfirmationEmail = document.getElementById('sendConfirmationEmail').checked;
+    const pinExpiryInput = document.getElementById('pinExpiryHours');
+    const pinExpiryHours = pinExpiryInput ? (parseInt(pinExpiryInput.value) || 48) : 48;
+    const allowMultipleSubmissionsInput = document.getElementById('allowMultipleSubmissions');
+    const allowMultipleSubmissions = allowMultipleSubmissionsInput ? allowMultipleSubmissionsInput.checked : false;
+    const sendConfirmationEmailInput = document.getElementById('sendConfirmationEmail');
+    const sendConfirmationEmail = sendConfirmationEmailInput ? sendConfirmationEmailInput.checked : false;
     
     if (!formTitle) {
         alert('Please enter a form title');
@@ -928,6 +1142,51 @@ function saveForm() {
     saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     saveBtn.disabled = true;
     
+    // If editing an assessment, POST fields to the assessment questions save endpoint
+    if (ASSESSMENT_ID) {
+        const mappedFields = formFields.map(f => ({
+            assessment_question_id: f.assessment_question_id || null,
+            field_type: f.field_type,
+            field_name: f.field_name,
+            field_label: f.field_label,
+            field_options: f.field_options || [],
+            assessment_points: (typeof f.assessment_points !== 'undefined' && f.assessment_points !== null) ? f.assessment_points : 1,
+            allow_multiple_answers: !!(f.allow_multiple_answers || f.field_type === 'checkbox'),
+            correct_answer: (typeof f.assessment_correct_answer !== 'undefined') ? f.assessment_correct_answer : (typeof f.correct_answer !== 'undefined' ? f.correct_answer : null),
+            order: f.order
+        }));
+
+        const endpoint = `/employee/hr/onboarding/assessments/${ASSESSMENT_ID}/questions/save/`;
+        fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ fields: mappedFields })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Assessment questions saved successfully!');
+                // Redirect back to assessments dashboard
+                window.location.href = '{% url "hr_onboarding_dashboard" %}';
+            } else {
+                alert('Error saving assessment: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error saving assessment. Please try again.');
+        })
+        .finally(() => {
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+        });
+        return;
+    }
+
+    // Default: create onboarding form flow
     fetch('{% url "create_onboarding_form" %}', {
         method: 'POST',
         headers: {

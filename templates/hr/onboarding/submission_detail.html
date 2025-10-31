@@ -282,6 +282,61 @@
                     </div>
                     {% endif %}
                 </div>
+                
+                <!-- Assessment Attempts -->
+                <div class="mt-4 pt-4">
+                    <h4 class="mb-3"><i class="fas fa-clipboard-check me-2"></i>Assessment Attempts</h4>
+                    {% if assessment_attempts %}
+                        {% for attempt in assessment_attempts %}
+                        <div class="mb-3 p-3" style="background:#fbfbff;border-radius:8px;border:1px solid #eef2ff;">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ attempt.assessment.title }}</strong>
+                                    <div class="text-muted small">Started: {{ attempt.started_at|date:"M j, Y g:i A" }}{% if attempt.completed_at %} · Completed: {{ attempt.completed_at|date:"M j, Y g:i A" }}{% endif %}</div>
+                                </div>
+                                <div class="text-end">
+                                    {% if attempt.score is not None %}
+                                        <div><strong>Score:</strong> {{ attempt.score }} pts</div>
+                                    {% endif %}
+                                    {% if attempt.percentage is not None %}
+                                        <div class="text-muted small">{{ attempt.percentage }}%</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {% if attempt.responses.all %}
+                            <form method="post" class="mt-3">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="grade_attempt">
+                                <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
+                                {% for resp in attempt.responses.all %}
+                                <div class="mb-3">
+                                    <div class="fw-semibold">Q: {{ resp.question.question_text }}</div>
+                                    <div class="text-muted small mb-1">{{ resp.answer|default:"(no response)" }}</div>
+                                    <label class="form-label small">Points awarded</label>
+                                    <input type="number" step="0.01" name="points_{{ resp.id }}" class="form-control form-control-sm" value="{% if resp.points_awarded is not None %}{{ resp.points_awarded }}{% endif %}" placeholder="Leave blank to preserve">
+                                </div>
+                                {% endfor %}
+
+                                <div class="d-flex gap-2 mt-2">
+                                    <button type="submit" class="btn btn-sm btn-primary">Save Grades</button>
+                                </div>
+                            </form>
+                            <form method="post" class="mt-2">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="reset_attempt">
+                                <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Reset this attempt? This will remove recorded responses and allow the candidate to retake.')">Reset Attempt</button>
+                            </form>
+                            {% else %}
+                                <div class="text-muted small mt-2">No responses recorded for this attempt.</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted small">No assessment attempts are linked to this submission.</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
         

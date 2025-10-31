@@ -184,6 +184,9 @@ urlpatterns = [
     # HR Onboarding System URLs
     path('employee/hr/onboarding/', views_onboarding_hr.hr_onboarding_dashboard, name='hr_onboarding_dashboard'),
     path('employee/hr/onboarding/forms/create/', views_onboarding_hr.create_onboarding_form, name='create_onboarding_form'),
+    path('employee/hr/onboarding/assessments/create/', views_onboarding_hr.create_onboarding_assessment, name='create_onboarding_assessment'),
+    path('employee/hr/onboarding/assessments/<uuid:assessment_id>/questions/save/', views_onboarding_hr.save_assessment_questions, name='save_assessment_questions'),
+    path('employee/hr/onboarding/assessments/<uuid:assessment_id>/preview/', views_onboarding_hr.preview_assessment, name='preview_assessment'),
     path('employee/hr/onboarding/forms/<uuid:form_id>/edit/', views_onboarding_hr.edit_onboarding_form, name='edit_onboarding_form'),
     path('employee/hr/onboarding/pdf/forms/', views_onboarding_hr.manage_onboarding_pdf_forms, name='manage_onboarding_pdf_forms'),
     path('employee/hr/onboarding/pdf/forms/<uuid:form_id>/download/', views_onboarding_hr.download_onboarding_pdf_template, name='download_onboarding_pdf_template'),
@@ -215,6 +218,7 @@ urlpatterns = [
     path('onboarding/login/', views_onboarding_portal.onboarding_login, name='onboarding_login'),
     path('onboarding/dashboard/', views_onboarding_portal.onboarding_dashboard, name='onboarding_dashboard'),
     path('onboarding/form/<uuid:invitation_id>/', views_onboarding_portal.onboarding_form, name='onboarding_form'),
+    path('onboarding/assessment/<uuid:invitation_id>/<uuid:assessment_id>/', views_onboarding_portal.onboarding_assessment, name='onboarding_assessment'),
     path('onboarding/offer/<uuid:offer_id>/', views_onboarding_portal.view_offer_letter, name='onboarding_offer_letter'),
     path('onboarding/offer/<uuid:offer_id>/download/', views_onboarding_portal.download_offer_letter_pdf, name='onboarding_offer_letter_download'),
     path('onboarding/pdf/<uuid:task_id>/template/', views_onboarding_portal.download_onboarding_pdf_template, name='onboarding_pdf_template_download'),

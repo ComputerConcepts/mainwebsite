@@ -1361,6 +1361,8 @@ class OnboardingInvitation(models.Model):
     sent_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_onboarding_invitations')
     sent_at = models.DateTimeField(auto_now_add=True)
     custom_message = models.TextField(blank=True, help_text="Custom message for the invitation")
+    # Assessments assigned to this invitation (optional)
+    assessments = models.ManyToManyField('OnboardingAssessment', blank=True, related_name='invitations')
     
     # Status tracking
     STATUS_CHOICES = [
@@ -1522,6 +1524,162 @@ class OnboardingPDFTask(models.Model):
                 'reviewed_at'
             ]
         )
+
+
+class OnboardingAssessment(models.Model):
+    """Assessments that can be attached to an onboarding flow.
+
+    Questions are stored in a related table `OnboardingAssessmentQuestion`.
+    Supports timed or untimed assessments and basic grading for MCQs.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_onboarding_assessments')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+
+    # timing and rules
+    is_timed = models.BooleanField(default=False, help_text="If true, candidates have a time limit to complete the assessment")
+    time_limit_minutes = models.IntegerField(null=True, blank=True, help_text="Time limit in minutes when timed")
+    allow_multiple_attempts = models.BooleanField(default=False)
+    passing_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Optional passing score (percentage)")
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+
+
+class OnboardingAssessmentQuestion(models.Model):
+    """A single question in an assessment.
+
+    - question_type: 'mcq' or 'open'
+    - choices: list of choice strings (for mcq)
+    - correct_answer: for mcq, store index(es) or value(s) as JSON
+    """
+    QUESTION_TYPES = [
+        ('mcq', 'Multiple Choice'),
+        ('open', 'Open Ended'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assessment = models.ForeignKey(OnboardingAssessment, on_delete=models.CASCADE, related_name='questions')
+    question_text = models.TextField()
+    question_type = models.CharField(max_length=10, choices=QUESTION_TYPES, default='open')
+    # For MCQ questions: a list of option strings
+    choices = models.JSONField(default=list, blank=True, help_text='Choice options for MCQ questions')
+    # The correct answer(s) for MCQ: store as index (int) or list of indices
+    correct_answer = models.JSONField(null=True, blank=True, help_text='Index or list of indices indicating correct choice(s)')
+    allow_multiple_answers = models.BooleanField(default=False, help_text='When true, candidates may select multiple choices')
+    points = models.DecimalField(max_digits=6, decimal_places=2, default=1)
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"{self.assessment.title} - {self.question_text[:60]}"
+
+
+class OnboardingAssessmentAttempt(models.Model):
+    """Records a candidate's attempt at an assessment."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assessment = models.ForeignKey(OnboardingAssessment, on_delete=models.CASCADE, related_name='attempts')
+    invitation = models.ForeignKey(OnboardingInvitation, on_delete=models.CASCADE, related_name='assessment_attempts')
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.IntegerField(null=True, blank=True)
+    score = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, help_text='Total points earned')
+    percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text='Percentage score')
+    is_submitted = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f"Attempt {self.id} - {self.assessment.title} for {self.invitation.prospective_employee.email}"
+
+    def grade(self):
+        """Auto-grade MCQ responses and compute totals. Returns (score, percentage)."""
+        total_points = 0
+        earned = 0
+        for resp in self.responses.select_related('question').all():
+            q = resp.question
+            total_points += float(q.points or 0)
+            if q.question_type == 'mcq' and q.correct_answer is not None:
+                try:
+                    correct = q.correct_answer
+                except Exception:
+                    correct = None
+                given = resp.answer
+                matched = False
+                if correct is not None:
+                    if q.allow_multiple_answers:
+                        def _normalize(value):
+                            if value in [None, '', []]:
+                                return []
+                            if isinstance(value, list):
+                                iterable = value
+                            else:
+                                iterable = [value]
+                            normalized = []
+                            for item in iterable:
+                                if item in [None, '']:
+                                    continue
+                                normalized.append(str(item))
+                            return normalized
+
+                        correct_values = set(_normalize(correct))
+                        given_values = set(_normalize(given))
+                        matched = bool(correct_values) and given_values == correct_values
+                    else:
+                        if isinstance(correct, list):
+                            for c in correct:
+                                if str(c) == str(given):
+                                    matched = True
+                                    break
+                        else:
+                            if str(correct) == str(given):
+                                matched = True
+
+                if matched:
+                    earned += float(q.points or 0)
+                    resp.points_awarded = q.points
+                else:
+                    resp.points_awarded = 0
+                resp.save(update_fields=['points_awarded'])
+            else:
+                # open-ended: cannot auto-grade; leave points_awarded null for manual review
+                resp.points_awarded = None
+                resp.save(update_fields=['points_awarded'])
+
+        self.score = earned
+        if total_points > 0:
+            self.percentage = round((earned / total_points) * 100, 2)
+        else:
+            self.percentage = None
+        self.save(update_fields=['score', 'percentage'])
+        return (self.score, self.percentage)
+
+
+class OnboardingAssessmentResponse(models.Model):
+    """Stores a single question response within an attempt."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    attempt = models.ForeignKey(OnboardingAssessmentAttempt, on_delete=models.CASCADE, related_name='responses')
+    question = models.ForeignKey(OnboardingAssessmentQuestion, on_delete=models.CASCADE)
+    # answer may be a string, index, or list depending on question type
+    answer = models.JSONField(null=True, blank=True)
+    points_awarded = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"Response {self.id} (Q: {self.question.id})"
 
 
 class OnboardingSubmission(models.Model):

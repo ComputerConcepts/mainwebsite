@@ -36,6 +36,10 @@ from .models import (
     JobPosting,
     OnboardingPDFForm,
     OnboardingPDFTask,
+    OnboardingAssessment,
+    OnboardingAssessmentQuestion,
+    OnboardingAssessmentAttempt,
+    OnboardingAssessmentResponse,
 )
 from .onboarding_emails import OnboardingEmailService
 from .views_onboarding_portal import _generate_offer_letter_pdf
@@ -381,6 +385,81 @@ def _handle_submission_post(request, submission, default_redirect_url):
         messages.success(request, "Offer letter details saved. Please sign to send to the candidate.")
         return redirect(redirect_url)
 
+    if action == 'grade_attempt':
+        attempt_id = request.POST.get('attempt_id')
+        if not attempt_id:
+            messages.error(request, "Missing attempt reference.")
+            return redirect(redirect_url)
+
+        try:
+            attempt = submission.invitation.assessment_attempts.get(id=attempt_id)
+        except OnboardingAssessmentAttempt.DoesNotExist:
+            messages.error(request, "Attempt not found.")
+            return redirect(redirect_url)
+
+        # Expect inputs like points_<response_id>
+        total_awarded = Decimal('0')
+        total_possible = Decimal('0')
+        responses = list(attempt.responses.select_related('question').all())
+        for resp in responses:
+            key = f'points_{resp.id}'
+            val = request.POST.get(key)
+            if val is None or val == '':
+                # leave as-is
+                pts = resp.points_awarded if resp.points_awarded is not None else None
+            else:
+                try:
+                    pts = Decimal(val)
+                except Exception:
+                    pts = None
+
+            if pts is not None:
+                resp.points_awarded = pts
+                resp.save(update_fields=['points_awarded'])
+                total_awarded += pts
+
+            # sum question points for percentage calc
+            try:
+                qpoints = Decimal(str(resp.question.points or 0))
+            except Exception:
+                qpoints = Decimal('0')
+            total_possible += qpoints
+
+        # Update attempt totals
+        attempt.score = total_awarded
+        if total_possible > 0:
+            attempt.percentage = round((total_awarded / total_possible) * 100, 2)
+        else:
+            attempt.percentage = None
+        attempt.save(update_fields=['score', 'percentage'])
+
+        messages.success(request, "Grades saved for the attempt.")
+        return redirect(redirect_url)
+
+    if action == 'reset_attempt':
+        attempt_id = request.POST.get('attempt_id')
+        if not attempt_id:
+            messages.error(request, "Missing attempt reference for reset.")
+            return redirect(redirect_url)
+
+        try:
+            attempt = submission.invitation.assessment_attempts.get(id=attempt_id)
+        except OnboardingAssessmentAttempt.DoesNotExist:
+            messages.error(request, "Attempt not found.")
+            return redirect(redirect_url)
+
+        # Delete responses and clear submission flags so candidate can retake
+        attempt.responses.all().delete()
+        attempt.completed_at = None
+        attempt.duration_seconds = None
+        attempt.score = None
+        attempt.percentage = None
+        attempt.is_submitted = False
+        attempt.save(update_fields=['completed_at', 'duration_seconds', 'score', 'percentage', 'is_submitted'])
+
+        messages.success(request, "Attempt has been reset; the candidate may retake the assessment.")
+        return redirect(redirect_url)
+
     if action == 'employer_sign_offer':
         if not offer_letter:
             messages.error(request, "Create the offer letter details before signing.")
@@ -537,6 +616,11 @@ def hr_onboarding_dashboard(request):
         submission_count=Count('onboardinginvitation__onboardingsubmission')
     ).order_by('-created_at')
 
+    # Assessments overview (for separate tab)
+    assessments = OnboardingAssessment.objects.filter(is_active=True).annotate(
+        question_count=Count('questions', filter=Q(questions__is_active=True))
+    ).order_by('-created_at')
+
     recent_pdf_tasks = OnboardingPDFTask.objects.filter(
         status__in=[
             OnboardingPDFTask.STATUS_SUBMITTED,
@@ -554,10 +638,94 @@ def hr_onboarding_dashboard(request):
         'recent_invitations': recent_invitations,
         'applicant_reviews': applicant_reviews,
         'forms': forms,
+        'assessments': assessments,
         'recent_pdf_tasks': recent_pdf_tasks,
     }
     
     return render(request, 'hr/onboarding/dashboard.html', context)
+
+
+@login_required
+def create_onboarding_assessment(request):
+    """Create the assessment shell (timing/attempt rules) before authoring questions."""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin']:
+            messages.error(request, "Access denied. HR permissions required.")
+            return redirect('employee_dashboard')
+    except Employee.DoesNotExist:
+        messages.error(request, "Employee profile not found.")
+        return redirect('employee_dashboard')
+
+    form_state = {}
+    if request.method == 'POST':
+        form_state = request.POST.copy()
+        title = request.POST.get('title', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_timed = request.POST.get('is_timed') == 'on'
+        time_limit_raw = (request.POST.get('time_limit_minutes') or '').strip()
+        allow_multiple = request.POST.get('allow_multiple_attempts') == 'on'
+        passing_score_raw = (request.POST.get('passing_score') or '').strip()
+
+        errors = []
+
+        if not title:
+            errors.append("Please provide a title for the assessment.")
+
+        time_limit_minutes = None
+        if is_timed:
+            if not time_limit_raw:
+                errors.append("Enter a time limit in minutes for a timed assessment.")
+            else:
+                try:
+                    time_limit_minutes = int(time_limit_raw)
+                    if time_limit_minutes <= 0:
+                        errors.append("Time limit must be greater than zero.")
+                except (TypeError, ValueError):
+                    errors.append("Time limit must be a whole number of minutes.")
+
+        passing_score = None
+        if passing_score_raw:
+            try:
+                passing_score = Decimal(passing_score_raw)
+            except (InvalidOperation, TypeError):
+                errors.append("Passing score must be a number between 0 and 100.")
+            else:
+                if passing_score < 0 or passing_score > 100:
+                    errors.append("Passing score must be between 0 and 100.")
+
+        form_state = {
+            'title': title,
+            'description': description,
+            'is_timed': is_timed,
+            'time_limit_minutes': time_limit_raw,
+            'allow_multiple_attempts': allow_multiple,
+            'passing_score': passing_score_raw,
+        }
+
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            return render(request, 'hr/onboarding/create_assessment.html', {'form_state': form_state})
+
+        assessment = OnboardingAssessment.objects.create(
+            title=title,
+            description=description,
+            created_by=request.user,
+            is_timed=is_timed,
+            time_limit_minutes=time_limit_minutes,
+            allow_multiple_attempts=allow_multiple,
+            passing_score=passing_score,
+        )
+        messages.success(request, f"Assessment '{assessment.title}' created. You can now add questions for it.")
+        # Redirect to the in-app form builder so HR can author questions in a familiar UI.
+        # The form builder will detect the `assessment_id` query parameter and present
+        # a suitable banner so questions can be associated with this assessment.
+        from django.urls import reverse
+        return redirect(reverse('create_onboarding_form') + f'?assessment_id={assessment.id}')
+
+    # GET -> render the create assessment form
+    return render(request, 'hr/onboarding/create_assessment.html', {'form_state': form_state})
 
 
 @login_required
@@ -575,6 +743,7 @@ def create_onboarding_employee(request):
 
     forms = OnboardingForm.objects.filter(is_active=True).order_by('title')
     pdf_forms = list(OnboardingPDFForm.objects.filter(is_active=True).order_by('title'))
+    assessments = list(OnboardingAssessment.objects.filter(is_active=True).order_by('title'))
     job_postings_qs = JobPosting.objects.filter(is_active=True).order_by('-created_at')[:25]
     job_postings = list(job_postings_qs)
 
@@ -594,6 +763,7 @@ def create_onboarding_employee(request):
         send_email = request.POST.get('send_email') == 'on'
         selected_form_ids = request.POST.getlist('form_ids')
         selected_pdf_ids = request.POST.getlist('pdf_form_ids')
+        selected_assessment_ids = request.POST.getlist('assessment_ids')
 
         form_state = {
             'email': email,
@@ -608,8 +778,9 @@ def create_onboarding_employee(request):
         errors = []
         if not email:
             errors.append("Email is required.")
-        if not selected_form_ids:
-            errors.append("Select at least one onboarding form to assign.")
+        # Require at least one item to assign: either a form, a PDF, or an assessment.
+        if not (selected_form_ids or selected_pdf_ids or selected_assessment_ids):
+            errors.append("Select at least one onboarding form, PDF, or assessment to assign.")
 
         valid_forms = {str(form.id): form for form in forms}
         invalid_forms = [form_id for form_id in selected_form_ids if form_id not in valid_forms]
@@ -620,6 +791,11 @@ def create_onboarding_employee(request):
         invalid_pdf_forms = [form_id for form_id in selected_pdf_ids if form_id not in pdf_form_lookup]
         if invalid_pdf_forms:
             errors.append("One or more selected PDF forms are unavailable. Please refresh and try again.")
+
+        assessment_lookup = {str(a.id): a for a in assessments}
+        invalid_assessments = [aid for aid in selected_assessment_ids if aid not in assessment_lookup]
+        if invalid_assessments:
+            errors.append("One or more selected assessments are unavailable. Please refresh and try again.")
 
         job_posting = None
         if job_posting_id:
@@ -636,10 +812,12 @@ def create_onboarding_employee(request):
                     {
                         'forms': forms,
                         'pdf_forms': pdf_forms,
+                            'assessments': assessments,
                         'job_postings': job_postings,
                         'form_state': form_state,
                         'selected_forms': selected_form_ids,
                         'selected_pdf_forms': selected_pdf_ids,
+                            'selected_assessments': selected_assessment_ids,
                     },
                 )
 
@@ -666,44 +844,92 @@ def create_onboarding_employee(request):
                 updated_count = 0
                 failed_emails = []
 
-                for form_id in selected_form_ids:
-                    onboarding_form = valid_forms.get(form_id)
-                    if not onboarding_form:
-                        continue
+                # If onboarding forms were selected, create one invitation per form (existing behavior).
+                if selected_form_ids:
+                    for form_id in selected_form_ids:
+                        onboarding_form = valid_forms.get(form_id)
+                        if not onboarding_form:
+                            continue
 
-                    invitation, invitation_created = OnboardingInvitation.objects.get_or_create(
-                        onboarding_form=onboarding_form,
-                        prospective_employee=prospective_employee,
-                        defaults={
-                            'sent_by': request.user,
-                            'custom_message': custom_message,
-                        },
-                    )
+                        invitation, invitation_created = OnboardingInvitation.objects.get_or_create(
+                            onboarding_form=onboarding_form,
+                            prospective_employee=prospective_employee,
+                            defaults={
+                                'sent_by': request.user,
+                                'custom_message': custom_message,
+                            },
+                        )
 
-                    if invitation_created:
-                        created_count += 1
-                    else:
-                        invitation.sent_by = request.user
-                        invitation.custom_message = custom_message
-                        update_fields = ['sent_by', 'custom_message']
+                        if invitation_created:
+                            created_count += 1
+                        else:
+                            invitation.sent_by = request.user
+                            invitation.custom_message = custom_message
+                            update_fields = ['sent_by', 'custom_message']
+                            if send_email:
+                                invitation.status = 'sent'
+                                update_fields.append('status')
+                            invitation.save(update_fields=update_fields)
+                            updated_count += 1
+
+                        selected_pdf_form_objects = [pdf_form_lookup[form_id] for form_id in selected_pdf_ids if form_id in pdf_form_lookup]
+                        _assign_pdf_tasks(
+                            invitation,
+                            selected_pdf_form_objects,
+                            request.user,
+                            deactivate_missing=True,
+                        )
+
+                        # Attach selected assessments to the invitation
+                        selected_assessment_objects = [assessment_lookup[aid] for aid in selected_assessment_ids if aid in assessment_lookup]
+                        if selected_assessment_objects:
+                            invitation.assessments.set(selected_assessment_objects)
+
                         if send_email:
-                            invitation.status = 'sent'
-                            update_fields.append('status')
-                        invitation.save(update_fields=update_fields)
-                        updated_count += 1
+                            success = OnboardingEmailService.send_onboarding_invitation(invitation, request)
+                            if not success:
+                                failed_emails.append(onboarding_form.title)
+                else:
+                    # No onboarding forms selected, but we validated earlier that at least
+                    # a PDF or an assessment was chosen. If assessments are selected but no
+                    # onboarding form is present, create a minimal 'Assessment Packet' form
+                    # to attach the assessments to so we can create an invitation.
+                    if selected_assessment_ids:
+                        temp_form = OnboardingForm.objects.create(
+                            title=f"Assessment Packet - {email}",
+                            description="Auto-generated assessment packet",
+                            created_by=request.user,
+                            allow_multiple_submissions=False,
+                            send_confirmation_email=False,
+                        )
 
-                    selected_pdf_form_objects = [pdf_form_lookup[form_id] for form_id in selected_pdf_ids if form_id in pdf_form_lookup]
-                    _assign_pdf_tasks(
-                        invitation,
-                        selected_pdf_form_objects,
-                        request.user,
-                        deactivate_missing=True,
-                    )
+                        invitation = OnboardingInvitation.objects.create(
+                            onboarding_form=temp_form,
+                            prospective_employee=prospective_employee,
+                            sent_by=request.user,
+                            custom_message=custom_message,
+                        )
+                        created_count += 1
 
-                    if send_email:
-                        success = OnboardingEmailService.send_onboarding_invitation(invitation, request)
-                        if not success:
-                            failed_emails.append(onboarding_form.title)
+                        selected_pdf_form_objects = [pdf_form_lookup[form_id] for form_id in selected_pdf_ids if form_id in pdf_form_lookup]
+                        _assign_pdf_tasks(
+                            invitation,
+                            selected_pdf_form_objects,
+                            request.user,
+                            deactivate_missing=True,
+                        )
+
+                        selected_assessment_objects = [assessment_lookup[aid] for aid in selected_assessment_ids if aid in assessment_lookup]
+                        if selected_assessment_objects:
+                            invitation.assessments.set(selected_assessment_objects)
+
+                        if send_email:
+                            success = OnboardingEmailService.send_onboarding_invitation(invitation, request)
+                            if not success:
+                                failed_emails.append(temp_form.title)
+                    else:
+                        # No forms and no assessments — but this branch shouldn't be hit due to earlier validation.
+                        pass
 
                 if created:
                     messages.success(
@@ -760,11 +986,13 @@ def create_onboarding_employee(request):
             'hr/onboarding/create_employee_wizard.html',
             {
                 'forms': forms,
-                'pdf_forms': pdf_forms,
+                    'pdf_forms': pdf_forms,
+                    'assessments': assessments,
                 'job_postings': job_postings,
                 'form_state': form_state,
                 'selected_forms': selected_forms,
-                'selected_pdf_forms': selected_pdf_forms,
+                    'selected_pdf_forms': selected_pdf_forms,
+                    'selected_assessments': [value for value in request.GET.getlist('assessment_ids') if value],
             },
         )
 
@@ -774,6 +1002,7 @@ def create_onboarding_employee(request):
         {
             'forms': forms,
             'pdf_forms': pdf_forms,
+            'assessments': assessments,
             'job_postings': job_postings,
             'form_state': {
                 'first_name': '',
@@ -786,6 +1015,7 @@ def create_onboarding_employee(request):
             },
             'selected_forms': [],
             'selected_pdf_forms': [],
+            'selected_assessments': [],
         },
     )
 
@@ -847,11 +1077,200 @@ def create_onboarding_form(request):
             }, status=400)
     
     # Field type choices for the form builder
-    field_types = OnboardingFormField.FIELD_TYPES
-    
+    field_types = list(OnboardingFormField.FIELD_TYPES)
+
+    # If an assessment_id is provided, fetch it and include in the context so the
+    # template can display a banner or take other UI cues (the builder currently
+    # does not auto-save assessment questions - additional wiring can be added
+    # later to POST questions to an assessment-specific endpoint).
+    assessment = None
+    assessment_id = request.GET.get('assessment_id')
+    assessment_active_questions = None
+    assessment_questions_json = None
+    if assessment_id:
+        try:
+            assessment = OnboardingAssessment.objects.filter(id=assessment_id).first()
+            # If we have an assessment, serialize its questions for the builder JS
+            if assessment:
+                # Restrict the field palette when authoring assessment questions
+                field_types = [
+                    ('radio', 'Multiple Choice (single answer)'),
+                    ('checkbox', 'Multiple Choice (select all that apply)'),
+                    ('textarea', 'Open Ended Response'),
+                ]
+                questions_qs = assessment.questions.filter(is_active=True).order_by('order')
+                assessment_active_questions = list(questions_qs)
+                assessment_questions = []
+                for q in questions_qs:
+                    assessment_questions.append({
+                        'id': str(q.id),
+                        'question_text': q.question_text,
+                        'question_type': q.question_type,
+                        'allow_multiple_answers': q.allow_multiple_answers,
+                        'field_type': 'checkbox' if q.allow_multiple_answers else ('radio' if q.question_type == 'mcq' else 'textarea'),
+                        'choices': q.choices or [],
+                        'correct_answer': q.correct_answer,
+                        'points': float(q.points) if q.points is not None else None,
+                        'order': q.order,
+                    })
+                assessment_questions_json = json.dumps(assessment_questions)
+        except Exception:
+            assessment = None
     return render(request, 'hr/onboarding/create_form.html', {
-        'field_types': field_types
+        'field_types': field_types,
+        'assessment': assessment,
+        'assessment_questions_json': assessment_questions_json if assessment is not None else None,
+        'assessment_active_questions': assessment_active_questions,
     })
+
+
+@login_required
+@require_http_methods(["POST"])
+def save_assessment_questions(request, assessment_id):
+    """Accept builder JSON and persist as OnboardingAssessmentQuestion records.
+
+    Expected payload: { fields: [ { field_type, field_name, field_label, field_options, assessment_question_id?, assessment_points, order }, ... ] }
+    """
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin']:
+            return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+    except Employee.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Employee profile not found'}, status=403)
+
+    assessment = get_object_or_404(OnboardingAssessment, id=assessment_id)
+
+    try:
+        payload = json.loads(request.body)
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Invalid JSON payload'}, status=400)
+
+    fields = payload.get('fields', [])
+
+    try:
+        with transaction.atomic():
+            existing = {str(q.id): q for q in assessment.questions.all()}
+            incoming_ids = []
+
+            for f in fields:
+                aq_id = f.get('assessment_question_id') or f.get('id')
+                question_text = f.get('field_label') or f.get('question_text') or ''
+                # map builder field types to assessment question types
+                ft = (f.get('field_type') or '').strip()
+                if ft in ['radio', 'select', 'checkbox'] or f.get('field_options'):
+                    qtype = 'mcq'
+                else:
+                    qtype = 'open'
+
+                raw_choices = f.get('field_options') if qtype == 'mcq' else []
+                choices = [str(choice) for choice in raw_choices] if raw_choices else []
+                points_raw = f.get('assessment_points', 1)
+                try:
+                    points = Decimal(str(points_raw))
+                except (InvalidOperation, TypeError, ValueError):
+                    points = Decimal('1')
+                # correct_answer may be an index or list of indices for MCQ, or None
+                correct_answer = f.get('correct_answer') if 'correct_answer' in f else f.get('correctAnswer') if 'correctAnswer' in f else None
+                if correct_answer is not None:
+                    if isinstance(correct_answer, list):
+                        processed = []
+                        for item in correct_answer:
+                            try:
+                                processed.append(int(item))
+                            except (TypeError, ValueError):
+                                continue
+                        correct_answer = processed
+                    else:
+                        try:
+                            correct_answer = int(correct_answer)
+                        except (TypeError, ValueError):
+                            correct_answer = None
+                order = int(f.get('order') or 0)
+                allow_multiple = bool(f.get('allow_multiple_answers')) or ft == 'checkbox'
+                if qtype != 'mcq':
+                    allow_multiple = False
+
+                if aq_id and str(aq_id) in existing:
+                    q = existing[str(aq_id)]
+                    q.question_text = question_text
+                    q.question_type = qtype
+                    q.choices = choices
+                    q.points = points
+                    q.correct_answer = correct_answer
+                    q.order = order
+                    q.allow_multiple_answers = allow_multiple
+                    q.is_active = True
+                    q.save()
+                else:
+                    q = OnboardingAssessmentQuestion.objects.create(
+                        assessment=assessment,
+                        question_text=question_text,
+                        question_type=qtype,
+                        choices=choices or [],
+                        correct_answer=correct_answer,
+                        allow_multiple_answers=allow_multiple,
+                        points=points,
+                        order=order,
+                        is_active=True,
+                    )
+
+                incoming_ids.append(str(q.id))
+
+            # Deactivate any questions not included in the incoming payload
+            for qid, qobj in existing.items():
+                if qid not in incoming_ids:
+                    qobj.is_active = False
+                    qobj.save(update_fields=['is_active'])
+
+        return JsonResponse({'success': True, 'message': 'Assessment questions saved', 'assessment_id': str(assessment.id)})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+
+
+@login_required
+@require_http_methods(["POST"])
+def preview_assessment(request, assessment_id):
+    """Create a temporary invitation and return a preview URL for the assessment."""
+    try:
+        employee = Employee.objects.get(user=request.user)
+        if employee.department != 'HR' and employee.role not in ['admin', 'super_admin']:
+            return JsonResponse({'success': False, 'message': 'Access denied'}, status=403)
+    except Employee.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'Employee profile not found'}, status=403)
+
+    assessment = get_object_or_404(OnboardingAssessment, id=assessment_id)
+
+    # Create a lightweight OnboardingForm shell for preview
+    preview_form = OnboardingForm.objects.create(
+        title=f"Preview - {assessment.title}",
+        description=assessment.description or 'Preview form',
+        form_fields={},
+        created_by=request.user,
+        allow_multiple_submissions=False,
+        send_confirmation_email=False,
+    )
+
+    # Create a temporary ProspectiveEmployee used only for preview
+    temp_email = f"preview+{uuid.uuid4().hex}@example.local"
+    prospect = ProspectiveEmployee.objects.create(
+        email=temp_email,
+        first_name='Preview',
+        last_name='User',
+        created_by=request.user,
+    )
+
+    # Create invitation and attach the assessment
+    invitation = OnboardingInvitation.objects.create(
+        onboarding_form=preview_form,
+        prospective_employee=prospect,
+        sent_by=request.user,
+        custom_message='Preview invitation',
+    )
+    invitation.assessments.add(assessment)
+
+    preview_url = reverse('onboarding_assessment', kwargs={'invitation_id': invitation.id, 'assessment_id': assessment.id})
+    return JsonResponse({'success': True, 'preview_url': preview_url})
 
 
 @login_required
@@ -1092,7 +1511,7 @@ def edit_onboarding_form(request, form_id):
             'order': field.order
         })
     
-    field_types = OnboardingFormField.FIELD_TYPES
+    field_types = list(OnboardingFormField.FIELD_TYPES)
     
     return render(request, 'hr/onboarding/edit_form.html', {
         'form': form,
@@ -1491,6 +1910,12 @@ def submission_detail(request, submission_id):
         'reviewed_by',
     ).order_by('pdf_form__title')
 
+    # Load any assessment attempts associated with this invitation so HR can review them
+    assessment_attempts_qs = submission.invitation.assessment_attempts.select_related('assessment').prefetch_related(
+        'responses__question'
+    ).order_by('-started_at')
+
+
     context = {
         'submission': submission,
         'form_display_data': form_display_data,
@@ -1507,6 +1932,7 @@ def submission_detail(request, submission_id):
         'offer_letter_preview_url': offer_letter_context.get('preview_url', ''),
         'pdf_tasks': pdf_tasks,
         'pdf_status_choices': OnboardingPDFTask.STATUS_CHOICES,
+        'assessment_attempts': assessment_attempts_qs,
     }
     context.update(offer_letter_context)
     

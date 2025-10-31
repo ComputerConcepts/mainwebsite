@@ -239,6 +239,40 @@
                     </div>
                     {% endif %}
                 </div>
+                
+                <div class="mt-5">
+                    <h5 class="fw-semibold mb-3">
+                        <i class="fas fa-clipboard-list me-2 text-info"></i>Assessments
+                    </h5>
+                    <p class="text-muted mb-3">
+                        Optionally assign an assessment to evaluate the candidate. Assessments can be timed and include multiple choice or open-ended questions.
+                    </p>
+                    {% if assessments %}
+                    <div class="row g-3">
+                        {% for assessment in assessments %}
+                        <div class="col-md-6">
+                            <label class="form-card d-flex align-items-start">
+                                <input type="checkbox" name="assessment_ids" value="{{ assessment.id }}"
+                                       {% if assessment.id|stringformat:"s" in selected_assessments %}checked{% endif %}>
+                                <div>
+                                    <div class="fw-semibold">{{ assessment.title }}</div>
+                                    <div class="text-muted small mt-1">
+                                        {{ assessment.description|default:"No description provided."|truncatechars:160 }}
+                                    </div>
+                                    {% if assessment.is_timed %}
+                                    <div class="text-muted small mt-1"><i class="fas fa-stopwatch me-1"></i>Timed — {{ assessment.time_limit_minutes }} minutes</div>
+                                    {% endif %}
+                                </div>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-light border">
+                        <i class="fas fa-info-circle me-1"></i>No assessments are active. Create one in the Assessments manager.
+                    </div>
+                    {% endif %}
+                </div>
             </div>
 
             <div class="wizard-step" data-step="3">
@@ -263,6 +297,11 @@
                             <h5 class="fw-semibold mb-3">PDF Attachments</h5>
                             <ul id="summary-pdf-forms">
                                 <li>No PDF documents attached.</li>
+                            </ul>
+                            <hr>
+                            <h5 class="fw-semibold mb-3">Assigned Assessments</h5>
+                            <ul id="summary-assessments">
+                                <li>No assessments assigned.</li>
                             </ul>
                         </div>
                     </div>
@@ -377,6 +416,24 @@
                 const item = document.createElement('li');
                 item.textContent = title;
                 pdfList.appendChild(item);
+            });
+        }
+
+        // Assessments
+        const assessList = document.getElementById('summary-assessments');
+        const checkedAssess = Array.from(form.querySelectorAll('input[name="assessment_ids"]:checked'));
+        assessList.innerHTML = '';
+        if (!checkedAssess.length) {
+            const item = document.createElement('li');
+            item.textContent = 'No assessments assigned.';
+            assessList.appendChild(item);
+        } else {
+            checkedAssess.forEach(input => {
+                const label = input.closest('.form-card');
+                const title = label ? label.querySelector('.fw-semibold').textContent.trim() : input.value;
+                const item = document.createElement('li');
+                item.textContent = title;
+                assessList.appendChild(item);
             });
         }
     }

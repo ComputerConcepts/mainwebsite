@@ -8,6 +8,10 @@ from .models import (
     FileFolder, FileDocument, FileVersion, FileShare, FileActivity,
     BoardShare, BoardActivity
 )
+from .models import (
+    OnboardingAssessment, OnboardingAssessmentQuestion,
+    OnboardingAssessmentAttempt, OnboardingAssessmentResponse
+)
 
 @admin.register(ContactForm)
 class ContactFormAdmin(admin.ModelAdmin):
@@ -399,25 +403,25 @@ class EmployeeAdmin(admin.ModelAdmin):
         
         messages.success(request, f'Email verified for {employee.user.email}')
         return redirect('admin:pages_employee_change', employee_id)
-    
+
     def unverify_employee_email_view(self, request, employee_id):
         """Custom view to unverify employee email"""
         from django.shortcuts import get_object_or_404, redirect
         from django.contrib import messages
         import secrets
-        
+
         if not request.user.is_superuser:
             messages.error(request, 'Only superusers can unverify emails.')
             return redirect('admin:pages_employee_changelist')
-        
+
         employee = get_object_or_404(Employee, id=employee_id)
         employee.is_email_verified = False
         employee.email_verification_token = secrets.token_urlsafe(32)
         employee.save()
-        
+
         messages.success(request, f'Email unverified for {employee.user.email}. New verification token generated.')
         return redirect('admin:pages_employee_change', employee_id)
-    
+
     def send_verification_email_view(self, request, employee_id):
         """Custom view to send verification email"""
         from django.shortcuts import get_object_or_404, redirect
@@ -427,21 +431,21 @@ class EmployeeAdmin(admin.ModelAdmin):
         from django.template.loader import render_to_string
         from django.conf import settings
         import secrets
-        
+
         if not request.user.is_superuser:
             messages.error(request, 'Only superusers can send verification emails.')
             return redirect('admin:pages_employee_changelist')
-        
+
         employee = get_object_or_404(Employee, id=employee_id)
-        
+
         if employee.is_email_verified:
             messages.warning(request, f'{employee.user.email} is already verified.')
             return redirect('admin:pages_employee_change', employee_id)
-        
+
         # Generate new token
         employee.email_verification_token = secrets.token_urlsafe(32)
         employee.save()
-        
+
         # Send verification email
         current_site = get_current_site(request)
         subject = 'Verify Your Computer Concepts Employee Account'
@@ -451,7 +455,7 @@ class EmployeeAdmin(admin.ModelAdmin):
             'protocol': 'https' if request.is_secure() else 'http',
             'token': employee.email_verification_token,
         })
-        
+
         try:
             send_mail(
                 subject,
@@ -464,8 +468,37 @@ class EmployeeAdmin(admin.ModelAdmin):
             messages.success(request, f'Verification email sent to {employee.user.email}')
         except Exception as e:
             messages.error(request, f'Failed to send email to {employee.user.email}: {str(e)}')
-        
+
         return redirect('admin:pages_employee_change', employee_id)
+
+
+# Simple admin registrations for onboarding assessments
+@admin.register(OnboardingAssessment)
+class OnboardingAssessmentAdmin(admin.ModelAdmin):
+    list_display = ['title', 'created_by', 'is_active', 'is_timed', 'time_limit_minutes', 'created_at']
+    search_fields = ['title', 'description']
+    list_filter = ['is_active', 'is_timed', 'created_at']
+
+
+@admin.register(OnboardingAssessmentQuestion)
+class OnboardingAssessmentQuestionAdmin(admin.ModelAdmin):
+    list_display = ['assessment', 'question_text', 'question_type', 'points', 'order', 'is_active']
+    search_fields = ['question_text']
+    list_filter = ['question_type', 'is_active']
+
+
+@admin.register(OnboardingAssessmentAttempt)
+class OnboardingAssessmentAttemptAdmin(admin.ModelAdmin):
+    list_display = ['assessment', 'invitation', 'started_at', 'completed_at', 'score', 'percentage', 'is_submitted']
+    search_fields = ['assessment__title', 'invitation__prospective_employee__email']
+    list_filter = ['is_submitted', 'started_at']
+
+
+@admin.register(OnboardingAssessmentResponse)
+class OnboardingAssessmentResponseAdmin(admin.ModelAdmin):
+    list_display = ['attempt', 'question', 'answer', 'points_awarded']
+    search_fields = ['question__question_text']
+    
 
 
 # Custom User Admin with Employee Integration

@@ -146,6 +146,38 @@
     .action-btn.secondary:hover {
         box-shadow: 0 5px 15px rgba(240, 147, 251, 0.4);
     }
+
+    /* Improve visibility for the tab labels and panels */
+    .nav-tabs .nav-link {
+        color: #374151; /* slate-700 */
+        background: #f8fafc; /* very light */
+        border: 1px solid #e5e7eb;
+        margin-right: 6px;
+        border-bottom: none;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+        padding: 10px 14px;
+        font-weight: 600;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #ffffff;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-color: #667eea;
+        box-shadow: 0 6px 18px rgba(102,126,234,0.12);
+    }
+
+    .nav-tabs .nav-link:hover {
+        color: #0f172a; /* darker on hover */
+        background: #eef2ff;
+    }
+
+    .tab-pane {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 18px;
+    }
 </style>
 {% endblock %}
 
@@ -173,6 +205,9 @@
         </a>
         <a href="{% url 'send_onboarding_invitation' %}" class="action-btn secondary">
             <i class="fas fa-paper-plane"></i> Send Invitation
+        </a>
+        <a href="{% url 'create_onboarding_assessment' %}" class="action-btn">
+            <i class="fas fa-clipboard-list"></i> Create Assessment
         </a>
         <a href="{% url 'onboarding_submissions' %}" class="action-btn">
             <i class="fas fa-inbox"></i> View Submissions
@@ -398,50 +433,110 @@
         </div>
     </div>
     
-    <!-- Forms Overview -->
+    <!-- Forms & Assessments Tabs -->
     <div class="row mt-4">
         <div class="col-12">
-            <h4 class="mb-3">Onboarding Forms</h4>
-            <div class="forms-grid">
-                {% for form in forms %}
-                <div class="form-card">
-                    <h5 class="mb-3">{{ form.title }}</h5>
-                    <p class="text-muted mb-3">{{ form.description|truncatechars:100 }}</p>
-                    
-                    <div class="row text-center mb-3">
-                        <div class="col-6">
-                            <div class="stat-number" style="font-size: 1.5rem; color: #667eea;">{{ form.invitation_count }}</div>
-                            <small class="text-muted">Invitations</small>
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="forms-tab" data-bs-toggle="tab" data-bs-target="#forms-tab-pane" type="button" role="tab">Onboarding Forms</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="assessments-tab" data-bs-toggle="tab" data-bs-target="#assessments-tab-pane" type="button" role="tab">Assessments</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="forms-tab-pane" role="tabpanel" aria-labelledby="forms-tab">
+                    <div class="forms-grid">
+                        {% for form in forms %}
+                        <div class="form-card">
+                            <h5 class="mb-3">{{ form.title }}</h5>
+                            <p class="text-muted mb-3">{{ form.description|truncatechars:100 }}</p>
+
+                            <div class="row text-center mb-3">
+                                <div class="col-6">
+                                    <div class="stat-number" style="font-size: 1.5rem; color: #667eea;">{{ form.invitation_count }}</div>
+                                    <small class="text-muted">Invitations</small>
+                                </div>
+                                <div class="col-6">
+                                    <div class="stat-number" style="font-size: 1.5rem; color: #f5576c;">{{ form.submission_count }}</div>
+                                    <small class="text-muted">Submissions</small>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'edit_onboarding_form' form.id %}" class="btn btn-sm btn-outline-primary flex-fill">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <a href="{% url 'send_onboarding_invitation' %}?form={{ form.id }}" class="btn btn-sm btn-outline-success flex-fill">
+                                    <i class="fas fa-paper-plane"></i> Send
+                                </a>
+                            </div>
+
+                            <div class="mt-2 text-muted small">
+                                Created {{ form.created_at|timesince }} ago by {{ form.created_by.get_full_name }}
+                            </div>
                         </div>
-                        <div class="col-6">
-                            <div class="stat-number" style="font-size: 1.5rem; color: #f5576c;">{{ form.submission_count }}</div>
-                            <small class="text-muted">Submissions</small>
+                        {% empty %}
+                        <div class="col-12 text-center py-5">
+                            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No onboarding forms yet</h5>
+                            <p class="text-muted">Create your first onboarding form to get started.</p>
+                            <a href="{% url 'create_onboarding_form' %}" class="action-btn">
+                                <i class="fas fa-plus"></i> Create First Form
+                            </a>
                         </div>
-                    </div>
-                    
-                    <div class="d-flex gap-2">
-                        <a href="{% url 'edit_onboarding_form' form.id %}" class="btn btn-sm btn-outline-primary flex-fill">
-                            <i class="fas fa-edit"></i> Edit
-                        </a>
-                        <a href="{% url 'send_onboarding_invitation' %}?form={{ form.id }}" class="btn btn-sm btn-outline-success flex-fill">
-                            <i class="fas fa-paper-plane"></i> Send
-                        </a>
-                    </div>
-                    
-                    <div class="mt-2 text-muted small">
-                        Created {{ form.created_at|timesince }} ago by {{ form.created_by.get_full_name }}
+                        {% endfor %}
                     </div>
                 </div>
-                {% empty %}
-                <div class="col-12 text-center py-5">
-                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
-                    <h5 class="text-muted">No onboarding forms yet</h5>
-                    <p class="text-muted">Create your first onboarding form to get started.</p>
-                    <a href="{% url 'create_onboarding_form' %}" class="action-btn">
-                        <i class="fas fa-plus"></i> Create First Form
-                    </a>
+
+                <div class="tab-pane fade" id="assessments-tab-pane" role="tabpanel" aria-labelledby="assessments-tab">
+                    <div class="forms-grid">
+                        {% for assessment in assessments %}
+                        <div class="form-card">
+                            <h5 class="mb-3">{{ assessment.title }}</h5>
+                            <p class="text-muted mb-3">{{ assessment.description|truncatechars:120 }}</p>
+
+                            <div class="row text-center mb-3">
+                                <div class="col-6">
+                                    <div class="stat-number" style="font-size: 1.25rem; color: #667eea;">{% if assessment.time_limit_minutes %}{{ assessment.time_limit_minutes }} min{% else %}Untimed{% endif %}</div>
+                                    <small class="text-muted">Duration</small>
+                                </div>
+                                <div class="col-6">
+                                    <div class="stat-number" style="font-size: 1.25rem; color: #f093fb;">{{ assessment.question_count|default:0 }}</div>
+                                    <small class="text-muted">Questions</small>
+                                </div>
+                            </div>
+                            <div class="status-chip mb-2">
+                                <i class="fas fa-sync"></i>
+                                {% if assessment.allow_multiple_attempts %}Multiple attempts allowed{% else %}Single attempt{% endif %}
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'create_onboarding_form' %}?assessment_id={{ assessment.id }}" class="btn btn-sm btn-outline-primary flex-fill">
+                                    <i class="fas fa-edit"></i> Edit Questions
+                                </a>
+                                <a href="{% url 'create_onboarding_employee' %}?assessment_ids={{ assessment.id }}" class="btn btn-sm btn-outline-success flex-fill">
+                                    <i class="fas fa-paper-plane"></i> Send
+                                </a>
+                            </div>
+
+                            <div class="mt-2 text-muted small">
+                                Created {{ assessment.created_at|timesince }} ago by {{ assessment.created_by.get_full_name }}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12 text-center py-5">
+                            <i class="fas fa-question-circle fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No assessments yet</h5>
+                            <p class="text-muted">Create an assessment to test candidates.</p>
+                            <a href="{% url 'create_onboarding_assessment' %}" class="action-btn">
+                                <i class="fas fa-plus"></i> Create Assessment
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
-                {% endfor %}
             </div>
         </div>
     </div>

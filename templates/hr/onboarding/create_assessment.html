@@ -1,0 +1,72 @@
+{% extends 'employee/base.html' %}
+{% load static %}
+
+{% block title %}Create Assessment{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="card p-4">
+        <h3 class="mb-2">Create New Assessment</h3>
+        <p class="text-muted mb-4">
+            Configure timing and scoring preferences below. After saving you'll be redirected to the in-app question builder to add multiple-choice or open-ended questions.
+        </p>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input type="text" name="title" class="form-control" value="{{ form_state.title|default:'' }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-control" rows="3">{{ form_state.description|default:'' }}</textarea>
+            </div>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="is_timed" id="is_timed" {% if form_state.is_timed %}checked{% endif %}>
+                <label class="form-check-label" for="is_timed">Timed assessment</label>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Time limit (minutes)</label>
+                <input type="number" name="time_limit_minutes" id="time_limit_minutes" class="form-control" value="{{ form_state.time_limit_minutes|default:'' }}" min="1" {% if not form_state.is_timed %}disabled{% endif %}>
+                <div class="form-text">Only required when the assessment is timed.</div>
+            </div>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="allow_multiple_attempts" id="allow_multiple_attempts" {% if form_state.allow_multiple_attempts %}checked{% endif %}>
+                <label class="form-check-label" for="allow_multiple_attempts">Allow multiple attempts</label>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Passing score (percentage, optional)</label>
+                <input type="text" name="passing_score" class="form-control" value="{{ form_state.passing_score|default:'' }}">
+                <div class="form-text">Leave blank for assessments that are reviewed manually.</div>
+            </div>
+
+            <div class="d-flex justify-content-end">
+                <a href="{% url 'hr_onboarding_dashboard' %}" class="btn btn-secondary me-2">Cancel</a>
+                <button type="submit" class="btn btn-primary">Create Assessment</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const timedToggle = document.getElementById('is_timed');
+    const timeInput = document.getElementById('time_limit_minutes');
+    function syncTimeState() {
+        if (!timedToggle.checked) {
+            timeInput.value = '';
+            timeInput.setAttribute('disabled', 'disabled');
+        } else {
+            timeInput.removeAttribute('disabled');
+            timeInput.focus();
+        }
+    }
+    if (timedToggle && timeInput) {
+        timedToggle.addEventListener('change', syncTimeState);
+        syncTimeState();
+    }
+});
+</script>
+{% endblock %}

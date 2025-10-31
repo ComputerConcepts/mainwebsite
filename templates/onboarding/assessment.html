@@ -1,0 +1,77 @@
+{% extends 'onboarding/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="card p-4">
+        <h3>{{ assessment.title }}</h3>
+        {% if assessment.description %}<p class="text-muted">{{ assessment.description }}</p>{% endif %}
+        {% if assessment.is_timed and assessment.time_limit_minutes %}
+        <div class="alert alert-info">This assessment is timed: <strong id="time-remaining">{{ assessment.time_limit_minutes }}:00</strong></div>
+        {% endif %}
+
+        <form method="post" id="assessment-form">
+            {% csrf_token %}
+            <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
+
+            {% for q in questions %}
+            <div class="mb-4">
+                <div class="fw-semibold">Q{{ forloop.counter }}. {{ q.question_text }}</div>
+                {% if q.question_type == 'mcq' %}
+                    {% if q.allow_multiple_answers %}
+                        {% for choice in q.choices %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="q_{{ q.id }}" id="q_{{ q.id }}_{{ forloop.counter0 }}" value="{{ forloop.counter0 }}">
+                            <label class="form-check-label" for="q_{{ q.id }}_{{ forloop.counter0 }}">{{ choice }}</label>
+                        </div>
+                        {% endfor %}
+                        <div class="form-text small text-muted">Select all that apply.</div>
+                    {% else %}
+                        {% for choice in q.choices %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="q_{{ q.id }}" id="q_{{ q.id }}_{{ forloop.counter0 }}" value="{{ forloop.counter0 }}">
+                            <label class="form-check-label" for="q_{{ q.id }}_{{ forloop.counter0 }}">{{ choice }}</label>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                {% else %}
+                    <textarea class="form-control" name="q_{{ q.id }}" rows="4"></textarea>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <div class="d-flex justify-content-end">
+                <a href="{% url 'onboarding_dashboard' %}" class="btn btn-secondary me-2">Cancel</a>
+                <button type="submit" class="btn btn-primary">Submit Assessment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if assessment.is_timed and assessment.time_limit_minutes %}
+<script>
+(function(){
+    const totalSeconds = {{ assessment.time_limit_minutes|default:0 }} * 60;
+    let remaining = totalSeconds;
+    const display = document.getElementById('time-remaining');
+    const form = document.getElementById('assessment-form');
+
+    function formatTime(sec){
+        const m = Math.floor(sec/60).toString().padStart(2,'0');
+        const s = (sec%60).toString().padStart(2,'0');
+        return `${m}:${s}`;
+    }
+
+    const timer = setInterval(()=>{
+        remaining -= 1;
+        display.textContent = formatTime(remaining);
+        if(remaining <= 0){
+            clearInterval(timer);
+            // auto-submit
+            form.submit();
+        }
+    }, 1000);
+})();
+</script>
+{% endif %}
+{% endblock %}
