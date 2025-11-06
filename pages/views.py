@@ -390,10 +390,11 @@ def forgotPassword(request):
             
         # Send password reset email
         current_site = get_current_site(request)
+        domain_for_links = getattr(settings, 'SITE_DOMAIN', '').strip() or current_site.domain
         subject = 'Set Up Your Computer Concepts Account'
         message = render_to_string('email/PasswordReset.html', {
             'user': user,
-            'domain': current_site.domain,
+            'domain': domain_for_links,
             'uid': urlsafe_base64_encode(force_bytes(user.pk)),
             'token': default_token_generator.make_token(user),
             'protocol': 'https' if request.is_secure() else 'http',
