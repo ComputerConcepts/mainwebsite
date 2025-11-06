@@ -43,7 +43,23 @@ from .models import (
 
 def is_tax_staff(user):
     """Check if user is tax preparation staff"""
-    return user.is_staff or user.groups.filter(name='Tax Preparers').exists()
+    if not user.is_authenticated:
+        return False
+
+    if user.is_staff or user.groups.filter(name='Tax Preparers').exists():
+        return True
+
+    employee = getattr(user, 'employee', None)
+    if not employee:
+        return False
+
+    # Allow managers/admins and anyone explicitly in a tax department/role
+    if getattr(employee, 'role', '') in ['manager', 'admin', 'super_admin']:
+        return True
+
+    department = (getattr(employee, 'department', '') or '').lower()
+    position = (getattr(employee, 'position', '') or '').lower()
+    return 'tax' in department or 'tax' in position
 
 def is_employee(user):
     """Check if user is an employee (for accessing admin features)"""

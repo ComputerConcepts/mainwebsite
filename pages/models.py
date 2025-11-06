@@ -139,6 +139,7 @@ class Employee(models.Model):
         ('Marketing', 'Marketing'),
         ('Sales', 'Sales'),
         ('Operations', 'Operations'),
+        ('Tax', 'Tax'),
         ('Management', 'Management'),
         ('Other', 'Other'),
     ]
@@ -249,12 +250,26 @@ class Employee(models.Model):
     @staticmethod
     def _format_bytes(bytes_value):
         """Format bytes into human-readable string"""
-        if bytes_value == 0:
-            return "0 B"
-        
-        size_names = ["B", "KB", "MB", "GB", "TB"]
         import math
+
+        if bytes_value is None:
+            return "0 B"
+        if isinstance(bytes_value, (int, float)):
+            if math.isinf(bytes_value):
+                return "Unlimited"
+            if bytes_value <= 0:
+                return "0 B"
+        else:
+            try:
+                bytes_value = float(bytes_value)
+            except (TypeError, ValueError):
+                return "0 B"
+            if math.isinf(bytes_value) or bytes_value <= 0:
+                return "0 B"
+
+        size_names = ["B", "KB", "MB", "GB", "TB"]
         i = int(math.floor(math.log(bytes_value, 1024)))
+        i = min(i, len(size_names) - 1)
         p = math.pow(1024, i)
         s = round(bytes_value / p, 2)
         return f"{s} {size_names[i]}"
