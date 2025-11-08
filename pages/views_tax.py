@@ -727,6 +727,7 @@ def employee_fill_form(request, assignment_id):
         'form_fields': form_fields,
         'submission': submission,
         'is_employee_filling': True,
+        'enforce_field_requirements': False,
     }
     
     return render(request, 'tax/admin/employee_fill_form.html', context)

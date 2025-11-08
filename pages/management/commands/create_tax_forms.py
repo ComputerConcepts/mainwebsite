@@ -305,18 +305,26 @@ class Command(BaseCommand):
         fields_data.extend([
             {'section': 'Additional Information', 'type': 'section_header', 'name': 'additional_header', 'label': 'NON-STANDARD DEPENDENTS (Grandchild, niece, nephew, stepchild, foster child, etc.)'},
             {'section': 'Additional Information', 'type': 'textarea', 'name': 'non_standard_dependents', 'label': 'List any non-standard dependents and care details'},
+            {'section': 'Additional Information', 'type': 'textarea', 'name': 'parents_not_claiming_reason', 'label': "Why aren't parents claiming the child?"},
+            {'section': 'Additional Information', 'type': 'text', 'name': 'child_residency_duration', 'label': 'How long has the child lived with you?'},
             {'section': 'Additional Information', 'type': 'yes_no', 'name': 'court_custody', 'label': 'Do you have Court documentation of custody?'},
-            {'section': 'Additional Information', 'type': 'text', 'name': 'custody_location', 'label': 'Where do they live?'},
-            {'section': 'Additional Information', 'type': 'yes_no', 'name': 'child_relationship', 'label': 'What is your relationship to child?'},
-            {'section': 'Additional Information', 'type': 'yes_no', 'name': 'filing_return', 'label': 'Why are they not filing their return?'},
-            {'section': 'Additional Information', 'type': 'yes_no', 'name': 'claim_dependent', 'label': 'Can anyone else claim this dependent?'},
+            {'section': 'Additional Information', 'type': 'yes_no', 'name': 'child_relationship', 'label': 'Do you have documentation to prove your relationship to the child?'},
+            
+            # Adult dependents follow-up
+            {'section': 'Adult Dependents', 'type': 'section_header', 'name': 'adult_dependents_header', 'label': 'ADULT DEPENDENTS'},
+            {'section': 'Adult Dependents', 'type': 'text', 'name': 'adult_dependent_name', 'label': 'Who is the dependent?'},
+            {'section': 'Adult Dependents', 'type': 'text', 'name': 'adult_dependent_location', 'label': 'Where do they live?'},
+            {'section': 'Adult Dependents', 'type': 'yes_no', 'name': 'adult_dependent_disabled', 'label': 'Is the dependent disabled?'},
+            {'section': 'Adult Dependents', 'type': 'textarea', 'name': 'filing_return', 'label': 'Why are they not filing their own return?'},
+            {'section': 'Adult Dependents', 'type': 'yes_no', 'name': 'claim_dependent', 'label': 'Can anyone else claim this dependent?'},
+            {'section': 'Adult Dependents', 'type': 'yes_no', 'name': 'parent_support_funds', 'label': 'Did the parent send funds to help support the dependent?'},
             
             # Signature
             {'section': 'Signature', 'type': 'signature', 'name': 'client_signature', 'label': 'Client Signature', 'required': True},
             {'section': 'Signature', 'type': 'date', 'name': 'signature_date', 'label': 'Date', 'required': True},
         ])
         
-        self.create_form_fields(form, fields_data)
+        self.create_form_fields(form, fields_data, reset_missing=True)
         self.stdout.write(f'Created Dependent Care Form with {len(fields_data)} fields')
     
     def create_student_acknowledgment_form(self, user):
@@ -380,32 +388,24 @@ class Command(BaseCommand):
         
         if not created:
             self.stdout.write(f'Photo ID Form already exists')
-            return
         
         fields_data = [
-            # Taxpayer Information
-            {'section': 'Taxpayer Information', 'type': 'name', 'name': 'taxpayer_name', 'label': 'Taxpayer Name', 'required': True},
-            {'section': 'Taxpayer Information', 'type': 'ssn', 'name': 'taxpayer_ssn', 'label': 'Taxpayer SSN', 'required': True},
+            # Taxpayer block
+            {'section': 'Taxpayer Identification', 'type': 'name', 'name': 'taxpayer_name', 'label': 'Taxpayer Name', 'required': True},
+            {'section': 'Taxpayer Identification', 'type': 'ssn', 'name': 'taxpayer_ssn', 'label': 'Taxpayer SSN', 'required': True},
+            {'section': 'Taxpayer Identification', 'type': 'file', 'name': 'taxpayer_photo_id', 'label': 'PHOTO ID #1 – Required', 'required': True},
+            {'section': 'Taxpayer Identification', 'type': 'file', 'name': 'taxpayer_other_id', 'label': '1 Other Form of ID – Required', 'required': True},
             
-            # Taxpayer Documents
-            {'section': 'Taxpayer Documents', 'type': 'section_header', 'name': 'taxpayer_docs_header', 'label': 'Taxpayer Required Documents'},
-            {'section': 'Taxpayer Documents', 'type': 'file', 'name': 'taxpayer_photo_id', 'label': 'PHOTO ID #1 - Required', 'required': True},
-            {'section': 'Taxpayer Documents', 'type': 'file', 'name': 'taxpayer_other_id', 'label': '1 Other Form of ID - Required', 'required': True},
+            # Spouse block
+            {'section': 'Spouse Identification', 'type': 'name', 'name': 'spouse_name', 'label': 'Spouse Name'},
+            {'section': 'Spouse Identification', 'type': 'ssn', 'name': 'spouse_ssn', 'label': 'Spouse SSN'},
+            {'section': 'Spouse Identification', 'type': 'file', 'name': 'spouse_photo_id', 'label': 'PHOTO ID #1 – Required'},
+            {'section': 'Spouse Identification', 'type': 'file', 'name': 'spouse_other_id', 'label': '1 Other Form of ID – Required'},
             
-            # Spouse Information
-            {'section': 'Spouse Information', 'type': 'name', 'name': 'spouse_name', 'label': 'Spouse Name'},
-            {'section': 'Spouse Information', 'type': 'ssn', 'name': 'spouse_ssn', 'label': 'Spouse SSN'},
+            # Banking info
+            {'section': 'Banking Information', 'type': 'file', 'name': 'voided_check', 'label': 'Place Voided Check Here (only if you selected Direct deposit on page – 2)', 'help': 'Required only if selecting direct deposit for refund'},
             
-            # Spouse Documents
-            {'section': 'Spouse Documents', 'type': 'section_header', 'name': 'spouse_docs_header', 'label': 'Spouse Required Documents (if applicable)'},
-            {'section': 'Spouse Documents', 'type': 'file', 'name': 'spouse_photo_id', 'label': 'PHOTO ID #1 - Required'},
-            {'section': 'Spouse Documents', 'type': 'file', 'name': 'spouse_other_id', 'label': '1 Other Form of ID - Required'},
-            
-            # Banking Information
-            {'section': 'Banking Information', 'type': 'section_header', 'name': 'banking_header', 'label': 'Banking Information'},
-            {'section': 'Banking Information', 'type': 'file', 'name': 'voided_check', 'label': 'Place Voided Check Here (only if you selected Direct deposit on page - 2)', 'help': 'Required only if selecting direct deposit for refund'},
-            
-            # Authorization
+            # Authorization statement
             {'section': 'Authorization', 'type': 'textarea', 'name': 'authorization_text', 'label': 'Authorization Statement', 'help': 'I hereby authorize the use of this identification above to electronically file my federal tax return according to IRS publication 1345'},
             
             # Signatures
@@ -415,7 +415,7 @@ class Command(BaseCommand):
             {'section': 'Signatures', 'type': 'date', 'name': 'spouse_date', 'label': 'Date'},
         ]
         
-        self.create_form_fields(form, fields_data)
+        self.create_form_fields(form, fields_data, reset_missing=True)
         self.stdout.write(f'Created Photo ID Form with {len(fields_data)} fields')
     
     def create_due_diligence_form(self, user):
@@ -456,17 +456,27 @@ class Command(BaseCommand):
         self.create_form_fields(form, fields_data)
         self.stdout.write(f'Created Due Diligence Form with {len(fields_data)} fields')
     
-    def create_form_fields(self, form, fields_data):
-        """Helper method to create form fields"""
+    def create_form_fields(self, form, fields_data, reset_missing=False):
+        """Helper method to create or update form fields"""
+        desired_names = {field_data['name'] for field_data in fields_data}
+        
         for i, field_data in enumerate(fields_data):
-            TaxFormField.objects.create(
+            defaults = {
+                'field_type': field_data['type'],
+                'field_label': field_data['label'],
+                'section': field_data.get('section', ''),
+                'is_required': field_data.get('required', False),
+                'help_text': field_data.get('help', ''),
+                'field_options': field_data.get('options', []),
+                'order': i * 10,
+                'column_width': field_data.get('column_width', 'full'),
+            }
+            
+            TaxFormField.objects.update_or_create(
                 tax_form=form,
-                field_type=field_data['type'],
                 field_name=field_data['name'],
-                field_label=field_data['label'],
-                section=field_data.get('section', ''),
-                is_required=field_data.get('required', False),
-                help_text=field_data.get('help', ''),
-                field_options=field_data.get('options', []),
-                order=i * 10
+                defaults=defaults
             )
+        
+        if reset_missing:
+            form.fields.exclude(field_name__in=desired_names).delete()
