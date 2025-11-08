@@ -393,6 +393,7 @@ class Command(BaseCommand):
             # Taxpayer block
             {'section': 'Taxpayer Identification', 'type': 'name', 'name': 'taxpayer_name', 'label': 'Taxpayer Name', 'required': True},
             {'section': 'Taxpayer Identification', 'type': 'ssn', 'name': 'taxpayer_ssn', 'label': 'Taxpayer SSN', 'required': True},
+            {'section': 'Taxpayer Identification', 'type': 'date', 'name': 'taxpayer_document_date', 'label': 'Date', 'required': True},
             {'section': 'Taxpayer Identification', 'type': 'file', 'name': 'taxpayer_photo_id', 'label': 'PHOTO ID #1 – Required', 'required': True},
             {'section': 'Taxpayer Identification', 'type': 'file', 'name': 'taxpayer_other_id', 'label': '1 Other Form of ID – Required', 'required': True},
             
@@ -405,14 +406,13 @@ class Command(BaseCommand):
             # Banking info
             {'section': 'Banking Information', 'type': 'file', 'name': 'voided_check', 'label': 'Place Voided Check Here (only if you selected Direct deposit on page – 2)', 'help': 'Required only if selecting direct deposit for refund'},
             
-            # Authorization statement
-            {'section': 'Authorization', 'type': 'textarea', 'name': 'authorization_text', 'label': 'Authorization Statement', 'help': 'I hereby authorize the use of this identification above to electronically file my federal tax return according to IRS publication 1345'},
-            
             # Signatures
             {'section': 'Signatures', 'type': 'signature', 'name': 'taxpayer_signature', 'label': 'Taxpayer Signature', 'required': True},
             {'section': 'Signatures', 'type': 'date', 'name': 'taxpayer_date', 'label': 'Date', 'required': True},
             {'section': 'Signatures', 'type': 'signature', 'name': 'spouse_signature', 'label': 'Spouse Signature'},
             {'section': 'Signatures', 'type': 'date', 'name': 'spouse_date', 'label': 'Date'},
+            # Authorization statement
+            {'section': 'Authorization', 'type': 'textarea', 'name': 'authorization_text', 'label': 'Authorization Statement', 'help': 'I hereby authorize the use of this identification above to electronically file my federal tax return according to IRS publication 1345'},
         ]
         
         self.create_form_fields(form, fields_data, reset_missing=True)
