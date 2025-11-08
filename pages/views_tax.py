@@ -117,17 +117,33 @@ def send_form_completion_email(assignment, completed_by):
         from django.urls import reverse
         from django.contrib.sites.models import Site
         
-        # Try to get domain from Django Sites framework first
-        try:
-            current_site = Site.objects.get_current()
-            domain = current_site.domain
-            # Use HTTPS for production domains (not localhost)
-            protocol = 'https' if not domain.startswith('localhost') and not domain.startswith('127.0.0.1') else 'http'
-        except:
-            # Fallback to settings or environment variables
-            domain = getattr(settings, 'SITE_DOMAIN', None) or os.environ.get('SITE_DOMAIN', 'localhost:8000')
-            protocol = 'https' if getattr(settings, 'USE_HTTPS', False) or os.environ.get('USE_HTTPS', '').lower() == 'true' else 'http'
-        
+        preferred_domain = (getattr(settings, 'SITE_DOMAIN', None) or os.environ.get('SITE_DOMAIN', '')).strip()
+        use_https = getattr(settings, 'USE_HTTPS', False) or os.environ.get('USE_HTTPS', '').lower() == 'true'
+
+        if preferred_domain and preferred_domain.lower() != 'example.com':
+            domain = preferred_domain
+        else:
+            # Try to get domain from Django Sites framework
+            try:
+                current_site = Site.objects.get_current()
+                domain = current_site.domain.strip()
+            except Site.DoesNotExist:
+                domain = ''
+
+            if not domain or domain.lower() == 'example.com':
+                # Final fallback to localhost for development
+                domain = 'localhost:8000'
+
+        # Strip any accidental protocol prefixes kept in the domain value
+        if domain.startswith('http://') or domain.startswith('https://'):
+            domain = domain.split('://', 1)[1]
+
+        is_local = domain.startswith('localhost') or domain.startswith('127.0.0.1')
+        if use_https:
+            protocol = 'https'
+        else:
+            protocol = 'http' if is_local else 'https'
+
         login_url = f"{protocol}://{domain}{reverse('tax_client_login')}"
         
         # Prepare email context
