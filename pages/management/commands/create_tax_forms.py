@@ -407,24 +407,25 @@ class Command(BaseCommand):
         self._log_template_status(form, 'Due Diligence Form', created)
         
         fields_data = [
-            {'section': 'Household Information', 'type': 'number', 'name': 'adults_in_home', 'label': 'How many people live with you? _____ Adults _____ Children', 'required': True},
-            {'section': 'Household Information', 'type': 'number', 'name': 'children_in_home', 'label': 'Children'},
+            {'section': 'Household Information', 'type': 'section_header', 'name': 'due_diligence_header', 'label': 'Due diligence questionnaire'},
+            {'section': 'Household Information', 'type': 'number', 'name': 'adults_in_home', 'label': 'How many people live with you? Adults', 'required': True},
+            {'section': 'Household Information', 'type': 'number', 'name': 'children_in_home', 'label': 'How many people live with you? Children'},
             
-            {'section': 'Support Information', 'type': 'yes_no', 'name': 'anyone_help_support', 'label': 'Did anyone else help support you during the year? ____ Yes ____ No'},
+            {'section': 'Support Information', 'type': 'yes_no', 'name': 'anyone_help_support', 'label': 'Did anyone else help support you during the year? (Choose YES or NO)', 'required': True},
             {'section': 'Support Information', 'type': 'text', 'name': 'who_helped', 'label': 'If yes, who?'},
-            {'section': 'Support Information', 'type': 'currency', 'name': 'support_amount', 'label': 'How much? $'},
+            {'section': 'Support Information', 'type': 'currency', 'name': 'support_amount', 'label': 'If yes, how much? $'},
             
-            {'section': 'Dependency Questions', 'type': 'yes_no', 'name': 'dependents_claimed_by_others', 'label': 'Are any of the Dependents being claimed NOT your Son or Daughter? ____ Yes ____ No'},
-            {'section': 'Dependency Questions', 'type': 'textarea', 'name': 'dependency_proof', 'label': 'If Yes, Provide proof of financial responsibility or residency (i.e copy of lease, medical records, school records, food stamps or benefit statements)'},
-            {'section': 'Dependency Questions', 'type': 'textarea', 'name': 'parent_explanation', 'label': 'If Yes, Why are parents not claiming the child? (Please explain and list the child\'s name(s) if more than one listed on the return)'},
+            {'section': 'Dependency Questions', 'type': 'yes_no', 'name': 'dependents_claimed_by_others', 'label': 'Are any of the Dependents being claimed NOT your son or daughter? (YES or NO)', 'required': True},
+            {'section': 'Dependency Questions', 'type': 'file', 'name': 'dependency_proof_upload', 'label': 'Upload proof of financial responsibility or residency (lease, medical records, school records, food stamps, benefit statements)'},
+            {'section': 'Dependency Questions', 'type': 'textarea', 'name': 'parent_explanation', 'label': 'If yes, why are parents not claiming the child? (List each child\'s name if more than one)'},
             
-            {'section': 'Other Income', 'type': 'yes_no', 'name': 'other_income_received', 'label': 'Did you have any other income during the year? (Child support, alimony) ____ Yes ____ No'},
-            {'section': 'Other Income', 'type': 'textarea', 'name': 'other_income_details', 'label': 'If yes, Please specify'},
+            {'section': 'Other Income', 'type': 'yes_no', 'name': 'other_income_received', 'label': 'Did you have any other income during the year? (Child support, alimony) – YES or NO', 'required': True},
+            {'section': 'Other Income', 'type': 'textarea', 'name': 'other_income_details', 'label': 'If yes, please specify'},
             
             {'section': 'Additional Comments', 'type': 'textarea', 'name': 'other_comments', 'label': 'Other comments:'},
         ]
         
-        self.create_form_fields(form, fields_data)
+        self.create_form_fields(form, fields_data, reset_missing=True)
         self.stdout.write(f'Created Due Diligence Form with {len(fields_data)} fields')
     
     def create_form_fields(self, form, fields_data, reset_missing=False):
