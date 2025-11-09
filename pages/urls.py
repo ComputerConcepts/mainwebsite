@@ -238,6 +238,7 @@ urlpatterns = [
     path('employee/tax/templates/create/', views_tax.create_tax_form_template, name='create_tax_form_template'),
     path('employee/tax/templates/<uuid:template_id>/edit/', views_tax.edit_tax_form_template, name='edit_tax_form_template'),
     path('employee/tax/templates/<uuid:template_id>/add-field/', views_tax.add_form_field, name='add_tax_form_field'),
+    path('employee/tax/templates/<uuid:template_id>/delete/', views_tax.delete_tax_form_template, name='delete_tax_form_template'),
     path('employee/tax/clients/', views_tax.manage_clients, name='manage_tax_clients'),
     path('employee/tax/clients/create/', views_tax.create_client, name='create_tax_client'),
     path('employee/tax/clients/<uuid:client_id>/', views_tax.client_detail, name='tax_client_detail'),

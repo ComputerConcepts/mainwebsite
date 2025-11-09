@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -310,6 +311,23 @@ def edit_tax_form_template(request, template_id):
     }
     
     return render(request, 'tax/admin/edit_template.html', context)
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+@require_POST
+def delete_tax_form_template(request, template_id):
+    """Soft delete a tax form template so it no longer appears in the library"""
+    template = get_object_or_404(TaxFormTemplate, id=template_id)
+
+    try:
+        template.is_active = False
+        template.save(update_fields=['is_active'])
+        template.fields.update(is_active=False)
+
+        return JsonResponse({'status': 'success'})
+    except Exception as exc:
+        return JsonResponse({'status': 'error', 'message': str(exc)}, status=400)
 
 
 @login_required
