@@ -154,7 +154,7 @@
         {% csrf_token %}
         
         <!-- Income Summary Table (if monthly fields exist) -->
-        {% if form_fields|length > 0 %}
+        {% if form_fields|length > 0 and False %}
             {% for field in form_fields %}
                 {% if 'january - service' in field.field_label|lower %}
                     <div class="form-section income-summary-section">
@@ -225,7 +225,7 @@
 
         <!-- Dependent Care Table (if dependent fields exist) -->
         {% for field in form_fields %}
-            {% if '1. name of child' in field.field_label|lower %}
+            {% if '1. name of child' in field.field_label|lower and False %}
                 <div class="form-section dependent-care-section">
                     <div class="form-field">
                         <label class="field-label">
@@ -326,7 +326,7 @@
 
         <!-- Form Fields -->
         {% for field in form_fields %}
-        {% if field.field_type == 'signature' or field.field_type == 'section_header' or '- service' in field.field_label|lower or '$ made' in field.field_label|lower or 'january' in field.field_label|lower or 'february' in field.field_label|lower or 'march' in field.field_label|lower or 'april' in field.field_label|lower or 'may' in field.field_label|lower or 'june' in field.field_label|lower or 'july' in field.field_label|lower or 'august' in field.field_label|lower or 'september' in field.field_label|lower or 'october' in field.field_label|lower or 'november' in field.field_label|lower or 'december' in field.field_label|lower or '. name of child' in field.field_label|lower or '. ssn' in field.field_label|lower or '. daycare or provider name' in field.field_label|lower or '. fein (or social of caregiver)' in field.field_label|lower or '. total amount paid $' in field.field_label|lower %}
+{% if field.field_type == 'signature' or field.field_type == 'section_header' %}
             {% comment %}Skip signature fields, section headers, monthly fields and dependent care fields as they're handled separately{% endcomment %}
         {% else %}
         <div class="form-section">
