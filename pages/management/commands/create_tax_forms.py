@@ -13,50 +13,9 @@ from pages.models import TaxFormTemplate, TaxFormField
 class Command(BaseCommand):
     help = 'Create predefined tax form templates'
     
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--user', 
-            type=str, 
-            help='Username of the user who will be marked as creator',
-            default='admin'
-        )
-    
     def handle(self, *args, **options):
-        username = options.get('user')
+        user = self._resolve_creator_user()
 
-        user = None
-
-        # If a username was provided, try to use it first
-        if username:
-            try:
-                user = User.objects.get(username=username)
-                self.stdout.write(self.style.SUCCESS(f'Using provided user: {username}'))
-            except User.DoesNotExist:
-                self.stdout.write(self.style.WARNING(f'Provided user "{username}" not found. Trying fallbacks...'))
-
-        # If no user found yet, try to find any superuser
-        if user is None:
-            try:
-                user = User.objects.filter(is_superuser=True).order_by('id').first()
-                if user:
-                    self.stdout.write(self.style.SUCCESS(f'Using superuser: {user.username}'))
-            except Exception:
-                user = None
-
-        # If still no user, try any existing user
-        if user is None:
-            user = User.objects.order_by('id').first()
-            if user:
-                self.stdout.write(self.style.SUCCESS(f'No superuser found; using first available user: {user.username}'))
-
-        # If no users exist at all, create a fallback admin user
-        if user is None:
-            # create a fallback admin user with a generated password
-            pwd = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
-            username = 'tax_admin'
-            user = User.objects.create_superuser(username=username, email='', password=pwd)
-            self.stdout.write(self.style.WARNING(f'No users found in database. Created fallback superuser "{username}" with generated password: {pwd}'))
-        
         self.stdout.write('Creating predefined tax form templates...')
         
         # Create Tax Intake Form
@@ -83,6 +42,39 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS('Successfully created all predefined tax form templates!')
         )
+
+    def _resolve_creator_user(self):
+        """Find or create a user that can own the templates"""
+        user = User.objects.filter(is_superuser=True).order_by('id').first()
+        if user:
+            self.stdout.write(self.style.SUCCESS(f'Using superuser: {user.username}'))
+            return user
+
+        user = User.objects.order_by('id').first()
+        if user:
+            self.stdout.write(self.style.SUCCESS(f'No superuser found; using first available user: {user.username}'))
+            return user
+
+        pwd = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+        username = 'tax_admin'
+        user = User.objects.create_superuser(username=username, email='', password=pwd)
+        self.stdout.write(self.style.WARNING(
+            f'No users found in database. Created fallback superuser "{username}" with generated password: {pwd}'
+        ))
+        return user
+
+    def _log_template_status(self, form, template_name, created):
+        """Log creation/update status and ensure template is active"""
+        if created:
+            self.stdout.write(self.style.SUCCESS(f'Created template: {template_name}'))
+            return
+
+        message = f'{template_name} already exists; refreshing fields'
+        self.stdout.write(self.style.WARNING(message))
+        if not form.is_active:
+            form.is_active = True
+            form.save(update_fields=['is_active'])
+            self.stdout.write(self.style.SUCCESS(f'{template_name} reactivated'))
     
     def create_tax_intake_form(self, user):
         """Create Tax Intake Form based on attached document"""
@@ -96,10 +88,7 @@ class Command(BaseCommand):
                 'created_by': user
             }
         )
-        
-        if not created:
-            self.stdout.write(f'Tax Intake Form already exists')
-            return
+        self._log_template_status(form, 'Tax Intake Form', created)
             
         # Taxpayer Section
         fields_data = [
@@ -179,10 +168,7 @@ class Command(BaseCommand):
                 'created_by': user
             }
         )
-        
-        if not created:
-            self.stdout.write(f'Schedule C Form already exists')
-            return
+        self._log_template_status(form, 'Schedule C Form', created)
         
         fields_data = [
             # Business Information
@@ -244,10 +230,7 @@ class Command(BaseCommand):
                 'created_by': user
             }
         )
-        
-        if not created:
-            self.stdout.write(f'Income Summary Form already exists')
-            return
+        self._log_template_status(form, 'Income Summary Form', created)
         
         fields_data = [
             {'section': 'Monthly Income', 'type': 'section_header', 'name': 'income_header', 'label': 'Monthly Income Summary'},
@@ -279,10 +262,7 @@ class Command(BaseCommand):
                 'created_by': user
             }
         )
-        
-        if not created:
-            self.stdout.write(f'Dependent Care Form already exists')
-            return
+        self._log_template_status(form, 'Dependent Care Form', created)
         
         fields_data = [
             {'section': 'Taxpayer Information', 'type': 'ssn', 'name': 'taxpayer_ssn', 'label': 'Taxpayer SSN', 'required': True},
@@ -339,10 +319,7 @@ class Command(BaseCommand):
                 'created_by': user
             }
         )
-        
-        if not created:
-            self.stdout.write(f'Student Acknowledgment Form already exists')
-            return
+        self._log_template_status(form, 'Student Acknowledgment Form', created)
         
         fields_data = [
             {'section': 'Student Information', 'type': 'text', 'name': 'student_name', 'label': 'I, _____________, was a student during the 20__ school year', 'required': True},
@@ -385,10 +362,7 @@ class Command(BaseCommand):
                 'created_by': user
             }
         )
-        
-        if not created:
-            self.stdout.write(f'Photo ID Form already exists')
-        
+        self._log_template_status(form, 'Photo ID Form', created)
         fields_data = [
             # Taxpayer block
             {'section': 'Taxpayer Identification', 'type': 'name', 'name': 'taxpayer_name', 'label': 'Taxpayer Name', 'required': True},
@@ -430,10 +404,7 @@ class Command(BaseCommand):
                 'created_by': user
             }
         )
-        
-        if not created:
-            self.stdout.write(f'Due Diligence Form already exists')
-            return
+        self._log_template_status(form, 'Due Diligence Form', created)
         
         fields_data = [
             {'section': 'Household Information', 'type': 'number', 'name': 'adults_in_home', 'label': 'How many people live with you? _____ Adults _____ Children', 'required': True},
