@@ -240,11 +240,30 @@
                 {% elif field.field_type == 'table' %}
                     <textarea name="field_{{ field.id }}" class="form-control" rows="4" {% if enforce_required and field.is_required %}required{% endif %}>{{ field.current_value }}</textarea>
 
+                {% elif field.field_type == 'file' %}
+                    <input type="file"
+                           name="field_{{ field.id }}"
+                           class="form-control"
+                           {% if enforce_required and field.is_required %}required{% endif %}>
+                    {% if field.help_text %}
+                        <small class="text-muted d-block mt-1">{{ field.help_text }}</small>
+                    {% endif %}
+
                 {% elif 'dependent' in field.field_name|lower %}
-                    <input type="text" name="field_{{ field.id }}" class="form-control" {% if enforce_required and field.is_required %}required{% endif %} value="{{ field.current_value }}" placeholder="{{ field.field_label }}">
+                    <input type="text"
+                           name="field_{{ field.id }}"
+                           class="form-control"
+                           {% if enforce_required and field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="{{ field.field_label }}">
 
                 {% elif 'income' in field.field_label|lower or 'summary' in field.field_label|lower %}
-                    <input type="text" name="field_{{ field.id }}" class="form-control" {% if enforce_required and field.is_required %}required{% endif %} value="{{ field.current_value }}" placeholder="{{ field.field_label }}">
+                    <input type="text"
+                           name="field_{{ field.id }}"
+                           class="form-control"
+                           {% if enforce_required and field.is_required %}required{% endif %}
+                           value="{{ field.current_value }}"
+                           placeholder="{{ field.field_label }}">
                 {% elif field.field_type == 'ssn' %}
                     <input type="text" 
                            name="field_{{ field.id }}" 
