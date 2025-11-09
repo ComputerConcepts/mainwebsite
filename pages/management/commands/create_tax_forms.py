@@ -442,6 +442,7 @@ class Command(BaseCommand):
                 'field_options': field_data.get('options', []),
                 'order': i * 10,
                 'column_width': field_data.get('column_width', 'full'),
+                'is_active': True,
             }
             
             TaxFormField.objects.update_or_create(
