@@ -2,6 +2,55 @@ from django import template
 
 register = template.Library()
 
+SECTION_METADATA = [
+    {
+        'slug': 'taxpayer',
+        'label': 'Taxpayer',
+        'aliases': ['Taxpayer', 'Taxpayer Information', 'Taxpayer Identification'],
+        'patterns': ['taxpayer_', 'tax payer', 'tp_'],
+    },
+    {
+        'slug': 'spouse',
+        'label': 'Spouse',
+        'aliases': ['Spouse', 'Spouse Information', 'Spouse Identification'],
+        'patterns': ['spouse_', 'spousal'],
+    },
+    {
+        'slug': 'filing-status',
+        'label': 'Filing Status',
+        'aliases': ['Filing Status'],
+        'patterns': ['filing', 'household', 'widower', 'marriage'],
+    },
+    {
+        'slug': 'address',
+        'label': 'Address',
+        'aliases': ['Address', 'Address Information', 'Mailing Address'],
+        'patterns': ['address', 'street', 'city', 'state', 'zip', 'county'],
+    },
+    {
+        'slug': 'dependents',
+        'label': 'Dependents',
+        'aliases': ['Dependents', 'Dependents Information', 'Standard Dependents', 'Adult Dependents'],
+        'patterns': ['dependent', 'dependents', 'child'],
+    },
+    {
+        'slug': 'affordable-care-act',
+        'label': 'Affordable Care Act',
+        'aliases': ['Affordable Care Act', 'ACA', 'Affordable Care Act Information'],
+        'patterns': ['insurance', 'coverage', 'aca', 'health'],
+    },
+]
+
+
+def _match_patterns(field, patterns):
+    name = (getattr(field, 'field_name', '') or '').lower()
+    label = (getattr(field, 'field_label', '') or '').lower()
+    for token in patterns:
+        token = token.lower()
+        if token and (token in name or token in label):
+            return True
+    return False
+
 
 @register.filter
 def get_item(dictionary, key):
@@ -15,42 +64,9 @@ def get_item(dictionary, key):
 def tax_required_sections():
     """
     Returns the canonical intake sections so the template can render them
-    even if the dynamic form does not explicitly define them. Each section
-    contains the slug used by the template, the label to display, and a
-    list of aliases that may be used inside saved form templates.
+    even if the dynamic form does not explicitly define them.
     """
-    return [
-        {
-            'slug': 'taxpayer',
-            'label': 'Taxpayer',
-            'aliases': ['Taxpayer', 'Taxpayer Information', 'Taxpayer Identification'],
-        },
-        {
-            'slug': 'spouse',
-            'label': 'Spouse',
-            'aliases': ['Spouse', 'Spouse Information', 'Spouse Identification'],
-        },
-        {
-            'slug': 'filing-status',
-            'label': 'Filing Status',
-            'aliases': ['Filing Status'],
-        },
-        {
-            'slug': 'address',
-            'label': 'Address',
-            'aliases': ['Address', 'Address Information', 'Mailing Address'],
-        },
-        {
-            'slug': 'dependents',
-            'label': 'Dependents',
-            'aliases': ['Dependents', 'Dependents Information', 'Standard Dependents', 'Adult Dependents'],
-        },
-        {
-            'slug': 'affordable-care-act',
-            'label': 'Affordable Care Act',
-            'aliases': ['Affordable Care Act', 'ACA', 'Affordable Care Act Information'],
-        },
-    ]
+    return SECTION_METADATA
 
 
 @register.filter
@@ -132,3 +148,29 @@ def field_lookup(fields, keywords):
                 return field
 
     return None
+
+
+@register.filter
+def section_fallback_fields(form_fields, slug):
+    """
+    When fields are not attached to a recognizable section, use this helper
+    to locate them based on naming patterns that match the canonical sections.
+    """
+    if not form_fields or not slug:
+        return []
+
+    slug = str(slug)
+    metadata = next((item for item in SECTION_METADATA if item['slug'] == slug), None)
+    if not metadata:
+        return []
+
+    patterns = metadata.get('patterns') or []
+    if not patterns:
+        return []
+
+    matches = []
+    for field in form_fields:
+        if _match_patterns(field, patterns):
+            matches.append(field)
+
+    return matches

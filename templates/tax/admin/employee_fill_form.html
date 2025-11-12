@@ -323,9 +323,31 @@
                     {% endfor %}
                 {% endif %}
             {% else %}
-                <p class="section-placeholder">
-                    No fields have been configured for this intake section yet.
-                </p>
+                {% with fallback_fields=form_fields|section_fallback_fields:section.slug %}
+                    {% if fallback_fields %}
+                        {% if section.slug == 'taxpayer' %}
+                            {% include 'tax/admin/partials/section_taxpayer.html' with fields=fallback_fields %}
+                        {% elif section.slug == 'spouse' %}
+                            {% include 'tax/admin/partials/section_spouse.html' with fields=fallback_fields %}
+                        {% elif section.slug == 'filing-status' %}
+                            {% include 'tax/admin/partials/section_filing_status.html' with fields=fallback_fields %}
+                        {% elif section.slug == 'address' %}
+                            {% include 'tax/admin/partials/section_address.html' with fields=fallback_fields %}
+                        {% elif section.slug == 'dependents' %}
+                            {% include 'tax/admin/partials/section_dependents.html' with fields=fallback_fields %}
+                        {% elif section.slug == 'affordable-care-act' %}
+                            {% include 'tax/admin/partials/section_affordable-care-act.html' with fields=fallback_fields %}
+                        {% else %}
+                            {% for field in fallback_fields %}
+                                {% include 'tax/admin/partials/dynamic_field.html' %}
+                            {% endfor %}
+                        {% endif %}
+                    {% else %}
+                        <p class="section-placeholder">
+                            No fields have been configured for this intake section yet.
+                        </p>
+                    {% endif %}
+                {% endwith %}
             {% endif %}
         </div>
         {% endwith %}
