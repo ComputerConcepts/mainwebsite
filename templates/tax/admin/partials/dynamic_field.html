@@ -1,0 +1,186 @@
+{% if field.field_type == 'signature' %}
+    {% comment %}Signatures captured later by clients{% endcomment %}
+{% elif field.field_type == 'section_header' %}
+    <div class="section-header">
+        <h4>{{ field.field_label }}</h4>
+        {% if field.help_text %}
+            <p class="text-muted mb-0">{{ field.help_text }}</p>
+        {% endif %}
+    </div>
+{% else %}
+<div class="form-field">
+    <label class="field-label">
+        {{ field.field_label }}
+        {% if enforce_required and field.is_required %}
+            <span class="required-field">*</span>
+        {% endif %}
+    </label>
+
+    {% if field.help_text %}
+    <div class="field-description">{{ field.help_text }}</div>
+    {% endif %}
+
+    {% if field.field_type == 'text' %}
+        <input type="text"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="Enter {{ field.field_label|lower }}">
+
+    {% elif field.field_type == 'email' %}
+        <input type="email"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="Enter email address">
+
+    {% elif field.field_type == 'phone' %}
+        <input type="tel"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="Enter phone number">
+
+    {% elif field.field_type == 'number' %}
+        <input type="number"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="Enter amount"
+               step="0.01">
+
+    {% elif field.field_type == 'date' %}
+        <input type="date"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}">
+
+    {% elif field.field_type == 'dropdown' %}
+        <select name="field_{{ field.id }}"
+                class="form-select"
+                {% if enforce_required and field.is_required %}required{% endif %}>
+            <option value="">Select {{ field.field_label|lower }}...</option>
+            {% for option in field.field_options %}
+                <option value="{{ option }}"
+                        {% if field.current_value == option %}selected{% endif %}>
+                    {{ option }}
+                </option>
+            {% endfor %}
+        </select>
+
+    {% elif field.field_type == 'checkbox' %}
+        <div class="form-check">
+            <input type="checkbox"
+                   name="field_{{ field.id }}"
+                   class="form-check-input"
+                   value="yes"
+                   {% if field.current_value == 'yes' %}checked{% endif %}
+                   id="field_{{ field.id }}">
+            <label class="form-check-label" for="field_{{ field.id }}">
+                {{ field.help_text|default:"Yes" }}
+            </label>
+        </div>
+
+    {% elif field.field_type == 'table' %}
+        <textarea name="field_{{ field.id }}" class="form-control" rows="4" {% if enforce_required and field.is_required %}required{% endif %}>{{ field.current_value }}</textarea>
+
+    {% elif field.field_type == 'file' %}
+        <input type="file"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}>
+        {% if field.help_text %}
+            <small class="text-muted d-block mt-1">{{ field.help_text }}</small>
+        {% endif %}
+
+    {% elif field.field_name and 'dependent' in field.field_name|lower %}
+        <input type="text"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="{{ field.field_label }}">
+
+    {% elif 'income' in field.field_label|lower or 'summary' in field.field_label|lower %}
+        <input type="text"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="{{ field.field_label }}">
+
+    {% elif field.field_type == 'ssn' %}
+        <input type="text"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="000-00-0000"
+               pattern="[0-9]{3}-[0-9]{2}-[0-9]{4}"
+               maxlength="11">
+
+    {% elif field.field_type == 'currency' %}
+        <input type="number"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="0.00"
+               step="0.01"
+               min="0">
+
+    {% elif field.field_type == 'yes_no' %}
+        <select name="field_{{ field.id }}"
+                class="form-select"
+                {% if enforce_required and field.is_required %}required{% endif %}>
+            <option value="">Select an option...</option>
+            <option value="yes" {% if field.current_value == 'yes' %}selected{% endif %}>Yes</option>
+            <option value="no" {% if field.current_value == 'no' %}selected{% endif %}>No</option>
+        </select>
+
+    {% elif field.field_type == 'radio' %}
+        <select name="field_{{ field.id }}"
+                class="form-select"
+                {% if enforce_required and field.is_required %}required{% endif %}>
+            <option value="">Select {{ field.field_label|lower }}...</option>
+            {% for option in field.field_options %}
+                <option value="{{ option }}"
+                        {% if field.current_value == option %}selected{% endif %}>
+                    {{ option }}
+                </option>
+            {% endfor %}
+        </select>
+
+    {% elif field.field_type == 'name' %}
+        <input type="text"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="Enter full name">
+
+    {% elif field.field_type == 'ein' %}
+        <input type="text"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="00-0000000"
+               pattern="[0-9]{2}-[0-9]{7}"
+               maxlength="10">
+
+    {% else %}
+        <input type="text"
+               name="field_{{ field.id }}"
+               class="form-control"
+               {% if enforce_required and field.is_required %}required{% endif %}
+               value="{{ field.current_value }}"
+               placeholder="Enter {{ field.field_label|lower }}">
+    {% endif %}
+</div>
+{% endif %}
