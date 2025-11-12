@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 import secrets
 import string
-from pages.models import TaxFormTemplate, TaxFormField
+from pages.models import TaxFormTemplate, TaxFormSection, TaxFormField
 
 
 class Command(BaseCommand):
@@ -75,7 +75,31 @@ class Command(BaseCommand):
             form.is_active = True
             form.save(update_fields=['is_active'])
             self.stdout.write(self.style.SUCCESS(f'{template_name} reactivated'))
-    
+
+    def _ensure_sections(self, form, sections_data):
+        """
+        Create or update canonical sections for a tax form template.
+        Returns a lookup dict keyed by section key.
+        """
+        section_lookup = {}
+        for index, section_def in enumerate(sections_data):
+            defaults = {
+                'description': section_def.get('description', ''),
+                'order': section_def.get('order', index * 10),
+                'is_collapsible': section_def.get('is_collapsible', False),
+                'is_expanded_by_default': section_def.get('is_expanded_by_default', True),
+                'show_border': section_def.get('show_border', True),
+                'background_color': section_def.get('background_color', ''),
+                'is_active': True,
+            }
+            section, _ = TaxFormSection.objects.update_or_create(
+                tax_form=form,
+                title=section_def['title'],
+                defaults=defaults,
+            )
+            section_lookup[section_def['key']] = section
+        return section_lookup
+
     def create_tax_intake_form(self, user):
         """Create Tax Intake Form based on attached document"""
         form, created = TaxFormTemplate.objects.get_or_create(
@@ -90,70 +114,73 @@ class Command(BaseCommand):
         )
         self._log_template_status(form, 'Tax Intake Form', created)
             
-        # Taxpayer Section
+        sections_schema = [
+            {'key': 'taxpayer', 'title': 'Taxpayer', 'order': 10},
+            {'key': 'spouse', 'title': 'Spouse', 'order': 20},
+            {'key': 'filing_status', 'title': 'Filing Status', 'order': 30},
+            {'key': 'address', 'title': 'Address', 'order': 40},
+            {'key': 'dependents', 'title': 'Dependents', 'order': 50},
+            {'key': 'affordable_care_act', 'title': 'Affordable Care Act', 'order': 60},
+            {'key': 'signature', 'title': 'Signature', 'order': 70},
+        ]
+        section_lookup = self._ensure_sections(form, sections_schema)
+
         fields_data = [
             # Taxpayer Information
-            {'section': 'Taxpayer Information', 'type': 'section_header', 'name': 'taxpayer_header', 'label': 'Taxpayer Information'},
-            {'section': 'Taxpayer Information', 'type': 'ssn', 'name': 'taxpayer_ssn', 'label': 'Social Security Number', 'required': True},
-            {'section': 'Taxpayer Information', 'type': 'name', 'name': 'taxpayer_first_name', 'label': 'First Name', 'required': True},
-            {'section': 'Taxpayer Information', 'type': 'text', 'name': 'taxpayer_mi', 'label': 'MI'},
-            {'section': 'Taxpayer Information', 'type': 'name', 'name': 'taxpayer_last_name', 'label': 'Last Name', 'required': True},
-            {'section': 'Taxpayer Information', 'type': 'date', 'name': 'taxpayer_dob', 'label': 'Date of Birth', 'required': True},
-            {'section': 'Taxpayer Information', 'type': 'date', 'name': 'taxpayer_death_date', 'label': 'Date of Death (if applicable)'},
-            {'section': 'Taxpayer Information', 'type': 'phone', 'name': 'taxpayer_work_phone', 'label': 'Work Phone'},
-            {'section': 'Taxpayer Information', 'type': 'phone', 'name': 'taxpayer_cell_phone', 'label': 'Cell/Other Phone'},
-            {'section': 'Taxpayer Information', 'type': 'text', 'name': 'taxpayer_occupation', 'label': 'Occupation'},
-            {'section': 'Taxpayer Information', 'type': 'email', 'name': 'taxpayer_email', 'label': 'Email', 'required': True},
-            {'section': 'Taxpayer Information', 'type': 'yes_no', 'name': 'taxpayer_legally_blind', 'label': 'Legally Blind?'},
-            {'section': 'Taxpayer Information', 'type': 'yes_no', 'name': 'taxpayer_dependent', 'label': 'Dependent of Other?'},
-            
-            # Spouse Information  
-            {'section': 'Spouse Information', 'type': 'section_header', 'name': 'spouse_header', 'label': 'Spouse Information'},
-            {'section': 'Spouse Information', 'type': 'ssn', 'name': 'spouse_ssn', 'label': 'Social Security Number'},
-            {'section': 'Spouse Information', 'type': 'name', 'name': 'spouse_first_name', 'label': 'First Name'},
-            {'section': 'Spouse Information', 'type': 'text', 'name': 'spouse_mi', 'label': 'MI'},
-            {'section': 'Spouse Information', 'type': 'name', 'name': 'spouse_last_name', 'label': 'Last Name'},
-            {'section': 'Spouse Information', 'type': 'date', 'name': 'spouse_dob', 'label': 'Date of Birth'},
-            {'section': 'Spouse Information', 'type': 'date', 'name': 'spouse_death_date', 'label': 'Date of Death (if applicable)'},
-            {'section': 'Spouse Information', 'type': 'phone', 'name': 'spouse_work_phone', 'label': 'Work Phone'},
-            {'section': 'Spouse Information', 'type': 'phone', 'name': 'spouse_cell_phone', 'label': 'Cell/Other Phone'},
-            {'section': 'Spouse Information', 'type': 'text', 'name': 'spouse_occupation', 'label': 'Occupation'},
-            {'section': 'Spouse Information', 'type': 'email', 'name': 'spouse_email', 'label': 'Email'},
-            {'section': 'Spouse Information', 'type': 'yes_no', 'name': 'spouse_legally_blind', 'label': 'Legally Blind?'},
-            {'section': 'Spouse Information', 'type': 'yes_no', 'name': 'spouse_dependent', 'label': 'Dependent of Other?'},
-            
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'ssn', 'name': 'taxpayer_ssn', 'label': 'Social Security Number', 'required': True},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'name', 'name': 'taxpayer_first_name', 'label': 'First Name', 'required': True},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'text', 'name': 'taxpayer_mi', 'label': 'MI'},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'name', 'name': 'taxpayer_last_name', 'label': 'Last Name', 'required': True},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'date', 'name': 'taxpayer_dob', 'label': 'Date of Birth', 'required': True},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'date', 'name': 'taxpayer_death_date', 'label': 'Date of Death (if applicable)'},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'phone', 'name': 'taxpayer_work_phone', 'label': 'Work Phone'},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'phone', 'name': 'taxpayer_cell_phone', 'label': 'Cell/Other Phone'},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'text', 'name': 'taxpayer_occupation', 'label': 'Occupation'},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'email', 'name': 'taxpayer_email', 'label': 'Email', 'required': True},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'yes_no', 'name': 'taxpayer_legally_blind', 'label': 'Legally Blind?'},
+            {'section_key': 'taxpayer', 'legacy_section': 'Taxpayer Information', 'type': 'yes_no', 'name': 'taxpayer_dependent', 'label': 'Dependent of Other?'},
+
+            # Spouse Information
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'ssn', 'name': 'spouse_ssn', 'label': 'Social Security Number'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'name', 'name': 'spouse_first_name', 'label': 'First Name'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'text', 'name': 'spouse_mi', 'label': 'MI'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'name', 'name': 'spouse_last_name', 'label': 'Last Name'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'date', 'name': 'spouse_dob', 'label': 'Date of Birth'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'date', 'name': 'spouse_death_date', 'label': 'Date of Death (if applicable)'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'phone', 'name': 'spouse_work_phone', 'label': 'Work Phone'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'phone', 'name': 'spouse_cell_phone', 'label': 'Cell/Other Phone'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'text', 'name': 'spouse_occupation', 'label': 'Occupation'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'email', 'name': 'spouse_email', 'label': 'Email'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'yes_no', 'name': 'spouse_legally_blind', 'label': 'Legally Blind?'},
+            {'section_key': 'spouse', 'legacy_section': 'Spouse Information', 'type': 'yes_no', 'name': 'spouse_dependent', 'label': 'Dependent of Other?'},
+
             # Filing Status
-            {'section': 'Filing Status', 'type': 'section_header', 'name': 'filing_header', 'label': 'Filing Status'},
-            {'section': 'Filing Status', 'type': 'radio', 'name': 'filing_status', 'label': 'Filing Status', 'required': True, 
+            {'section_key': 'filing_status', 'legacy_section': 'Filing Status', 'type': 'radio', 'name': 'filing_status', 'label': 'Filing Status', 'required': True,
              'options': ['Single', 'Married Filing Joint', 'Married Filing Separately', 'Head of Household', 'Qualifying Widow(er)']},
-            {'section': 'Filing Status', 'type': 'date', 'name': 'marriage_date', 'label': 'Marriage Date (if applicable)'},
-            {'section': 'Filing Status', 'type': 'text', 'name': 'household_head', 'label': 'Head of Household'},
-            {'section': 'Filing Status', 'type': 'yes_no', 'name': 'qualifying_widower', 'label': 'Qualifying Widower?'},
-            
+            {'section_key': 'filing_status', 'legacy_section': 'Filing Status', 'type': 'date', 'name': 'marriage_date', 'label': 'Marriage Date (if applicable)'},
+            {'section_key': 'filing_status', 'legacy_section': 'Filing Status', 'type': 'text', 'name': 'household_head', 'label': 'Head of Household'},
+            {'section_key': 'filing_status', 'legacy_section': 'Filing Status', 'type': 'yes_no', 'name': 'qualifying_widower', 'label': 'Qualifying Widower?'},
+
             # Address
-            {'section': 'Address', 'type': 'section_header', 'name': 'address_header', 'label': 'Address Information'},
-            {'section': 'Address', 'type': 'text', 'name': 'street_apt_no', 'label': 'Street & Apt. No.', 'required': True},
-            {'section': 'Address', 'type': 'text', 'name': 'city', 'label': 'City', 'required': True},
-            {'section': 'Address', 'type': 'text', 'name': 'state', 'label': 'State', 'required': True},
-            {'section': 'Address', 'type': 'text', 'name': 'zip', 'label': 'Zip Code', 'required': True},
-            {'section': 'Address', 'type': 'text', 'name': 'county', 'label': 'County'},
-            
+            {'section_key': 'address', 'legacy_section': 'Address', 'type': 'text', 'name': 'street_apt_no', 'label': 'Street & Apt. No.', 'required': True},
+            {'section_key': 'address', 'legacy_section': 'Address', 'type': 'text', 'name': 'city', 'label': 'City', 'required': True},
+            {'section_key': 'address', 'legacy_section': 'Address', 'type': 'text', 'name': 'state', 'label': 'State', 'required': True},
+            {'section_key': 'address', 'legacy_section': 'Address', 'type': 'text', 'name': 'zip', 'label': 'Zip Code', 'required': True},
+            {'section_key': 'address', 'legacy_section': 'Address', 'type': 'text', 'name': 'county', 'label': 'County'},
+
             # Dependents
-            {'section': 'Dependents', 'type': 'section_header', 'name': 'dependents_header', 'label': 'Dependents Information'},
-            {'section': 'Dependents', 'type': 'textarea', 'name': 'dependents_info', 'label': 'List all dependents (Name, DOB, SSN, Relationship)', 'help': 'Format: First, Middle Initial, Last Name | D.O.B | Social Security Number | Relationship'},
-            
+            {'section_key': 'dependents', 'legacy_section': 'Dependents', 'type': 'textarea', 'name': 'dependents_info', 'label': 'List all dependents (Name, DOB, SSN, Relationship)', 'help': 'Format: First, Middle Initial, Last Name | D.O.B | Social Security Number | Relationship'},
+
             # Affordable Care Act
-            {'section': 'Affordable Care Act', 'type': 'section_header', 'name': 'aca_header', 'label': 'Affordable Care Act Information'},
-            {'section': 'Affordable Care Act', 'type': 'yes_no', 'name': 'health_insurance_all_year', 'label': 'Did everyone on this tax return have health insurance all 12 months last year?', 'required': True},
-            {'section': 'Affordable Care Act', 'type': 'textarea', 'name': 'insurance_details', 'label': 'If no, were you exempt and/or did you pay the shared responsibility fee? Please explain.'},
-            
+            {'section_key': 'affordable_care_act', 'legacy_section': 'Affordable Care Act', 'type': 'yes_no', 'name': 'health_insurance_all_year', 'label': 'Did everyone on this tax return have health insurance all 12 months last year?', 'required': True},
+            {'section_key': 'affordable_care_act', 'legacy_section': 'Affordable Care Act', 'type': 'textarea', 'name': 'insurance_details', 'label': 'If no, were you exempt and/or did you pay the shared responsibility fee? Please explain.'},
+
             # Signature
-            {'section': 'Signature', 'type': 'section_header', 'name': 'signature_header', 'label': 'Electronic Signature'},
-            {'section': 'Signature', 'type': 'signature', 'name': 'taxpayer_signature', 'label': 'Taxpayer Electronic Signature', 'required': True},
-            {'section': 'Signature', 'type': 'date', 'name': 'signature_date', 'label': 'Date', 'required': True},
+            {'section_key': 'signature', 'legacy_section': 'Signature', 'type': 'signature', 'name': 'taxpayer_signature', 'label': 'Taxpayer Electronic Signature', 'required': True},
+            {'section_key': 'signature', 'legacy_section': 'Signature', 'type': 'date', 'name': 'signature_date', 'label': 'Date', 'required': True},
         ]
-        
-        self.create_form_fields(form, fields_data)
+
+        self.create_form_fields(form, fields_data, section_lookup=section_lookup)
         self.stdout.write(f'Created Tax Intake Form with {len(fields_data)} fields')
     
     def create_schedule_c_form(self, user):
@@ -428,15 +455,24 @@ class Command(BaseCommand):
         self.create_form_fields(form, fields_data, reset_missing=True)
         self.stdout.write(f'Created Due Diligence Form with {len(fields_data)} fields')
     
-    def create_form_fields(self, form, fields_data, reset_missing=False):
+    def create_form_fields(self, form, fields_data, section_lookup=None, reset_missing=False):
         """Helper method to create or update form fields"""
         desired_names = {field_data['name'] for field_data in fields_data}
-        
+
         for i, field_data in enumerate(fields_data):
+            section_obj = None
+            if section_lookup and field_data.get('section_key'):
+                section_obj = section_lookup.get(field_data['section_key'])
+
+            legacy_section = field_data.get('legacy_section') or field_data.get('section', '')
+            if not legacy_section and section_obj:
+                legacy_section = section_obj.title
+
             defaults = {
                 'field_type': field_data['type'],
                 'field_label': field_data['label'],
-                'section': field_data.get('section', ''),
+                'section': section_obj,
+                'section_name': legacy_section,
                 'is_required': field_data.get('required', False),
                 'help_text': field_data.get('help', ''),
                 'field_options': field_data.get('options', []),

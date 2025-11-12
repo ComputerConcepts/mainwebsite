@@ -294,83 +294,70 @@
         {% csrf_token %}
         
         <!-- Form Fields -->
-        {% regroup form_fields by section as sections_list %}
         {% tax_required_sections as required_sections %}
 
-        {% for section in required_sections %}
-        {% with current_fields=sections_list|section_fields:section.aliases %}
-        <div class="form-section tax-section tax-section-{{ section.slug }}">
-            <div class="section-header mb-3">
-                <h4 class="mb-0 text-primary">{{ section.label }}</h4>
-            </div>
+        {% for canonical in canonical_sections %}
+            {% if canonical.fields %}
+                <div class="form-section tax-section tax-section-{{ canonical.slug }}">
+                    <div class="section-header mb-3">
+                        <h4 class="mb-0 text-primary">{{ canonical.display_title }}</h4>
+                    </div>
 
-            {% if current_fields %}
-                {% if section.slug == 'taxpayer' %}
-                    {% include 'tax/admin/partials/section_taxpayer.html' with fields=current_fields %}
-                {% elif section.slug == 'spouse' %}
-                    {% include 'tax/admin/partials/section_spouse.html' with fields=current_fields %}
-                {% elif section.slug == 'filing-status' %}
-                    {% include 'tax/admin/partials/section_filing_status.html' with fields=current_fields %}
-                {% elif section.slug == 'address' %}
-                    {% include 'tax/admin/partials/section_address.html' with fields=current_fields %}
-                {% elif section.slug == 'dependents' %}
-                    {% include 'tax/admin/partials/section_dependents.html' with fields=current_fields %}
-                {% elif section.slug == 'affordable-care-act' %}
-                    {% include 'tax/admin/partials/section_affordable-care-act.html' with fields=current_fields %}
-                {% else %}
-                    {% for field in current_fields %}
+                    {% if canonical.slug == 'taxpayer' %}
+                        {% include 'tax/admin/partials/section_taxpayer.html' with fields=canonical.fields %}
+                    {% elif canonical.slug == 'spouse' %}
+                        {% include 'tax/admin/partials/section_spouse.html' with fields=canonical.fields %}
+                    {% elif canonical.slug == 'filing-status' %}
+                        {% include 'tax/admin/partials/section_filing_status.html' with fields=canonical.fields %}
+                    {% elif canonical.slug == 'address' %}
+                        {% include 'tax/admin/partials/section_address.html' with fields=canonical.fields %}
+                    {% elif canonical.slug == 'dependents' %}
+                        {% include 'tax/admin/partials/section_dependents.html' with fields=canonical.fields %}
+                    {% elif canonical.slug == 'affordable-care-act' %}
+                        {% include 'tax/admin/partials/section_affordable-care-act.html' with fields=canonical.fields %}
+                    {% else %}
+                        {% for field in canonical.fields %}
+                            {% include 'tax/admin/partials/dynamic_field.html' %}
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        {% if remaining_sections %}
+            {% for section in remaining_sections %}
+                {% if section.fields %}
+                <div class="form-section">
+                    <div class="section-header mb-3">
+                        <h4 class="mb-0 text-primary">{{ section.title|default:'Additional Information' }}</h4>
+                    </div>
+                    {% if section.description %}
+                        <p class="text-muted mb-3">{{ section.description }}</p>
+                    {% endif %}
+                    {% for field in section.fields %}
                         {% include 'tax/admin/partials/dynamic_field.html' %}
                     {% endfor %}
-                {% endif %}
-            {% else %}
-                {% with fallback_fields=form_fields|section_fallback_fields:section.slug %}
-                    {% if fallback_fields %}
-                        {% if section.slug == 'taxpayer' %}
-                            {% include 'tax/admin/partials/section_taxpayer.html' with fields=fallback_fields %}
-                        {% elif section.slug == 'spouse' %}
-                            {% include 'tax/admin/partials/section_spouse.html' with fields=fallback_fields %}
-                        {% elif section.slug == 'filing-status' %}
-                            {% include 'tax/admin/partials/section_filing_status.html' with fields=fallback_fields %}
-                        {% elif section.slug == 'address' %}
-                            {% include 'tax/admin/partials/section_address.html' with fields=fallback_fields %}
-                        {% elif section.slug == 'dependents' %}
-                            {% include 'tax/admin/partials/section_dependents.html' with fields=fallback_fields %}
-                        {% elif section.slug == 'affordable-care-act' %}
-                            {% include 'tax/admin/partials/section_affordable-care-act.html' with fields=fallback_fields %}
-                        {% else %}
-                            {% for field in fallback_fields %}
-                                {% include 'tax/admin/partials/dynamic_field.html' %}
-                            {% endfor %}
-                        {% endif %}
-                    {% else %}
-                        <p class="section-placeholder">
-                            No fields have been configured for this intake section yet.
-                        </p>
-                    {% endif %}
-                {% endwith %}
-            {% endif %}
-        </div>
-        {% endwith %}
-        {% endfor %}
-
-        {% for section in sections_list %}
-            {% if section.grouper and not section.grouper|is_required_section:required_sections %}
-            <div class="form-section">
-                <div class="section-header mb-3">
-                    <h4 class="mb-0 text-primary">{{ section.grouper }}</h4>
                 </div>
-                {% for field in section.list %}
-                    {% include 'tax/admin/partials/dynamic_field.html' %}
-                {% endfor %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+
+        {% if ungrouped_fields %}
+        <div class="form-section">
+            <div class="section-header mb-3">
+                <h4 class="mb-0 text-primary">Ungrouped Fields</h4>
             </div>
-            {% elif not section.grouper %}
-            <div class="form-section">
-                {% for field in section.list %}
-                    {% include 'tax/admin/partials/dynamic_field.html' %}
-                {% endfor %}
-            </div>
-            {% endif %}
-        {% endfor %}
+            {% for field in ungrouped_fields %}
+                {% include 'tax/admin/partials/dynamic_field.html' %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if not has_form_fields %}
+        <div class="alert alert-info">
+            No fields have been configured for this form yet.
+        </div>
+        {% endif %}
 
         <!-- Employee Completion Section -->
         <div class="form-section">

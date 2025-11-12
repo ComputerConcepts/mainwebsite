@@ -6,7 +6,9 @@ from django.db.models import Count
 from .models import (
     ContactForm, Events, Invoice, Ticket, Employee, Career, JobPosting,
     FileFolder, FileDocument, FileVersion, FileShare, FileActivity,
-    BoardShare, BoardActivity
+    BoardShare, BoardActivity,
+    TaxFormTemplate, TaxFormSection, TaxFormField, TaxClient, TaxClientWaiver,
+    TaxFormAssignment, TaxFormSubmission, TaxDocument
 )
 from .models import (
     OnboardingAssessment, OnboardingAssessmentQuestion,
@@ -741,3 +743,113 @@ class BoardActivityAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('board', 'user__user')
+
+
+# Tax Preparation Admin
+@admin.register(TaxFormTemplate)
+class TaxFormTemplateAdmin(admin.ModelAdmin):
+    list_display = ['name', 'form_type', 'is_active', 'requires_signature', 'created_by', 'created_at']
+    list_filter = ['form_type', 'is_active', 'requires_signature', 'created_at']
+    search_fields = ['name', 'description']
+    readonly_fields = ['id', 'created_at', 'updated_at']
+    date_hierarchy = 'created_at'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('created_by')
+
+
+@admin.register(TaxFormSection)
+class TaxFormSectionAdmin(admin.ModelAdmin):
+    list_display = ['title', 'tax_form', 'order', 'is_active', 'is_collapsible']
+    list_filter = ['is_active', 'is_collapsible', 'tax_form']
+    search_fields = ['title', 'description', 'tax_form__name']
+    readonly_fields = ['id']
+    ordering = ['tax_form', 'order']
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('tax_form')
+
+
+@admin.register(TaxFormField)
+class TaxFormFieldAdmin(admin.ModelAdmin):
+    list_display = ['field_label', 'field_name', 'tax_form', 'section', 'field_type', 'is_required', 'is_active', 'order']
+    list_filter = ['field_type', 'is_required', 'is_active', 'tax_form']
+    search_fields = ['field_name', 'field_label', 'tax_form__name', 'section__title']
+    readonly_fields = ['id']
+    ordering = ['tax_form', 'section', 'order']
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('tax_form', 'section')
+
+
+@admin.register(TaxClient)
+class TaxClientAdmin(admin.ModelAdmin):
+    list_display = ['full_name', 'email', 'phone', 'filing_status', 'is_active', 'created_by', 'created_at']
+    list_filter = ['is_active', 'filing_status', 'created_at']
+    search_fields = ['first_name', 'last_name', 'email', 'phone', 'ssn']
+    readonly_fields = ['id', 'created_at', 'updated_at', 'last_login']
+    date_hierarchy = 'created_at'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('created_by')
+
+
+@admin.register(TaxClientWaiver)
+class TaxClientWaiverAdmin(admin.ModelAdmin):
+    list_display = ['client', 'client_signed', 'signed_at', 'employee_witnessed', 'witnessed_by', 'witnessed_at']
+    list_filter = ['client_signed', 'employee_witnessed', 'signed_at']
+    search_fields = ['client__first_name', 'client__last_name', 'client__email']
+    readonly_fields = ['signed_at', 'witnessed_at']
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('client', 'witnessed_by')
+
+
+@admin.register(TaxFormAssignment)
+class TaxFormAssignmentAdmin(admin.ModelAdmin):
+    list_display = ['client', 'tax_form', 'status', 'assigned_by', 'assigned_at', 'due_date', 'completed_at']
+    list_filter = ['status', 'assigned_at', 'due_date']
+    search_fields = ['client__first_name', 'client__last_name', 'client__email', 'tax_form__name']
+    readonly_fields = ['id', 'assigned_at', 'first_accessed', 'last_activity', 'completed_at']
+    date_hierarchy = 'assigned_at'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('client', 'tax_form', 'assigned_by')
+
+
+@admin.register(TaxFormSubmission)
+class TaxFormSubmissionAdmin(admin.ModelAdmin):
+    list_display = ['get_client', 'get_form', 'review_status', 'submitted_at', 'reviewed_by', 'reviewed_at']
+    list_filter = ['review_status', 'submitted_at', 'reviewed_at']
+    search_fields = ['assignment__client__first_name', 'assignment__client__last_name', 'assignment__tax_form__name']
+    readonly_fields = ['id', 'submitted_at', 'reviewed_at', 'ip_address', 'user_agent']
+    date_hierarchy = 'submitted_at'
+    
+    def get_client(self, obj):
+        return obj.assignment.client.full_name
+    get_client.short_description = 'Client'
+    get_client.admin_order_field = 'assignment__client__last_name'
+    
+    def get_form(self, obj):
+        return obj.assignment.tax_form.name
+    get_form.short_description = 'Form'
+    get_form.admin_order_field = 'assignment__tax_form__name'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('assignment__client', 'assignment__tax_form', 'reviewed_by')
+
+
+@admin.register(TaxDocument)
+class TaxDocumentAdmin(admin.ModelAdmin):
+    list_display = ['file_name', 'document_type', 'get_client', 'uploaded_at', 'file_size']
+    list_filter = ['document_type', 'uploaded_at']
+    search_fields = ['file_name', 'description', 'submission__assignment__client__first_name', 'submission__assignment__client__last_name']
+    readonly_fields = ['id', 'uploaded_at', 'file_size', 'mime_type']
+    date_hierarchy = 'uploaded_at'
+    
+    def get_client(self, obj):
+        return obj.submission.assignment.client.full_name
+    get_client.short_description = 'Client'
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('submission__assignment__client')

@@ -1921,6 +1921,33 @@ class TaxFormTemplate(models.Model):
         return f"{self.name} ({self.get_form_type_display()})"
 
 
+class TaxFormSection(models.Model):
+    """Sections within tax form templates to organize fields"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tax_form = models.ForeignKey(TaxFormTemplate, on_delete=models.CASCADE, related_name='sections')
+    
+    # Section definition
+    title = models.CharField(max_length=200, help_text="Section title (e.g., 'Personal Information')")
+    description = models.TextField(blank=True, help_text="Optional description or instructions for this section")
+    
+    # Layout and display
+    order = models.IntegerField(default=0, help_text="Display order within the form")
+    is_collapsible = models.BooleanField(default=False, help_text="Can this section be collapsed/expanded?")
+    is_expanded_by_default = models.BooleanField(default=True, help_text="Is section expanded by default?")
+    is_active = models.BooleanField(default=True)
+    
+    # Styling
+    show_border = models.BooleanField(default=True, help_text="Show border around section")
+    background_color = models.CharField(max_length=20, blank=True, help_text="Optional background color (e.g., '#f5f5f5')")
+    
+    class Meta:
+        ordering = ['tax_form', 'order', 'id']
+        unique_together = ['tax_form', 'title']
+    
+    def __str__(self):
+        return f"{self.tax_form.name} - {self.title}"
+
+
 class TaxFormField(models.Model):
     """Fields within tax form templates"""
     FIELD_TYPE_CHOICES = [
@@ -1944,9 +1971,26 @@ class TaxFormField(models.Model):
         ('table', 'Data Table'),
         ('yes_no', 'Yes/No Radio'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tax_form = models.ForeignKey(TaxFormTemplate, on_delete=models.CASCADE, related_name='fields')
+    
+    # Section relationship - fields can belong to a section or be independent
+    section = models.ForeignKey(
+        'TaxFormSection', 
+        on_delete=models.CASCADE, 
+        related_name='fields',
+        null=True, 
+        blank=True,
+        help_text="Section this field belongs to (leave blank for independent fields)"
+    )
+    
+    # Legacy section name for backward compatibility
+    section_name = models.CharField(
+        max_length=100, 
+        blank=True, 
+        help_text="Legacy section name (deprecated - use section relationship instead)"
+    )
     
     # Field definition
     field_type = models.CharField(max_length=20, choices=FIELD_TYPE_CHOICES)
@@ -1965,10 +2009,9 @@ class TaxFormField(models.Model):
     
     # Options for select/radio/checkbox fields
     field_options = models.JSONField(default=list, help_text="Options for select/radio/checkbox fields")
-    
+
     # Layout and display
-    section = models.CharField(max_length=100, blank=True, help_text="Section name for grouping")
-    order = models.IntegerField(default=0, help_text="Display order within section")
+    order = models.IntegerField(default=0, help_text="Display order within section or form")
     column_width = models.CharField(max_length=20, default='full', choices=[
         ('full', 'Full Width'),
         ('half', 'Half Width'),

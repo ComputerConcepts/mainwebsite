@@ -22,6 +22,7 @@ import uuid
 import os
 import logging
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 # PDF generation imports
 from reportlab.lib.pagesizes import letter, A4
@@ -33,9 +34,10 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from io import BytesIO
 
 from .models import (
-    TaxFormTemplate, TaxFormField, TaxClient, TaxClientWaiver, TaxFormAssignment, 
+    TaxFormTemplate, TaxFormSection, TaxFormField, TaxClient, TaxClientWaiver, TaxFormAssignment,
     TaxFormSubmission, TaxDocument
 )
+from pages.templatetags import tax_extras
 
 
 # =============================================================================
@@ -287,7 +289,10 @@ def create_tax_form_template(request):
 def edit_tax_form_template(request, template_id):
     """Edit tax form template and its fields"""
     template = get_object_or_404(TaxFormTemplate, id=template_id)
-    fields = template.fields.filter(is_active=True).order_by('section', 'order')
+    
+    # Get sections and fields
+    sections = template.sections.filter(is_active=True).order_by('order')
+    independent_fields = template.fields.filter(is_active=True, section__isnull=True).order_by('order')
     
     if request.method == 'POST':
         # Update template info
@@ -305,9 +310,9 @@ def edit_tax_form_template(request, template_id):
     
     context = {
         'template': template,
-        'fields': fields,
+        'sections': sections,
+        'independent_fields': independent_fields,
         'field_type_choices': field_type_choices,
-        'sections': list(set(f.section for f in fields if f.section)),
     }
     
     return render(request, 'tax/admin/edit_template.html', context)
@@ -345,14 +350,23 @@ def add_form_field(request, template_id):
                 if options_text:
                     field_options = [opt.strip() for opt in options_text.split('\\n') if opt.strip()]
             
+            # Get section if specified
+            section_id = request.POST.get('section_id', '').strip()
+            section = None
+            if section_id:
+                try:
+                    section = TaxFormSection.objects.get(id=section_id, tax_form=template)
+                except TaxFormSection.DoesNotExist:
+                    pass
+            
             field = TaxFormField.objects.create(
                 tax_form=template,
+                section=section,
                 field_type=request.POST['field_type'],
                 field_name=request.POST['field_name'],
                 field_label=request.POST['field_label'],
                 placeholder=request.POST.get('placeholder', ''),
                 help_text=request.POST.get('help_text', ''),
-                section=request.POST.get('section', ''),
                 is_required=request.POST.get('is_required') == 'on',
                 field_options=field_options,
                 order=int(request.POST.get('order', 0)),
@@ -368,6 +382,130 @@ def add_form_field(request, template_id):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+def add_form_section(request, template_id):
+    """Add a section to a tax form template"""
+    template = get_object_or_404(TaxFormTemplate, id=template_id)
+    
+    if request.method == 'POST':
+        try:
+            section = TaxFormSection.objects.create(
+                tax_form=template,
+                title=request.POST['title'],
+                description=request.POST.get('description', ''),
+                order=int(request.POST.get('order', 0)),
+                is_collapsible=request.POST.get('is_collapsible') == 'on',
+                is_expanded_by_default=request.POST.get('is_expanded_by_default', 'on') == 'on',
+                show_border=request.POST.get('show_border', 'on') == 'on',
+                background_color=request.POST.get('background_color', ''),
+            )
+            
+            return JsonResponse({
+                'success': True, 
+                'section_id': str(section.id),
+                'section_title': section.title
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+@require_POST
+def edit_form_section(request, section_id):
+    """Edit a tax form section"""
+    section = get_object_or_404(TaxFormSection, id=section_id)
+    
+    try:
+        section.title = request.POST.get('title', section.title)
+        section.description = request.POST.get('description', section.description)
+        section.order = int(request.POST.get('order', section.order))
+        section.is_collapsible = request.POST.get('is_collapsible') == 'on'
+        section.is_expanded_by_default = request.POST.get('is_expanded_by_default') == 'on'
+        section.show_border = request.POST.get('show_border') == 'on'
+        section.background_color = request.POST.get('background_color', '')
+        section.save()
+        
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+@require_POST
+def delete_form_section(request, section_id):
+    """Soft delete a form section and its fields"""
+    section = get_object_or_404(TaxFormSection, id=section_id)
+    
+    try:
+        # Soft delete the section
+        section.is_active = False
+        section.save(update_fields=['is_active'])
+        
+        # Also soft delete all fields in this section
+        section.fields.update(is_active=False)
+        
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+@require_POST
+def reorder_sections(request):
+    """Reorder sections within a form"""
+    try:
+        data = json.loads(request.body)
+        section_orders = data.get('section_orders', [])
+        
+        for item in section_orders:
+            section_id = item.get('id')
+            order = item.get('order')
+            
+            if section_id and order is not None:
+                TaxFormSection.objects.filter(id=section_id).update(order=order)
+        
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+@require_POST
+def move_field_to_section(request, field_id):
+    """Move a field to a different section or make it independent"""
+    field = get_object_or_404(TaxFormField, id=field_id)
+    
+    try:
+        data = json.loads(request.body)
+        section_id = data.get('section_id')
+        
+        if section_id:
+            # Move to section
+            section = get_object_or_404(TaxFormSection, id=section_id, tax_form=field.tax_form)
+            field.section = section
+        else:
+            # Make independent
+            field.section = None
+        
+        field.save(update_fields=['section'])
+        
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 
 @login_required
@@ -719,12 +857,17 @@ def employee_fill_form(request, assignment_id):
     if submission and submission.form_data:
         existing_values = submission.form_data
     
-    for field in assignment.tax_form.fields.filter(is_active=True).order_by('section', 'order', 'id'):
+    tax_form_fields = assignment.tax_form.fields.filter(is_active=True).select_related('section').order_by('section__order', 'order', 'id')
+    for field in tax_form_fields:
         # Skip signature fields - these are only for client signing, not employee filling
         # Also skip section headers as they are just for organization/display
         if field.field_type in ['signature', 'electronic_signature', 'section_header']:
             continue
-            
+
+        section_obj = field.section
+        section_id = str(section_obj.id) if section_obj else ''
+        section_title = section_obj.title if section_obj else (field.section_name or '')
+
         field_data = {
             'id': field.id,
             'field_name': field.field_name,
@@ -735,14 +878,91 @@ def employee_fill_form(request, assignment_id):
             'placeholder': field.placeholder,
             'field_options': field.field_options,
             'current_value': existing_values.get(field.field_name, ''),
+            'section_id': section_id,
+            'section_title': section_title.strip(),
         }
         form_fields.append(field_data)
-    
+
+    # Organize sections and fields for structured rendering
+    sections = list(assignment.tax_form.sections.filter(is_active=True).order_by('order', 'title'))
+    fields_by_section = defaultdict(list)
+    legacy_sections = defaultdict(list)
+    ungrouped_fields = []
+
+    for field in form_fields:
+        if field['section_id']:
+            fields_by_section[field['section_id']].append(field)
+        elif field['section_title']:
+            legacy_sections[field['section_title']].append(field)
+        else:
+            ungrouped_fields.append(field)
+
+    canonical_sections_ctx = []
+    used_section_ids = set()
+    used_legacy_titles = set()
+
+    for meta in tax_extras.SECTION_METADATA:
+        alias_set = {alias.strip().lower() for alias in meta['aliases']}
+        matched_title = meta['label']
+        matched_fields = []
+
+        matched_section = next(
+            (section for section in sections
+             if section.id not in used_section_ids
+             and section.title
+             and section.title.strip().lower() in alias_set),
+            None
+        )
+
+        if matched_section:
+            matched_title = matched_section.title
+            matched_fields = fields_by_section.get(str(matched_section.id), [])
+            used_section_ids.add(matched_section.id)
+        else:
+            for title, fields in legacy_sections.items():
+                if title in used_legacy_titles:
+                    continue
+                if title.strip().lower() in alias_set:
+                    matched_title = title
+                    matched_fields = fields
+                    used_legacy_titles.add(title)
+                    break
+
+        canonical_sections_ctx.append({
+            'slug': meta['slug'],
+            'label': meta['label'],
+            'display_title': matched_title,
+            'fields': matched_fields,
+        })
+
+    remaining_sections = []
+    for section in sections:
+        if section.id in used_section_ids:
+            continue
+        remaining_sections.append({
+            'title': section.title,
+            'description': section.description,
+            'fields': fields_by_section.get(str(section.id), []),
+        })
+
+    for title, fields in legacy_sections.items():
+        if title in used_legacy_titles:
+            continue
+        remaining_sections.append({
+            'title': title,
+            'description': '',
+            'fields': fields,
+        })
+
     context = {
         'assignment': assignment,
         'client': assignment.client,
         'tax_form': assignment.tax_form,
         'form_fields': form_fields,
+        'canonical_sections': canonical_sections_ctx,
+        'remaining_sections': remaining_sections,
+        'ungrouped_fields': ungrouped_fields,
+        'has_form_fields': bool(form_fields),
         'submission': submission,
         'is_employee_filling': True,
         'enforce_field_requirements': False,
