@@ -1,0 +1,82 @@
+{% load tax_extras %}
+{% if fields %}
+<div class="structured-section">
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'taxpayer_ssn|social security' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Social Security Number' extra_classes='inline-field full-width' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'taxpayer_first_name' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='First Name' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'taxpayer_mi|middle initial' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='MI' extra_classes='inline-field small-width' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'taxpayer_last_name' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Last Name' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'taxpayer_dob|date of birth' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Date of Birth' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'taxpayer_death_date|date of death' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Date of Death' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'taxpayer_work_phone' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Work Phone' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'taxpayer_cell_phone|cell/other phone' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Cell/Other Phone' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'taxpayer_occupation' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Occupation' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'taxpayer_email' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Email' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'taxpayer_legally_blind' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Legally Blind?' extra_classes='inline-field third-width' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'taxpayer_dependent' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Dependent of Other?' extra_classes='inline-field third-width' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+</div>
+{% endif %}

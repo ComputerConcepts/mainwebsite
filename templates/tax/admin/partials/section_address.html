@@ -1,0 +1,38 @@
+{% load tax_extras %}
+{% if fields %}
+<div class="structured-section">
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'street_apt_no|street' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Street & Apt. No.' extra_classes='inline-field full-width' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'city' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='City' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'state' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='State' extra_classes='inline-field third-width' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'zip' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Zip' extra_classes='inline-field third-width' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'county' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='County' extra_classes='inline-field third-width' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+</div>
+{% endif %}

@@ -1,0 +1,30 @@
+{% load tax_extras %}
+{% if fields %}
+<div class="structured-section">
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'filing_status' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Select Filing Status' extra_classes='inline-field full-width' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'marriage_date' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Marriage Date (if applicable)' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'household_head' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Head of Household' extra_classes='inline-field' %}
+            {% endif %}
+        {% endwith %}
+        {% with field=fields|field_lookup:'qualifying_widower' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Qualifying Widower?' extra_classes='inline-field third-width' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+</div>
+{% endif %}

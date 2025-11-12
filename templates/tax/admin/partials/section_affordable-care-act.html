@@ -1,0 +1,25 @@
+{% load tax_extras %}
+{% if fields %}
+<div class="structured-section">
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'health_insurance_all_year|health insurance' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Did everyone have health insurance all 12 months last year?' extra_classes='inline-field full-width' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+    <div class="inline-row">
+        {% with field=fields|field_lookup:'insurance_details|shared responsibility' %}
+            {% if field %}
+                {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='If no, please explain exemptions or coverage details' extra_classes='inline-field full-width' %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    {% for field in fields %}
+        {% if field.field_name not in ('health_insurance_all_year', 'insurance_details') %}
+            {% include 'tax/admin/partials/dynamic_field.html' %}
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}

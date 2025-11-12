@@ -1,0 +1,19 @@
+{% load tax_extras %}
+{% if fields %}
+<div class="structured-section">
+    <p class="field-description mb-2">
+        First, Middle initial, Last Name &nbsp;|&nbsp; Date of Birth &nbsp;|&nbsp; Social Security Number &nbsp;|&nbsp; Relationship
+    </p>
+    {% with field=fields|field_lookup:'dependents_info|list all dependents' %}
+        {% if field %}
+            {% include 'tax/admin/partials/dynamic_field.html' with field=field custom_label='Dependents' extra_classes='inline-field full-width' %}
+        {% endif %}
+    {% endwith %}
+
+    {% for field in fields %}
+        {% if field.field_name != 'dependents_info' %}
+            {% include 'tax/admin/partials/dynamic_field.html' %}
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}

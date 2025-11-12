@@ -1,4 +1,8 @@
-{% if field.field_type == 'signature' %}
+{% if not field %}
+    <div class="form-field missing-field">
+        <label class="field-label text-muted">Field unavailable</label>
+    </div>
+{% elif field.field_type == 'signature' %}
     {% comment %}Signatures captured later by clients{% endcomment %}
 {% elif field.field_type == 'section_header' %}
     <div class="section-header">
@@ -8,13 +12,16 @@
         {% endif %}
     </div>
 {% else %}
-<div class="form-field">
+{% with display_label=custom_label|default:field.field_label %}
+<div class="form-field {{ extra_classes }}">
+    {% if not hide_label %}
     <label class="field-label">
-        {{ field.field_label }}
+        {{ display_label }}
         {% if enforce_required and field.is_required %}
             <span class="required-field">*</span>
         {% endif %}
     </label>
+    {% endif %}
 
     {% if field.help_text %}
     <div class="field-description">{{ field.help_text }}</div>
@@ -184,3 +191,4 @@
     {% endif %}
 </div>
 {% endif %}
+{% endwith %}

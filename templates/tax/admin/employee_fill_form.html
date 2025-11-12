@@ -119,6 +119,40 @@
     font-style: italic;
 }
 
+.structured-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.inline-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+}
+
+.inline-field {
+    flex: 1 1 45%;
+    min-width: 220px;
+}
+
+.inline-field.full-width {
+    flex-basis: 100%;
+}
+
+.inline-field.third-width {
+    flex: 1 1 28%;
+}
+
+.inline-field.small-width {
+    flex: 0 0 140px;
+}
+
+.missing-field .field-label {
+    color: #999;
+}
+
 .section-placeholder {
     font-size: 0.85rem;
     font-style: italic;
@@ -263,24 +297,38 @@
         {% regroup form_fields by section as sections_list %}
         {% tax_required_sections as required_sections %}
 
-        {% for slug,label in required_sections %}
-        <div class="form-section tax-section tax-section-{{ slug }}">
+        {% for section in required_sections %}
+        {% with current_fields=sections_list|section_fields:section.aliases %}
+        <div class="form-section tax-section tax-section-{{ section.slug }}">
             <div class="section-header mb-3">
-                <h4 class="mb-0 text-primary">{{ label }}</h4>
+                <h4 class="mb-0 text-primary">{{ section.label }}</h4>
             </div>
 
-            {% with current_fields=sections_list|section_fields:label %}
-                {% if current_fields %}
+            {% if current_fields %}
+                {% if section.slug == 'taxpayer' %}
+                    {% include 'tax/admin/partials/section_taxpayer.html' with fields=current_fields %}
+                {% elif section.slug == 'spouse' %}
+                    {% include 'tax/admin/partials/section_spouse.html' with fields=current_fields %}
+                {% elif section.slug == 'filing-status' %}
+                    {% include 'tax/admin/partials/section_filing_status.html' with fields=current_fields %}
+                {% elif section.slug == 'address' %}
+                    {% include 'tax/admin/partials/section_address.html' with fields=current_fields %}
+                {% elif section.slug == 'dependents' %}
+                    {% include 'tax/admin/partials/section_dependents.html' with fields=current_fields %}
+                {% elif section.slug == 'affordable-care-act' %}
+                    {% include 'tax/admin/partials/section_affordable-care-act.html' with fields=current_fields %}
+                {% else %}
                     {% for field in current_fields %}
                         {% include 'tax/admin/partials/dynamic_field.html' %}
                     {% endfor %}
-                {% else %}
-                    <p class="section-placeholder">
-                        No fields have been configured for this intake section yet.
-                    </p>
                 {% endif %}
-            {% endwith %}
+            {% else %}
+                <p class="section-placeholder">
+                    No fields have been configured for this intake section yet.
+                </p>
+            {% endif %}
         </div>
+        {% endwith %}
         {% endfor %}
 
         {% for section in sections_list %}
