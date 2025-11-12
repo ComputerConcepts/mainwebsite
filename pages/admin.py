@@ -796,11 +796,11 @@ class TaxClientAdmin(admin.ModelAdmin):
 
 @admin.register(TaxClientWaiver)
 class TaxClientWaiverAdmin(admin.ModelAdmin):
-    list_display = ['client', 'client_signed', 'signed_at', 'employee_witnessed', 'witnessed_by', 'witnessed_at']
-    list_filter = ['client_signed', 'employee_witnessed', 'signed_at']
+    list_display = ['client', 'client_signed', 'client_signed_at', 'employee_witnessed', 'witnessed_by', 'witnessed_at']
+    list_filter = ['client_signed', 'employee_witnessed', 'client_signed_at']
     search_fields = ['client__first_name', 'client__last_name', 'client__email']
-    readonly_fields = ['signed_at', 'witnessed_at']
-    
+    readonly_fields = ['client_signed_at', 'witnessed_at']
+
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('client', 'witnessed_by')
 
