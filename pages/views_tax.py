@@ -880,6 +880,7 @@ def employee_fill_form(request, assignment_id):
             'current_value': existing_values.get(field.field_name, ''),
             'section_id': section_id,
             'section_title': section_title.strip(),
+            'section': section_title.strip(),
         }
         form_fields.append(field_data)
 
