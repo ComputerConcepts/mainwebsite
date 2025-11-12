@@ -17,7 +17,7 @@
     </div>
 
     {% for field in fields %}
-        {% if field.field_name not in ('health_insurance_all_year', 'insurance_details') %}
+        {% if field.field_name != 'health_insurance_all_year' and field.field_name != 'insurance_details' %}
             {% include 'tax/admin/partials/dynamic_field.html' %}
         {% endif %}
     {% endfor %}
