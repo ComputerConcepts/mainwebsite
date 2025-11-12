@@ -5,152 +5,251 @@
 
 {% block extra_css %}
 <style>
+.tax-intake-bg {
+    background: #f1f2f4;
+    padding: 2rem 1rem 4rem;
+}
+
+.tax-form-sheet {
+    max-width: 960px;
+    margin: 0 auto;
+    background: #fff;
+    border: 2px solid #1f1f1f;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    padding: 2.5rem 2.25rem;
+    font-family: 'Times New Roman', serif;
+}
+
+.tax-form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #1f1f1f;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+}
+
+.tax-form-title {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.tax-form-subtitle {
+    font-size: 0.95rem;
+    color: #444;
+    letter-spacing: 0.04em;
+}
+
+.tax-form-page {
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+}
+
+.tax-form-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem 2.5rem;
+    border-bottom: 1px solid #c7c7c7;
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+}
+
+.tax-form-meta span {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-right: 0.25rem;
+}
+
+.tax-form-note {
+    background: #fdf9e7;
+    border: 1px solid #d6c89c;
+    padding: 0.85rem 1rem;
+    font-size: 0.95rem;
+    margin-bottom: 1.25rem;
+    font-style: italic;
+}
+
 .form-section {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 2rem;
-    margin-bottom: 2rem;
-    border-left: 4px solid #007bff;
+    border: 1px solid #1f1f1f;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    background: white;
+}
+
+.section-header h4,
+.section-title {
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.85rem;
+    border-bottom: 1px solid #1f1f1f;
+    padding-bottom: 0.35rem;
 }
 
 .form-field {
-    margin-bottom: 1.5rem;
-    padding: 1rem;
-    background: white;
-    border-radius: 6px;
-    border: 1px solid #e3e6f0;
+    margin-bottom: 1.1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px dashed #b1b1b1;
+}
+
+.form-field:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
 }
 
 .field-label {
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 0.5rem;
+    font-weight: 700;
+    color: #111;
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
 }
 
 .field-description {
-    font-size: 0.9rem;
-    color: #6c757d;
-    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    color: #4b4b4b;
+    margin-bottom: 0.45rem;
+    font-style: italic;
 }
 
 .required-field {
-    color: #dc3545;
+    color: #a61c1c;
+}
+
+.tax-form-sheet .form-control,
+.tax-form-sheet .form-select {
+    border: none;
+    border-bottom: 1px solid #111;
+    border-radius: 0;
+    padding: 0.35rem 0.25rem;
+    font-size: 0.95rem;
+    background: transparent;
+    box-shadow: none !important;
+}
+
+.tax-form-sheet textarea.form-control {
+    border: 1px solid #111;
+    min-height: 100px;
+}
+
+.tax-form-sheet input[type="file"] {
+    border: 1px solid #111;
+    padding: 0.35rem;
+    background: transparent;
+}
+
+.tax-form-sheet .form-control:focus,
+.tax-form-sheet .form-select:focus {
+    border-bottom: 2px solid #000;
+    outline: none;
+    box-shadow: none;
+}
+
+.tax-form-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+}
+
+.tax-form-table th,
+.tax-form-table td {
+    border: 1px solid #1f1f1f;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.tax-form-table input,
+.tax-form-table select {
+    width: 100%;
+    border: none;
+    border-radius: 0;
+    font-size: 0.9rem;
+    padding: 0.25rem;
+    background: transparent;
 }
 
 .signature-pad-container {
-    border: 2px dashed #dee2e6;
-    border-radius: 8px;
-    padding: 2rem;
-    text-align: center;
-    background: #f8f9fa;
-    margin-top: 1rem;
+    border: 1px solid #1f1f1f;
+    padding: 1.25rem;
+    background: #fafafa;
 }
 
 .signature-pad {
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
+    border: 1px solid #1f1f1f;
     background: white;
-    cursor: crosshair;
-}
-
-.progress-indicator {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 2rem;
-}
-
-.client-info-card {
-    background: #e8f4fd;
-    border: 1px solid #b8daff;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
 }
 
 .form-actions {
-    position: sticky;
-    bottom: 0;
-    background: white;
-    padding: 1.5rem 0;
-    margin-top: 2rem;
-    border-top: 2px solid #e3e6f0;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    max-width: 960px;
+    margin: 2rem auto 0;
+    background: #fff;
+    padding: 1.25rem 2.25rem;
+    border: 1px solid #d4d7db;
+}
+
+.alert-info {
+    background: #e7f5ff;
+    border-color: #a6d4f5;
+    color: #0f3f63;
+}
+
+@media (max-width: 992px) {
+    .tax-form-sheet {
+        padding: 1.5rem;
+    }
+
+    .tax-form-title {
+        font-size: 1.6rem;
+    }
+
+    .tax-form-meta {
+        flex-direction: column;
+    }
 }
 </style>
 {% endblock %}
 
 {% block content %}
 {% with enforce_required=enforce_field_requirements|default:True %}
-<div class="container-fluid">
-    <!-- Header -->
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <div>
-            <h1 class="h3 mb-0 text-gray-800">
-                <i class="fas fa-edit fa-fw me-2"></i>Fill Tax Form
-            </h1>
-            <p class="text-muted mb-0">Complete {{ assignment.tax_form.name }} for {{ assignment.client.full_name }}</p>
+<div class="tax-intake-bg">
+    <div class="tax-form-sheet">
+        <div class="tax-form-header">
+            <div>
+                <div class="tax-form-title">Tax Intake Form</div>
+                <div class="tax-form-subtitle">Complete {{ assignment.tax_form.name }} for {{ assignment.client.full_name }}</div>
+            </div>
+            <div class="tax-form-page">Page - 1</div>
         </div>
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'employee_dashboard' %}">Dashboard</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'tax_admin_dashboard' %}">Tax Management</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'manage_tax_clients' %}">Clients</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'tax_client_detail' assignment.client.id %}">{{ assignment.client.full_name }}</a></li>
-                <li class="breadcrumb-item active">Fill Form</li>
-            </ol>
-        </nav>
-    </div>
 
-    <!-- Progress Indicator -->
-    <div class="progress-indicator">
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <h6 class="mb-1">
-                    <i class="fas fa-file-alt me-2"></i>{{ assignment.tax_form.name }}
-                </h6>
-                <small class="opacity-75">{{ assignment.tax_form.description }}</small>
-            </div>
-            <div class="col-md-4 text-md-end">
-                <span class="badge bg-light text-dark fs-6">
-                    Employee Filling Mode
-                </span>
-            </div>
+        <div class="tax-form-meta">
+            <div><span>Client</span>{{ assignment.client.full_name }}</div>
+            <div><span>Email</span>{{ assignment.client.email }}</div>
+            {% if assignment.client.phone %}
+            <div><span>Phone</span>{{ assignment.client.phone }}</div>
+            {% endif %}
+            <div><span>Assignment</span>{{ assignment.assigned_at|date:"M j, Y" }}</div>
+            {% if assignment.due_date %}
+            <div><span>Due Date</span>{{ assignment.due_date|date:"M j, Y" }}</div>
+            {% endif %}
+            <div><span>Status</span>{{ assignment.get_status_display }}</div>
         </div>
-    </div>
 
-    <!-- Client Information Card -->
-    <div class="client-info-card">
-        <div class="row">
-            <div class="col-md-6">
-                <h6 class="text-primary mb-2">
-                    <i class="fas fa-user me-2"></i>Client Information
-                </h6>
-                <p class="mb-1"><strong>Name:</strong> {{ assignment.client.full_name }}</p>
-                <p class="mb-1"><strong>Email:</strong> {{ assignment.client.email }}</p>
-                {% if assignment.client.phone %}
-                <p class="mb-1"><strong>Phone:</strong> {{ assignment.client.phone }}</p>
-                {% endif %}
-            </div>
-            <div class="col-md-6">
-                <h6 class="text-primary mb-2">
-                    <i class="fas fa-calendar me-2"></i>Assignment Details
-                </h6>
-                <p class="mb-1"><strong>Assigned:</strong> {{ assignment.assigned_at|date:"M j, Y g:i A" }}</p>
-                {% if assignment.due_date %}
-                <p class="mb-1"><strong>Due Date:</strong> {{ assignment.due_date|date:"M j, Y" }}</p>
-                {% endif %}
-                <p class="mb-0"><strong>Status:</strong> 
-                    <span class="badge bg-{% if assignment.status == 'completed' %}success{% elif assignment.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
-                        {{ assignment.get_status_display }}
-                    </span>
-                </p>
-            </div>
+        {% if assignment.tax_form.description %}
+        <div class="tax-form-note">
+            {{ assignment.tax_form.description }}
         </div>
-    </div>
+        {% endif %}
 
-    <form method="post" id="taxForm" enctype="multipart/form-data">
+        <form method="post" id="taxForm" enctype="multipart/form-data">
         {% csrf_token %}
         
         <!-- Form Fields -->
@@ -390,6 +489,7 @@
             </div>
         </div>
     </form>
+    </div>
 
     <!-- Action Buttons -->
     <div class="form-actions">
@@ -409,6 +509,7 @@
             </div>
         </div>
     </div>
+</div>
 {% endwith %}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/1.5.3/signature_pad.min.js"></script>
