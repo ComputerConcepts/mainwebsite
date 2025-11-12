@@ -1,5 +1,5 @@
 {% extends 'employee/base.html' %}
-{% load static tax_extras %}
+{% load static %}
 
 {% block title %}Fill Form for {{ assignment.client.full_name }} - Computer Concepts{% endblock %}
 
@@ -294,51 +294,29 @@
         {% csrf_token %}
         
         <!-- Form Fields -->
-        {% tax_required_sections as required_sections %}
-
-        {% for canonical in canonical_sections %}
-            {% if canonical.fields %}
-                <div class="form-section tax-section tax-section-{{ canonical.slug }}">
-                    <div class="section-header mb-3">
-                        <h4 class="mb-0 text-primary">{{ canonical.display_title }}</h4>
-                    </div>
-
-                    {% if canonical.slug == 'taxpayer' %}
-                        {% include 'tax/admin/partials/section_taxpayer.html' with fields=canonical.fields %}
-                    {% elif canonical.slug == 'spouse' %}
-                        {% include 'tax/admin/partials/section_spouse.html' with fields=canonical.fields %}
-                    {% elif canonical.slug == 'filing-status' %}
-                        {% include 'tax/admin/partials/section_filing_status.html' with fields=canonical.fields %}
-                    {% elif canonical.slug == 'address' %}
-                        {% include 'tax/admin/partials/section_address.html' with fields=canonical.fields %}
-                    {% elif canonical.slug == 'dependents' %}
-                        {% include 'tax/admin/partials/section_dependents.html' with fields=canonical.fields %}
-                    {% elif canonical.slug == 'affordable-care-act' %}
-                        {% include 'tax/admin/partials/section_affordable-care-act.html' with fields=canonical.fields %}
-                    {% else %}
-                        {% for field in canonical.fields %}
-                            {% include 'tax/admin/partials/dynamic_field.html' %}
-                        {% endfor %}
+        {% if section_groups %}
+            {% for section in section_groups %}
+            <div class="form-section {% if not section.show_border %}border-0{% endif %}"
+                 {% if section.background_color %}style="background-color: {{ section.background_color }};"{% endif %}>
+                {% if section.title %}
+                <div class="section-header mb-3">
+                    <h4 class="mb-0 text-primary">{{ section.title }}</h4>
+                    {% if section.description %}
+                        <div class="field-description mb-0">{{ section.description }}</div>
                     {% endif %}
                 </div>
-            {% endif %}
-        {% endfor %}
+                {% endif %}
 
-        {% if remaining_sections %}
-            {% for section in remaining_sections %}
                 {% if section.fields %}
-                <div class="form-section">
-                    <div class="section-header mb-3">
-                        <h4 class="mb-0 text-primary">{{ section.title|default:'Additional Information' }}</h4>
-                    </div>
-                    {% if section.description %}
-                        <p class="text-muted mb-3">{{ section.description }}</p>
-                    {% endif %}
                     {% for field in section.fields %}
                         {% include 'tax/admin/partials/dynamic_field.html' %}
                     {% endfor %}
-                </div>
+                {% else %}
+                    <div class="section-placeholder">
+                        No fields have been added to this section yet.
+                    </div>
                 {% endif %}
+            </div>
             {% endfor %}
         {% endif %}
 
@@ -353,7 +331,7 @@
         </div>
         {% endif %}
 
-        {% if not has_form_fields %}
+        {% if not section_groups and not ungrouped_fields %}
         <div class="alert alert-info">
             No fields have been configured for this form yet.
         </div>

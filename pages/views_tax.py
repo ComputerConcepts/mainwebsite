@@ -898,70 +898,41 @@ def employee_fill_form(request, assignment_id):
         else:
             ungrouped_fields.append(field)
 
-    canonical_sections_ctx = []
-    used_section_ids = set()
-    used_legacy_titles = set()
-
-    for meta in tax_extras.SECTION_METADATA:
-        alias_set = {alias.strip().lower() for alias in meta['aliases']}
-        matched_title = meta['label']
-        matched_fields = []
-
-        matched_section = next(
-            (section for section in sections
-             if section.id not in used_section_ids
-             and section.title
-             and section.title.strip().lower() in alias_set),
-            None
-        )
-
-        if matched_section:
-            matched_title = matched_section.title
-            matched_fields = fields_by_section.get(str(matched_section.id), [])
-            used_section_ids.add(matched_section.id)
-        else:
-            for title, fields in legacy_sections.items():
-                if title in used_legacy_titles:
-                    continue
-                if title.strip().lower() in alias_set:
-                    matched_title = title
-                    matched_fields = fields
-                    used_legacy_titles.add(title)
-                    break
-
-        canonical_sections_ctx.append({
-            'slug': meta['slug'],
-            'label': meta['label'],
-            'display_title': matched_title,
-            'fields': matched_fields,
-        })
-
-    remaining_sections = []
+    section_groups = []
     for section in sections:
-        if section.id in used_section_ids:
-            continue
-        remaining_sections.append({
+        section_groups.append({
+            'id': str(section.id),
             'title': section.title,
             'description': section.description,
+            'is_collapsible': section.is_collapsible,
+            'is_expanded_by_default': section.is_expanded_by_default,
+            'show_border': section.show_border,
+            'background_color': section.background_color,
             'fields': fields_by_section.get(str(section.id), []),
         })
 
     for title, fields in legacy_sections.items():
-        if title in used_legacy_titles:
-            continue
-        remaining_sections.append({
-            'title': title,
-            'description': '',
-            'fields': fields,
-        })
+        normalized_title = (title or '').strip()
+        if normalized_title:
+            section_groups.append({
+                'id': '',
+                'title': normalized_title,
+                'description': '',
+                'is_collapsible': False,
+                'is_expanded_by_default': True,
+                'show_border': True,
+                'background_color': '',
+                'fields': fields,
+            })
+        else:
+            ungrouped_fields.extend(fields)
 
     context = {
         'assignment': assignment,
         'client': assignment.client,
         'tax_form': assignment.tax_form,
         'form_fields': form_fields,
-        'canonical_sections': canonical_sections_ctx,
-        'remaining_sections': remaining_sections,
+        'section_groups': section_groups,
         'ungrouped_fields': ungrouped_fields,
         'has_form_fields': bool(form_fields),
         'submission': submission,
