@@ -142,13 +142,30 @@
                min="0">
 
     {% elif field.field_type == 'yes_no' %}
-        <select name="field_{{ field.id }}"
-                class="form-select"
-                {% if enforce_required and field.is_required %}required{% endif %}>
-            <option value="">Select an option...</option>
-            <option value="yes" {% if field.current_value == 'yes' %}selected{% endif %}>Yes</option>
-            <option value="no" {% if field.current_value == 'no' %}selected{% endif %}>No</option>
-        </select>
+        {% with current_value=field.current_value|default:'' %}
+        <div class="d-flex flex-wrap gap-4">
+            <div class="form-check">
+                <input type="radio"
+                       id="field_{{ field.id }}_yes"
+                       name="field_{{ field.id }}"
+                       class="form-check-input"
+                       value="Yes"
+                       {% if enforce_required and field.is_required %}required{% endif %}
+                       {% if current_value|lower == 'yes' %}checked{% endif %}>
+                <label class="form-check-label" for="field_{{ field.id }}_yes">Yes</label>
+            </div>
+            <div class="form-check">
+                <input type="radio"
+                       id="field_{{ field.id }}_no"
+                       name="field_{{ field.id }}"
+                       class="form-check-input"
+                       value="No"
+                       {% if enforce_required and field.is_required %}required{% endif %}
+                       {% if current_value|lower == 'no' %}checked{% endif %}>
+                <label class="form-check-label" for="field_{{ field.id }}_no">No</label>
+            </div>
+        </div>
+        {% endwith %}
 
     {% elif field.field_type == 'radio' %}
         <select name="field_{{ field.id }}"
