@@ -129,14 +129,14 @@
             <div class="card shadow">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
                     <h6 class="m-0 font-weight-bold text-primary">
-                        <i class="fas fa-list me-2"></i>Form Fields ({{ template.fields.count }} fields)
+                        <i class="fas fa-list me-2"></i>Form Fields ({{ active_fields|length }} fields)
                     </h6>
                     <button type="button" class="btn btn-success btn-sm" onclick="showAddFieldModal()">
                         <i class="fas fa-plus me-2"></i>Add Field
                     </button>
                 </div>
                 <div class="card-body">
-                    {% if template.fields.exists %}
+                    {% if active_fields %}
                         <div class="table-responsive">
                             <table class="table table-bordered" id="fieldsTable">
                                 <thead class="table-light">
@@ -151,7 +151,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="fieldsTableBody">
-                                    {% for field in template.fields.all %}
+                                    {% for field in active_fields %}
                                     <tr data-field-id="{{ field.id }}">
                                         <td class="text-center">
                                             <span class="badge bg-secondary">{{ field.order }}</span>

@@ -293,6 +293,7 @@ def edit_tax_form_template(request, template_id):
     # Get sections and fields
     sections = template.sections.filter(is_active=True).order_by('order')
     independent_fields = template.fields.filter(is_active=True, section__isnull=True).order_by('order')
+    active_fields = list(template.fields.filter(is_active=True).order_by('order'))
     
     if request.method == 'POST':
         # Update template info
@@ -312,6 +313,7 @@ def edit_tax_form_template(request, template_id):
         'template': template,
         'sections': sections,
         'independent_fields': independent_fields,
+        'active_fields': active_fields,
         'field_type_choices': field_type_choices,
     }
     
@@ -348,20 +350,31 @@ def add_form_field(request, template_id):
             if request.POST.get('field_options'):
                 options_text = request.POST['field_options'].strip()
                 if options_text:
-                    field_options = [opt.strip() for opt in options_text.split('\\n') if opt.strip()]
+                    field_options = [opt.strip() for opt in options_text.split('\n') if opt.strip()]
             
-            # Get section if specified
-            section_id = request.POST.get('section_id', '').strip()
+            # Determine section association
             section = None
+            section_name = ''
+            section_id = request.POST.get('section_id', '').strip()
+            section_label = (request.POST.get('section') or '').strip()
+
             if section_id:
                 try:
                     section = TaxFormSection.objects.get(id=section_id, tax_form=template)
+                    section_name = section.title
                 except TaxFormSection.DoesNotExist:
-                    pass
+                    section = None
+            elif section_label:
+                section = template.sections.filter(
+                    is_active=True,
+                    title__iexact=section_label
+                ).first()
+                section_name = section.title if section else section_label
             
             field = TaxFormField.objects.create(
                 tax_form=template,
                 section=section,
+                section_name=section_name,
                 field_type=request.POST['field_type'],
                 field_name=request.POST['field_name'],
                 field_label=request.POST['field_label'],
@@ -383,6 +396,94 @@ def add_form_field(request, template_id):
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
+
+@login_required
+@user_passes_test(is_tax_staff)
+def get_form_field(request, field_id):
+    """Return details for a specific form field"""
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=405)
+
+    field = get_object_or_404(TaxFormField, id=field_id, is_active=True)
+
+    data = {
+        'id': str(field.id),
+        'field_name': field.field_name,
+        'field_label': field.field_label,
+        'field_type': field.field_type,
+        'is_required': field.is_required,
+        'help_text': field.help_text,
+        'section_id': str(field.section_id) if field.section_id else '',
+        'section': field.section.title if field.section else field.section_name,
+        'order': field.order,
+        'field_options': field.field_options,
+    }
+
+    return JsonResponse(data)
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+@require_POST
+def update_form_field(request, field_id):
+    """Update an existing tax form field"""
+    field = get_object_or_404(TaxFormField, id=field_id)
+
+    try:
+        field.field_name = request.POST.get('field_name', field.field_name)
+        field.field_label = request.POST.get('field_label', field.field_label)
+        field.field_type = request.POST.get('field_type', field.field_type)
+        field.help_text = request.POST.get('help_text', field.help_text)
+        field.order = int(request.POST.get('order') or field.order or 0)
+        field.is_required = request.POST.get('is_required') == 'on'
+
+        options_text = (request.POST.get('field_options') or '').strip()
+        if options_text:
+            field.field_options = [opt.strip() for opt in options_text.split('\n') if opt.strip()]
+        else:
+            field.field_options = []
+
+        section_id = (request.POST.get('section_id') or '').strip()
+        section_label = (request.POST.get('section') or '').strip()
+        section = None
+        section_name = ''
+
+        if section_id:
+            try:
+                section = TaxFormSection.objects.get(id=section_id, tax_form=field.tax_form)
+                section_name = section.title
+            except TaxFormSection.DoesNotExist:
+                section = None
+        elif section_label:
+            section = field.tax_form.sections.filter(
+                is_active=True,
+                title__iexact=section_label
+            ).first()
+            section_name = section.title if section else section_label
+
+        field.section = section
+        field.section_name = section_name
+
+        field.save()
+
+        return JsonResponse({'success': True})
+    except Exception as exc:
+        return JsonResponse({'success': False, 'error': str(exc)})
+
+
+@login_required
+@user_passes_test(is_tax_staff)
+@require_POST
+def delete_form_field(request, field_id):
+    """Soft delete a tax form field"""
+    field = get_object_or_404(TaxFormField, id=field_id)
+
+    try:
+        field.is_active = False
+        field.save(update_fields=['is_active'])
+        return JsonResponse({'success': True})
+    except Exception as exc:
+        return JsonResponse({'success': False, 'error': str(exc)})
 
 @login_required
 @user_passes_test(is_tax_staff)
